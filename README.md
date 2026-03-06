@@ -1,74 +1,106 @@
-# Medical Form Digitizer
+# MedDigitizer
 
-A Streamlit-based application designed to digitize handwritten and printed medical forms using Google Gemini AI. This tool extracts data from front and back images of medical forms and presents it in a structured, editable format, saving the records to a local SQLite database.
+A Streamlit-based tool for digitizing handwritten medical health cards from Indian schools. It uses Google's Gemini vision model to extract structured data from scanned form images and stores the results in a local SQLite database.
+
+Built for [AIIMS Bathinda](https://aiimsbathinda.edu.in/) to streamline the digitization of student health records.
 
 ## Features
 
-- **Document Processing**: Supports uploading front and back images of medical forms.
-- **AI-Powered Extraction**: Utilizes Google Gemini to automatically transcribe handwritten and printed text into structured data.
-- **Manual Data Entry**: Provides a manual entry mode for creating records from scratch.
-- **Structured Data Management**: Organizes complex medical data into logical sections (Personal Details, Medical History, Health Checkup).
-- **Persistent Storage**: Automatically saves all digitized records to a local SQLite database.
-- **Record Viewer**: Includes a dedicated interface to view and review historically saved records.
+- **AI-powered extraction** — Upload front and back images of a health card; Gemini reads the handwriting and fills in a structured form automatically.
+- **Batch processing** — Upload entire folders of front-page and back-page images. Files with matching names are paired and processed concurrently (up to 4 parallel API calls).
+- **Manual entry** — Fill forms manually through a clean, tabbed interface covering personal details, medical history, vaccinations, and health checkup data.
+- **Bulk Excel/CSV import** — Download a pre-formatted template, fill it in a spreadsheet, and upload to import many records at once.
+- **Manual transcription from images** — Browse through uploaded form images side-by-side with an editable form for manual data entry.
+- **Record management** — Search, view, and delete stored records through a dashboard with structured card-style display.
+- **SQLite storage** — All records are persisted locally in `medical_forms.db`.
 
-## Prerequisites
+## Project Structure
 
-- Python 3.8 or higher
-- A Google Cloud Project with the Gemini API enabled
-- A valid Google API Key
+```
+.
+├── app.py               # Main Streamlit application (UI, routing, all tabs)
+├── gemini_client.py     # Gemini API client for image-to-JSON extraction
+├── schema.py            # Pydantic models (MedicalForm and sub-models)
+├── db.py                # SQLite database operations (CRUD)
+├── excel_handler.py     # Excel/CSV template generation and import
+├── requirements.txt     # Python dependencies
+├── .env.example         # Environment variable template
+└── medical_forms.db     # SQLite database (created on first run)
+```
 
-## Installation
+## Setup
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd aiims-bhatinda
-   ```
+### Prerequisites
 
-2. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- Python 3.10+
+- A [Google AI Studio](https://aistudio.google.com/) API key with access to Gemini
 
-3. Configure your API Key:
-   - Create a `.env` file in the root directory.
-   - Add your Google API Key:
-     ```
-     GOOGLE_API_KEY=your_api_key_here
-     ```
+### Installation
 
-## Usage
+```bash
+git clone <repo-url>
+cd aiims-bhatinda
 
-To start the application, run the following command from the project root:
+pip install -r requirements.txt
+
+cp .env.example .env
+# Edit .env and add your Google API key
+```
+
+### Running
 
 ```bash
 streamlit run app.py
 ```
 
-The application will launch in your default web browser.
+The app will open at `http://localhost:8501`.
 
-### Creating a New Record
+## Usage
 
-1. Navigate to the "New Entry" section.
-2. Select "Upload & Digitize" to use AI extraction or "Fill Manually" for manual input.
-3. If uploading, select the front and back images of the form and click "Digitize Form".
-4. Review the extracted information in the form fields.
-5. Make any necessary corrections and click "Save to Database".
+### Single Form Entry
 
-### Viewing Saved Records
+1. Navigate to **Fill Forms > Single Form**.
+2. Upload front and back images of the health card.
+3. Click **Digitize with AI** — Gemini extracts all fields.
+4. Review and correct any misread values in the form.
+5. Click **Save Record**.
 
-1. Navigate to the "View Records" section.
-2. Expand any record to view its full details in a read-only format.
+### Batch Processing
 
-## Project Structure
+1. Navigate to **Fill Forms > Bulk Images > Auto AI Scan**.
+2. Upload all front-page images in the left uploader and all back-page images in the right uploader.
+3. Files are matched by name — `001.jpg` in fronts pairs with `001.jpg` (or `001.png`) in backs.
+4. Review the matched pairs in the preview expander.
+5. Click **Digitize All Pairs** — extraction runs concurrently and records are saved automatically.
 
-- `app.py`: Main Streamlit application entry point.
-- `gemini_client.py`: Handles interactions with the Google Gemini API.
-- `db.py`: Manages SQLite database connections and operations.
-- `schema.py`: Defines the data models for the medical forms.
-- `analyze_form_schema.py`: Utility script for initial schema analysis.
-- `requirements.txt`: List of Python dependencies.
+### Excel/CSV Import
+
+1. Navigate to **Fill Forms > Bulk Excel / CSV**.
+2. Download the template, fill it in any spreadsheet editor.
+3. Upload the completed file — records are validated and can be saved in bulk.
+
+## Schema
+
+The form schema covers five sections, defined in `schema.py`:
+
+| Section | Fields |
+|---|---|
+| Personal Details | Name, age/sex, class, DOB, blood group, parents' names and occupations |
+| Contact Details | Address, pin code, phone, mobile, family physician |
+| Medical History | Past history, jaundice, allergies, blood transfusion, surgeries, implants |
+| Vaccination Status | Hepatitis B, typhoid, DT & polio, tetanus, current medication |
+| Health Checkup | Date, height/weight, vision, ears, dental, systemic exam, doctor remarks |
+
+## Configuration
+
+The only required environment variable is:
+
+```
+GOOGLE_API_KEY=your_key_here
+```
+
+The Gemini model is configured in `gemini_client.py` (default: `gemini-3.1-flash-lite-preview`). Change the `MODEL_NAME` constant to use a different model.
 
 ## License
 
-[License Information]
+This project was developed for internal use at AIIMS Bathinda.

@@ -46,9 +46,10 @@ class HealthCheckup(BaseModel):
     teeth_gums: Optional[str] = Field(None, description="Teeth & Gums")
     systemic_exam: Optional[str] = Field(None, description="Systemic Examination details")
     remarks: Optional[str] = Field(None, description="Doctor's Remarks")
-    teacher_sign: Optional[str] = Field(None, description="Class teacher's Sign")
-    principal_sign: Optional[str] = Field(None, description="Principal's Sign")
-    parent_sign: Optional[str] = Field(None, description="Parent's Sign")
+    teacher_sign: Optional[str] = Field(None, description="Teacher's Signature/Name")
+    principal_sign: Optional[str] = Field(None, description="Principal's Signature/Name")
+    parent_sign: Optional[str] = Field(None, description="Parent's Signature/Name")
+    additional_notes: Optional[str] = Field(None, description="Additional prescription or notes found side-by-side with the form")
 
 class MedicalForm(BaseModel):
     personal_details: PersonalDetails = Field(default_factory=PersonalDetails)
