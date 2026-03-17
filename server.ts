@@ -283,6 +283,8 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
+    const fs = require('fs');
+    fs.appendFileSync('server_log.txt', `Server started at ${new Date().toISOString()}\n`);
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
