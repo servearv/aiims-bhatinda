@@ -44,28 +44,39 @@ def init_db():
             username TEXT PRIMARY KEY,
             password TEXT,
             role TEXT,
-            name TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS Schools (
-            school_id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
-            district TEXT,
-            total_students INTEGER
+            designation TEXT DEFAULT ''
         );
 
-        CREATE TABLE IF NOT EXISTS Camps (
-            camp_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            school_id INTEGER,
-            date TEXT,
-            status TEXT,
-            assigned_doctors TEXT,
-            FOREIGN KEY(school_id) REFERENCES Schools(school_id)
+        CREATE TABLE IF NOT EXISTS Events (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            school_name TEXT NOT NULL,
+            school_address TEXT DEFAULT '',
+            poc_name TEXT DEFAULT '',
+            poc_designation TEXT DEFAULT '',
+            poc_phone TEXT DEFAULT '',
+            poc_email TEXT DEFAULT '',
+            start_date TEXT NOT NULL,
+            end_date TEXT DEFAULT '',
+            operational_hours TEXT DEFAULT '',
+            tag TEXT DEFAULT 'Upcoming',
+            created_at TEXT,
+            created_by TEXT,
+            FOREIGN KEY(created_by) REFERENCES Users(username)
+        );
+
+        CREATE TABLE IF NOT EXISTS Event_Staff (
+            event_id INTEGER,
+            username TEXT,
+            assigned_at TEXT,
+            PRIMARY KEY (event_id, username),
+            FOREIGN KEY(event_id) REFERENCES Events(event_id),
+            FOREIGN KEY(username) REFERENCES Users(username)
         );
 
         CREATE TABLE IF NOT EXISTS Students (
             student_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            school_id INTEGER,
+            event_id INTEGER,
             name TEXT,
             age INTEGER,
             dob TEXT,
@@ -76,27 +87,20 @@ def init_db():
             father_name TEXT,
             phone TEXT,
             qr_code_hash TEXT,
-            FOREIGN KEY(school_id) REFERENCES Schools(school_id)
+            FOREIGN KEY(event_id) REFERENCES Events(event_id)
         );
 
         CREATE TABLE IF NOT EXISTS Health_Records (
             record_id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id INTEGER,
-            camp_id INTEGER,
+            event_id INTEGER,
             doctor_id TEXT,
             category TEXT,
             json_data TEXT,
             timestamp TEXT,
             FOREIGN KEY(student_id) REFERENCES Students(student_id),
-            FOREIGN KEY(camp_id) REFERENCES Camps(camp_id),
+            FOREIGN KEY(event_id) REFERENCES Events(event_id),
             FOREIGN KEY(doctor_id) REFERENCES Users(username)
-        );
-
-        CREATE TABLE IF NOT EXISTS Inventory (
-            item_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_name TEXT,
-            stock_count INTEGER,
-            camp_allocated INTEGER
         );
 
         CREATE TABLE IF NOT EXISTS Audit_Logs (
@@ -109,38 +113,59 @@ def init_db():
         );
     """)
 
+    # Idempotent migration: add designation column to Users if missing
+    try:
+        cur.execute("ALTER TABLE Users ADD COLUMN designation TEXT DEFAULT ''")
+    except Exception:
+        pass
+
     # Idempotent migration: add new columns to Students if they don't exist
-    new_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
-                "blood_group TEXT", "father_name TEXT", "phone TEXT"]
-    for col_def in new_cols:
+    student_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
+                    "blood_group TEXT", "father_name TEXT", "phone TEXT",
+                    "event_id INTEGER"]
+    for col_def in student_cols:
         try:
             cur.execute(f"ALTER TABLE Students ADD COLUMN {col_def}")
         except Exception:
-            pass  # column already exists
+            pass
+
+    # Idempotent migration: rename school_id to event_id alias in Students (keep backward compat)
+    # We keep the column if exists; new inserts use event_id
 
     # Seed only when Users table is empty
     row = cur.execute("SELECT COUNT(*) AS count FROM Users").fetchone()
     if row["count"] == 0:
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?)", ("admin", "admin", "Super Admin", "Dr. Sharma (HOD)"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?)", ("coord", "coord", "Camp Admin", "Rahul (Coordinator)"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?)", ("school", "school", "School PoC", "Principal Singh"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?)", ("doctor", "doc", "Medical Staff", "Dr. Verma"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?)", ("parent", "parent", "Parent", "Beneficiary"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("admin", "admin", "Admin", "Dr. Sharma (HOD)", "HOD"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("doctor", "doc", "Medical Staff", "Dr. Verma", "Doctor"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("nurse1", "nurse1", "Medical Staff", "Nurse Priya", "Nurse"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("nurse2", "nurse2", "Medical Staff", "Nurse Anita", "Nurse"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("doc2", "doc2", "Medical Staff", "Dr. Kapoor", "Doctor"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("doc3", "doc3", "Medical Staff", "Dr. Singh", "Dentist"))
+        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("para1", "para1", "Medical Staff", "Ravi Kumar", "Paramedic"))
 
-        cur.execute("INSERT INTO Schools (name, district, total_students) VALUES (?,?,?)",
-                    ("Govt High School", "Bathinda", 500))
+        # Seed a demo event
+        now = datetime.utcnow().isoformat()
+        cur.execute("""INSERT INTO Events (school_name, school_address, poc_name, poc_designation, poc_phone, poc_email,
+                       start_date, end_date, operational_hours, tag, created_at, created_by)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    ("Govt High School, Bathinda", "Civil Lines, Bathinda, Punjab",
+                     "Principal Singh", "Principal", "9876543210", "principal@ghs.edu",
+                     "2026-04-10", "2026-04-12", "9:00 AM - 4:00 PM", "Upcoming", now, "admin"))
 
-        cur.execute("INSERT INTO Camps (school_id, date, status, assigned_doctors) VALUES (?,?,?,?)",
-                    (1, "2026-04-10", "Scheduled", "Dr. Verma"))
+        # Assign some staff to the demo event
+        cur.execute("INSERT INTO Event_Staff VALUES (?,?,?)", (1, "doctor", now))
+        cur.execute("INSERT INTO Event_Staff VALUES (?,?,?)", (1, "nurse1", now))
 
-        cur.execute("INSERT INTO Inventory (item_name, stock_count, camp_allocated) VALUES (?,?,?)",
-                    ("Iron-Folic Acid Tablets", 1000, 200))
-        cur.execute("INSERT INTO Inventory (item_name, stock_count, camp_allocated) VALUES (?,?,?)",
-                    ("Dental Kits", 50, 40))
-        cur.execute("INSERT INTO Inventory (item_name, stock_count, camp_allocated) VALUES (?,?,?)",
-                    ("Vision Charts", 10, 2))
-        cur.execute("INSERT INTO Inventory (item_name, stock_count, camp_allocated) VALUES (?,?,?)",
-                    ("Vitamins", 500, 100))
+        # Seed some students
+        for i, (name, age, gender) in enumerate([
+            ("Arjun Sharma", 12, "M"), ("Priya Kaur", 11, "F"), ("Rohit Singh", 13, "M"),
+            ("Neha Verma", 10, "F"), ("Karan Deep", 14, "M"),
+        ]):
+            qr_hash = "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
+            cur.execute(
+                """INSERT INTO Students (event_id, name, age, gender, student_class, section, qr_code_hash)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (1, name, age, gender, str(5 + i), "A", qr_hash))
 
     conn.commit()
     conn.close()
@@ -179,7 +204,7 @@ def api_login():
     password = data.get("password", "")
     conn = get_db()
     user = conn.execute(
-        "SELECT username, role, name FROM Users WHERE username = ? AND password = ?",
+        "SELECT username, role, name, designation FROM Users WHERE username = ? AND password = ?",
         (username, password),
     ).fetchone()
     conn.close()
@@ -189,143 +214,234 @@ def api_login():
     return jsonify({"success": False, "message": "Invalid credentials"}), 401
 
 
-# ---- Super Admin ----
-@app.route("/api/admin/metrics")
-def api_admin_metrics():
+# ---- Events ----
+@app.route("/api/events", methods=["GET"])
+def api_list_events():
     conn = get_db()
-    students = conn.execute("SELECT COUNT(*) AS count FROM Students").fetchone()["count"]
-    camps = conn.execute("SELECT COUNT(*) AS count FROM Camps").fetchone()["count"]
-    referrals = conn.execute(
-        "SELECT COUNT(*) AS count FROM Health_Records WHERE json_data LIKE '%Referral%'"
-    ).fetchone()["count"]
+    events = conn.execute("""
+        SELECT e.*,
+               (SELECT COUNT(*) FROM Event_Staff es WHERE es.event_id = e.event_id) AS staff_count,
+               (SELECT COUNT(*) FROM Students s WHERE s.event_id = e.event_id) AS student_count,
+               (SELECT COUNT(*) FROM Health_Records hr WHERE hr.event_id = e.event_id AND hr.category = 'FullExam') AS screened_count
+        FROM Events e
+        ORDER BY e.start_date DESC
+    """).fetchall()
     conn.close()
-    return jsonify({"students": students, "camps": 39 + camps, "referrals": referrals})
+    return jsonify(rows_to_list(events))
 
 
-@app.route("/api/admin/heatmap")
-def api_admin_heatmap():
+@app.route("/api/events/<int:event_id>", methods=["GET"])
+def api_get_event(event_id):
     conn = get_db()
-    camps = conn.execute("SELECT COUNT(*) AS count FROM Camps").fetchone()["count"]
+    event = conn.execute("SELECT * FROM Events WHERE event_id = ?", (event_id,)).fetchone()
+    if not event:
+        conn.close()
+        return jsonify({"error": "Event not found"}), 404
+
+    staff = conn.execute("""
+        SELECT u.username, u.name, u.designation, es.assigned_at
+        FROM Event_Staff es
+        JOIN Users u ON es.username = u.username
+        WHERE es.event_id = ?
+    """, (event_id,)).fetchall()
+
     conn.close()
-    extra = camps - 1 if camps > 0 else 0
-    return jsonify([
-        {"district": "Bathinda", "camp_count": 15 + extra},
-        {"district": "Mansa", "camp_count": 8},
-        {"district": "Muktsar", "camp_count": 12},
-        {"district": "Faridkot", "camp_count": 5},
-    ])
+    result = row_to_dict(event)
+    result["staff"] = rows_to_list(staff)
+    return jsonify(result)
 
 
-@app.route("/api/admin/audit-logs")
-def api_admin_audit_logs():
-    conn = get_db()
-    logs = conn.execute("SELECT * FROM Audit_Logs ORDER BY timestamp DESC LIMIT 50").fetchall()
-    conn.close()
-    return jsonify(rows_to_list(logs))
-
-
-# ---- Inventory ----
-@app.route("/api/inventory")
-def api_inventory():
-    conn = get_db()
-    items = conn.execute("SELECT * FROM Inventory").fetchall()
-    conn.close()
-    return jsonify(rows_to_list(items))
-
-
-# ---- Camps ----
-@app.route("/api/camps", methods=["POST"])
-def api_create_camp():
+@app.route("/api/events", methods=["POST"])
+def api_create_event():
     data = request.get_json(force=True)
-    school_id = data.get("school_id")
-    date = data.get("date")
-    assigned_doctors = data.get("assigned_doctors", "")
-    user_id = data.get("user_id", "")
+    now = datetime.utcnow().isoformat()
     conn = get_db()
-    conn.execute(
-        "INSERT INTO Camps (school_id, date, status, assigned_doctors) VALUES (?,?,'Scheduled',?)",
-        (school_id, date, assigned_doctors),
-    )
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO Events (school_name, school_address, poc_name, poc_designation, poc_phone, poc_email,
+                            start_date, end_date, operational_hours, tag, created_at, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        data.get("school_name", ""),
+        data.get("school_address", ""),
+        data.get("poc_name", ""),
+        data.get("poc_designation", ""),
+        data.get("poc_phone", ""),
+        data.get("poc_email", ""),
+        data.get("start_date", ""),
+        data.get("end_date", ""),
+        data.get("operational_hours", ""),
+        data.get("tag", "Upcoming"),
+        now,
+        data.get("created_by", "admin"),
+    ))
+    new_id = cur.lastrowid
     conn.commit()
     conn.close()
-    log_audit(user_id, "CREATE_CAMP", f"Scheduled camp for school {school_id} on {date}")
+    log_audit(data.get("created_by", "admin"), "CREATE_EVENT", f"Created event {new_id}: {data.get('school_name')}")
+    return jsonify({"success": True, "event_id": new_id})
+
+
+@app.route("/api/events/<int:event_id>", methods=["PUT"])
+def api_update_event(event_id):
+    data = request.get_json(force=True)
+    conn = get_db()
+
+    # Build dynamic update
+    fields = []
+    params = []
+    allowed = ["school_name", "school_address", "poc_name", "poc_designation",
+               "poc_phone", "poc_email", "start_date", "end_date",
+               "operational_hours", "tag"]
+    for field in allowed:
+        if field in data:
+            fields.append(f"{field} = ?")
+            params.append(data[field])
+
+    if not fields:
+        conn.close()
+        return jsonify({"success": False, "message": "No fields to update"}), 400
+
+    params.append(event_id)
+    conn.execute(f"UPDATE Events SET {', '.join(fields)} WHERE event_id = ?", params)
+    conn.commit()
+    conn.close()
+    log_audit(data.get("user_id", "admin"), "UPDATE_EVENT", f"Updated event {event_id}")
     return jsonify({"success": True})
 
 
-@app.route("/api/camps/pending")
-def api_camps_pending():
+# ---- Event Staff (Roster) ----
+@app.route("/api/events/<int:event_id>/staff", methods=["POST"])
+def api_assign_staff(event_id):
+    data = request.get_json(force=True)
+    username = data.get("username", "")
+    now = datetime.utcnow().isoformat()
     conn = get_db()
-    rows = conn.execute("""
-        SELECT c.*, s.name AS school_name, s.district
-        FROM Camps c
-        JOIN Schools s ON c.school_id = s.school_id
-        WHERE c.status = 'Requested'
-    """).fetchall()
+    try:
+        conn.execute("INSERT INTO Event_Staff (event_id, username, assigned_at) VALUES (?,?,?)",
+                     (event_id, username, now))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"success": False, "message": "Staff already assigned"}), 409
+    conn.close()
+    log_audit(data.get("user_id", "admin"), "ASSIGN_STAFF", f"Assigned {username} to event {event_id}")
+    return jsonify({"success": True})
+
+
+@app.route("/api/events/<int:event_id>/staff/<username>", methods=["DELETE"])
+def api_remove_staff(event_id, username):
+    conn = get_db()
+    conn.execute("DELETE FROM Event_Staff WHERE event_id = ? AND username = ?", (event_id, username))
+    conn.commit()
+    conn.close()
+    user_id = request.args.get("user_id", "admin")
+    log_audit(user_id, "REMOVE_STAFF", f"Removed {username} from event {event_id}")
+    return jsonify({"success": True})
+
+
+# ---- Staff Search ----
+@app.route("/api/staff/search")
+def api_staff_search():
+    q = request.args.get("q", "").strip()
+    conn = get_db()
+    if q:
+        rows = conn.execute(
+            "SELECT username, name, designation FROM Users WHERE role = 'Medical Staff' AND (name LIKE ? OR designation LIKE ? OR username LIKE ?)",
+            (f"%{q}%", f"%{q}%", f"%{q}%"),
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT username, name, designation FROM Users WHERE role = 'Medical Staff'").fetchall()
     conn.close()
     return jsonify(rows_to_list(rows))
 
 
-@app.route("/api/camps/request", methods=["POST"])
-def api_camps_request():
+# ---- User Registration ----
+@app.route("/api/users/register", methods=["POST"])
+def api_register_user():
     data = request.get_json(force=True)
-    school_id = data.get("school_id")
-    date = data.get("date")
-    user_id = data.get("user_id", "")
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    name = data.get("name", "").strip()
+    role = data.get("role", "Medical Staff")
+    designation = data.get("designation", "").strip()
+    admin_user = data.get("admin_user", "admin")
+
+    if not username or not password or not name:
+        return jsonify({"success": False, "message": "Username, password, and name are required"}), 400
+
+    if role not in ("Admin", "Medical Staff"):
+        return jsonify({"success": False, "message": "Role must be Admin or Medical Staff"}), 400
+
     conn = get_db()
-    conn.execute(
-        "INSERT INTO Camps (school_id, date, status, assigned_doctors) VALUES (?,?,'Requested','')",
-        (school_id, date),
-    )
+    existing = conn.execute("SELECT username FROM Users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"success": False, "message": "Username already exists"}), 409
+
+    conn.execute("INSERT INTO Users (username, password, role, name, designation) VALUES (?,?,?,?,?)",
+                 (username, password, role, name, designation))
     conn.commit()
     conn.close()
-    log_audit(user_id, "REQUEST_CAMP", f"Requested camp for school {school_id} on {date}")
+    log_audit(admin_user, "REGISTER_USER", f"Registered {role} user: {username} ({name})")
     return jsonify({"success": True})
 
 
-@app.route("/api/camps/<int:camp_id>/approve", methods=["PUT"])
-def api_camps_approve(camp_id):
-    data = request.get_json(force=True)
-    assigned_doctors = data.get("assigned_doctors", "")
-    user_id = data.get("user_id", "")
+# ---- Event Stats ----
+@app.route("/api/events/<int:event_id>/stats")
+def api_event_stats(event_id):
     conn = get_db()
-    conn.execute(
-        "UPDATE Camps SET status = 'Scheduled', assigned_doctors = ? WHERE camp_id = ?",
-        (assigned_doctors, camp_id),
-    )
-    conn.commit()
+    total_students = conn.execute("SELECT COUNT(*) AS c FROM Students WHERE event_id = ?", (event_id,)).fetchone()["c"]
+    screened = conn.execute("SELECT COUNT(*) AS c FROM Health_Records WHERE event_id = ? AND category = 'FullExam'", (event_id,)).fetchone()["c"]
+
+    # Count assessments
+    normal = 0
+    observation = 0
+    referred = 0
+    records = conn.execute("SELECT json_data FROM Health_Records WHERE event_id = ? AND category = 'FullExam'", (event_id,)).fetchall()
+    for r in records:
+        try:
+            d = json.loads(r["json_data"])
+            a = d.get("assessment", "N")
+            if a == "N":
+                normal += 1
+            elif a == "O":
+                observation += 1
+            elif a == "R":
+                referred += 1
+        except Exception:
+            pass
+
+    # Get individual health records
+    hr_rows = conn.execute("""
+        SELECT hr.record_id, hr.student_id, s.name AS student_name, hr.doctor_id, hr.category,
+               hr.json_data, hr.timestamp
+        FROM Health_Records hr
+        JOIN Students s ON hr.student_id = s.student_id
+        WHERE hr.event_id = ?
+        ORDER BY hr.timestamp DESC
+    """, (event_id,)).fetchall()
+
+    staff = conn.execute("""
+        SELECT u.username, u.name, u.designation
+        FROM Event_Staff es
+        JOIN Users u ON es.username = u.username
+        WHERE es.event_id = ?
+    """, (event_id,)).fetchall()
+
     conn.close()
-    log_audit(user_id, "APPROVE_CAMP", f"Approved camp {camp_id}")
-    return jsonify({"success": True})
+    return jsonify({
+        "total_students": total_students,
+        "screened": screened,
+        "normal": normal,
+        "observation": observation,
+        "referred": referred,
+        "records": rows_to_list(hr_rows),
+        "staff": rows_to_list(staff),
+    })
 
 
-# ---- Schools ----
-@app.route("/api/schools")
-def api_schools():
-    conn = get_db()
-    schools = conn.execute("SELECT * FROM Schools").fetchall()
-    conn.close()
-    return jsonify(rows_to_list(schools))
-
-
-# ---- Students ----
-@app.route("/api/students/bulk", methods=["POST"])
-def api_students_bulk():
-    data = request.get_json(force=True)
-    students = data.get("students", [])
-    user_id = data.get("user_id", "")
-    conn = get_db()
-    for s in students:
-        qr_hash = "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
-        conn.execute(
-            "INSERT INTO Students (school_id, name, age, gender, qr_code_hash) VALUES (?,?,?,?,?)",
-            (1, s.get("name"), s.get("age"), s.get("gender"), qr_hash),
-        )
-    conn.commit()
-    conn.close()
-    log_audit(user_id, "UPLOAD_ROSTER", f"Uploaded {len(students)} students")
-    return jsonify({"success": True, "count": len(students)})
-
-
+# ---- Students (kept for DoctorWorkflow compatibility) ----
 @app.route("/api/students", methods=["POST"])
 def api_create_student():
     """Create a single student (used by doctor workflow)."""
@@ -340,6 +456,7 @@ def api_create_student():
     father_name = data.get("father_name", "")
     phone = data.get("phone", "")
     user_id = data.get("user_id", "")
+    event_id = data.get("event_id", 1)
 
     if not name:
         return jsonify({"success": False, "message": "Name is required"}), 400
@@ -349,9 +466,9 @@ def api_create_student():
     cur = conn.cursor()
     cur.execute(
         """INSERT INTO Students
-           (school_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_code_hash)
+           (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_code_hash)
            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-        (1, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_hash),
+        (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_hash),
     )
     new_id = cur.lastrowid
     conn.commit()
@@ -437,20 +554,20 @@ def api_student_by_id(student_id):
     return jsonify(row_to_dict(student))
 
 
-# ---- Health Records ----
+# ---- Health Records (kept for DoctorWorkflow compatibility) ----
 @app.route("/api/health-records", methods=["POST"])
 def api_create_health_record():
     data = request.get_json(force=True)
     student_id = data.get("student_id")
-    camp_id = data.get("camp_id")
+    event_id = data.get("event_id", data.get("camp_id", 1))
     doctor_id = data.get("doctor_id")
     category = data.get("category")
     json_data = data.get("json_data")
     ts = datetime.utcnow().isoformat()
     conn = get_db()
     conn.execute(
-        "INSERT INTO Health_Records (student_id, camp_id, doctor_id, category, json_data, timestamp) VALUES (?,?,?,?,?,?)",
-        (student_id, camp_id, doctor_id, category, json_data, ts),
+        "INSERT INTO Health_Records (student_id, event_id, doctor_id, category, json_data, timestamp) VALUES (?,?,?,?,?,?)",
+        (student_id, event_id, doctor_id, category, json_data, ts),
     )
     conn.commit()
     conn.close()
@@ -460,10 +577,10 @@ def api_create_health_record():
 
 @app.route("/api/health-records/exam", methods=["POST"])
 def api_save_full_exam():
-    """Save a complete medical examination (upsert by student + camp)."""
+    """Save a complete medical examination (upsert by student + event)."""
     data = request.get_json(force=True)
     student_id = data.get("student_id")
-    camp_id = data.get("camp_id", 1)
+    event_id = data.get("event_id", data.get("camp_id", 1))
     doctor_id = data.get("doctor_id", "doctor")
     exam_data = data.get("exam_data", {})
     ts = datetime.utcnow().isoformat()
@@ -472,8 +589,8 @@ def api_save_full_exam():
     conn = get_db()
     # Check for existing record
     existing = conn.execute(
-        "SELECT record_id FROM Health_Records WHERE student_id = ? AND camp_id = ? AND category = 'FullExam'",
-        (student_id, camp_id),
+        "SELECT record_id FROM Health_Records WHERE student_id = ? AND event_id = ? AND category = 'FullExam'",
+        (student_id, event_id),
     ).fetchone()
 
     if existing:
@@ -485,8 +602,8 @@ def api_save_full_exam():
     else:
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO Health_Records (student_id, camp_id, doctor_id, category, json_data, timestamp) VALUES (?,?,?,?,?,?)",
-            (student_id, camp_id, doctor_id, "FullExam", json_str, ts),
+            "INSERT INTO Health_Records (student_id, event_id, doctor_id, category, json_data, timestamp) VALUES (?,?,?,?,?,?)",
+            (student_id, event_id, doctor_id, "FullExam", json_str, ts),
         )
         record_id = cur.lastrowid
 
@@ -505,6 +622,15 @@ def api_get_health_records(student_id):
     ).fetchall()
     conn.close()
     return jsonify(rows_to_list(rows))
+
+
+# ---- Audit Logs ----
+@app.route("/api/admin/audit-logs")
+def api_admin_audit_logs():
+    conn = get_db()
+    logs = conn.execute("SELECT * FROM Audit_Logs ORDER BY timestamp DESC LIMIT 50").fetchall()
+    conn.close()
+    return jsonify(rows_to_list(logs))
 
 
 # ---- Digitise (MedDigitizer Streamlit launcher) ----

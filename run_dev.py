@@ -13,9 +13,23 @@ Open http://localhost:5173 in your browser for dev mode with hot-reload.
 import os
 import sys
 import subprocess
+import shutil
 import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def find_npx():
+    """Find the npx executable cross-platform."""
+    # Try plain 'npx' first (works on macOS/Linux and Windows with PATH set up)
+    npx = shutil.which("npx")
+    if npx:
+        return npx
+    # On Windows, try 'npx.cmd' explicitly
+    npx_cmd = shutil.which("npx.cmd")
+    if npx_cmd:
+        return npx_cmd
+    return None
 
 
 def main():
@@ -35,26 +49,22 @@ def main():
     # 2) Start Vite dev server (React HMR) on port 5173
     print("[dev] Starting Vite dev server on http://localhost:5173 ...")
     print("[dev] Open http://localhost:5173 in your browser.\n")
-    vite_proc = subprocess.Popen(
-        [sys.executable, "-m", "http.server", "5173"],  # fallback if npx not found
-        cwd=ROOT,
-    )
-    # Try npx vite first
-    try:
-        vite_proc.terminate()
+
+    npx_path = find_npx()
+    if npx_path:
         vite_proc = subprocess.Popen(
-            ["npx.cmd", "vite", "--host"],
+            [npx_path, "vite", "--host"],
             cwd=ROOT,
         )
-    except FileNotFoundError:
-        print("[dev] WARNING: npx not found, falling back to static server")
+    else:
+        print("[dev] WARNING: npx not found, falling back to static server on port 5173")
         vite_proc = subprocess.Popen(
             [sys.executable, "-m", "http.server", "5173"],
             cwd=ROOT,
         )
     procs.append(vite_proc)
 
-    # Wait for either to exit 
+    # Wait for either to exit
     try:
         while True:
             for p in procs:

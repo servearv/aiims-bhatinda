@@ -8,10 +8,10 @@ echo.
 
 REM --- Step 1: Install Python dependencies ---
 echo [1/4] Installing Python dependencies...
-pip install flask flask-cors >nul 2>&1
+pip install flask >nul 2>&1
 if errorlevel 1 (
     echo  ERROR: pip install failed. Make sure Python and pip are installed.
-    echo  Try: python -m pip install flask flask-cors
+    echo  Try: python -m pip install flask
     pause
     exit /b 1
 )
@@ -50,7 +50,8 @@ echo.
 
 echo  ============================================
 echo   Starting server on http://localhost:3000
-echo   Login: admin/admin, doctor/doc, school/school
+echo   Login: admin/admin (Admin)
+echo          doctor/doc (Medical Staff)
 echo  ============================================
 echo.
 
