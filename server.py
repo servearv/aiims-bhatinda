@@ -45,7 +45,8 @@ def init_db():
             password TEXT,
             role TEXT,
             name TEXT,
-            designation TEXT DEFAULT ''
+            designation TEXT DEFAULT '',
+            specialization TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS Events (
@@ -119,6 +120,12 @@ def init_db():
     except Exception:
         pass
 
+    # Idempotent migration: add specialization column to Users if missing
+    try:
+        cur.execute("ALTER TABLE Users ADD COLUMN specialization TEXT DEFAULT ''")
+    except Exception:
+        pass
+
     # Idempotent migration: add new columns to Students if they don't exist
     student_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
                     "blood_group TEXT", "father_name TEXT", "phone TEXT",
@@ -135,37 +142,8 @@ def init_db():
     # Seed only when Users table is empty
     row = cur.execute("SELECT COUNT(*) AS count FROM Users").fetchone()
     if row["count"] == 0:
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("admin", "admin", "Admin", "Dr. Sharma (HOD)", "HOD"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("doctor", "doc", "Medical Staff", "Dr. Verma", "Doctor"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("nurse1", "nurse1", "Medical Staff", "Nurse Priya", "Nurse"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("nurse2", "nurse2", "Medical Staff", "Nurse Anita", "Nurse"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("doc2", "doc2", "Medical Staff", "Dr. Kapoor", "Doctor"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("doc3", "doc3", "Medical Staff", "Dr. Singh", "Dentist"))
-        cur.execute("INSERT INTO Users VALUES (?,?,?,?,?)", ("para1", "para1", "Medical Staff", "Ravi Kumar", "Paramedic"))
-
-        # Seed a demo event
-        now = datetime.utcnow().isoformat()
-        cur.execute("""INSERT INTO Events (school_name, school_address, poc_name, poc_designation, poc_phone, poc_email,
-                       start_date, end_date, operational_hours, tag, created_at, created_by)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    ("Govt High School, Bathinda", "Civil Lines, Bathinda, Punjab",
-                     "Principal Singh", "Principal", "9876543210", "principal@ghs.edu",
-                     "2026-04-10", "2026-04-12", "9:00 AM - 4:00 PM", "Upcoming", now, "admin"))
-
-        # Assign some staff to the demo event
-        cur.execute("INSERT INTO Event_Staff VALUES (?,?,?)", (1, "doctor", now))
-        cur.execute("INSERT INTO Event_Staff VALUES (?,?,?)", (1, "nurse1", now))
-
-        # Seed some students
-        for i, (name, age, gender) in enumerate([
-            ("Arjun Sharma", 12, "M"), ("Priya Kaur", 11, "F"), ("Rohit Singh", 13, "M"),
-            ("Neha Verma", 10, "F"), ("Karan Deep", 14, "M"),
-        ]):
-            qr_hash = "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
-            cur.execute(
-                """INSERT INTO Students (event_id, name, age, gender, student_class, section, qr_code_hash)
-                   VALUES (?,?,?,?,?,?,?)""",
-                (1, name, age, gender, str(5 + i), "A", qr_hash))
+        cur.execute("INSERT INTO Users (username,password,role,name,designation,specialization) VALUES (?,?,?,?,?,?)",
+                   ("Admin", "admin", "Admin", "Admin", "", ""))
 
     conn.commit()
     conn.close()
@@ -239,7 +217,7 @@ def api_get_event(event_id):
         return jsonify({"error": "Event not found"}), 404
 
     staff = conn.execute("""
-        SELECT u.username, u.name, u.designation, es.assigned_at
+        SELECT u.username, u.name, u.designation, u.specialization, es.assigned_at
         FROM Event_Staff es
         JOIN Users u ON es.username = u.username
         WHERE es.event_id = ?
@@ -347,11 +325,11 @@ def api_staff_search():
     conn = get_db()
     if q:
         rows = conn.execute(
-            "SELECT username, name, designation FROM Users WHERE role = 'Medical Staff' AND (name LIKE ? OR designation LIKE ? OR username LIKE ?)",
-            (f"%{q}%", f"%{q}%", f"%{q}%"),
+            "SELECT username, name, designation, specialization FROM Users WHERE role = 'Medical Staff' AND (name LIKE ? OR designation LIKE ? OR username LIKE ? OR specialization LIKE ?)",
+            (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"),
         ).fetchall()
     else:
-        rows = conn.execute("SELECT username, name, designation FROM Users WHERE role = 'Medical Staff'").fetchall()
+        rows = conn.execute("SELECT username, name, designation, specialization FROM Users WHERE role = 'Medical Staff'").fetchall()
     conn.close()
     return jsonify(rows_to_list(rows))
 
@@ -365,6 +343,7 @@ def api_register_user():
     name = data.get("name", "").strip()
     role = data.get("role", "Medical Staff")
     designation = data.get("designation", "").strip()
+    specialization = data.get("specialization", "").strip()
     admin_user = data.get("admin_user", "admin")
 
     if not username or not password or not name:
@@ -379,8 +358,8 @@ def api_register_user():
         conn.close()
         return jsonify({"success": False, "message": "Username already exists"}), 409
 
-    conn.execute("INSERT INTO Users (username, password, role, name, designation) VALUES (?,?,?,?,?)",
-                 (username, password, role, name, designation))
+    conn.execute("INSERT INTO Users (username, password, role, name, designation, specialization) VALUES (?,?,?,?,?,?)",
+                 (username, password, role, name, designation, specialization))
     conn.commit()
     conn.close()
     log_audit(admin_user, "REGISTER_USER", f"Registered {role} user: {username} ({name})")
@@ -423,7 +402,7 @@ def api_event_stats(event_id):
     """, (event_id,)).fetchall()
 
     staff = conn.execute("""
-        SELECT u.username, u.name, u.designation
+        SELECT u.username, u.name, u.designation, u.specialization
         FROM Event_Staff es
         JOIN Users u ON es.username = u.username
         WHERE es.event_id = ?
@@ -439,6 +418,22 @@ def api_event_stats(event_id):
         "records": rows_to_list(hr_rows),
         "staff": rows_to_list(staff),
     })
+
+
+# ---- My Events (for Medical Staff camp selection) ----
+@app.route("/api/events/my")
+def api_my_events():
+    username = request.args.get("username", "")
+    conn = get_db()
+    events = conn.execute("""
+        SELECT e.*
+        FROM Events e
+        JOIN Event_Staff es ON e.event_id = es.event_id
+        WHERE es.username = ?
+        ORDER BY e.start_date DESC
+    """, (username,)).fetchall()
+    conn.close()
+    return jsonify(rows_to_list(events))
 
 
 # ---- Students (kept for DoctorWorkflow compatibility) ----
@@ -487,11 +482,17 @@ def api_students_search():
     examined = request.args.get("examined", "")  # '1' or '0'
     referred = request.args.get("referred", "")  # '1'
 
+    event_id = request.args.get("event_id", "").strip()
+
     conn = get_db()
 
     # Build dynamic query
     conditions = []
     params = []
+
+    if event_id:
+        conditions.append("s.event_id = ?")
+        params.append(int(event_id))
 
     if query:
         conditions.append("(s.name LIKE ? OR s.student_id = ? OR s.phone LIKE ? OR s.student_class LIKE ? OR s.section LIKE ?)")

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DoctorWorkflow from './DoctorWorkflow';
 import AdminDashboard from './AdminDashboard';
 import {
   Activity, Stethoscope, ActivitySquare,
-  LogOut, ShieldCheck
+  LogOut, ShieldCheck, Sun, Moon
 } from 'lucide-react';
 
 // --- Types ---
@@ -12,6 +12,17 @@ type User = { username: string, role: string, name: string };
 // --- Main App Component ---
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
+    return 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
   if (!user) {
     return <LoginScreen onLogin={setUser} />;
@@ -53,13 +64,20 @@ export default function App() {
           </div>
         </nav>
 
-        <div className="p-4 border-t border-slate-800/50">
+        <div className="p-4 border-t border-slate-800/50 space-y-2">
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-500/20"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <span className="font-medium text-sm">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
           <button 
             onClick={() => setUser(null)}
             className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20"
           >
             <LogOut className="w-4 h-4" />
-            <span className="font-medium text-sm">Secure Logout</span>
+            <span className="font-medium text-sm">Logout</span>
           </button>
         </div>
       </aside>
@@ -165,12 +183,12 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
             disabled={loading}
             className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all disabled:opacity-50 mt-4"
           >
-            {loading ? 'Authenticating...' : 'Secure Login'}
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
         
         <div className="mt-8 pt-6 border-t border-slate-800/50 text-center">
-          <p className="text-xs text-slate-500">Demo: admin/admin (Admin) · doctor/doc (Medical Staff)</p>
+          <p className="text-xs text-slate-500">Login: Admin / admin</p>
         </div>
       </div>
     </div>

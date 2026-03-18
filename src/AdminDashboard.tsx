@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Calendar, Users, UserPlus, BarChart3, Search, Plus, X, Check,
+  Calendar, Users, UserPlus, Search, Plus, X, Check,
   MapPin, Phone, Mail, Clock, Tag, ChevronDown, ChevronRight,
-  Activity, FileText, Stethoscope, AlertTriangle, Trash2, Eye
+  Activity, FileText, Stethoscope, Trash2
 } from 'lucide-react';
 
 type User = { username: string; role: string; name: string };
@@ -16,6 +16,12 @@ const TAG_STYLES: Record<string, string> = {
 };
 
 const TAGS = ['Upcoming', 'Ongoing', 'Completed', 'Cancelled'];
+
+const SPECIALIZATIONS = [
+  'General Medicine', 'Pediatrics', 'Ophthalmology', 'ENT',
+  'Dentistry', 'Dermatology', 'Orthopedics', 'Cardiology',
+  'Psychiatry', 'Nursing', 'Emergency Medicine', 'Other',
+];
 
 interface EventData {
   event_id: number;
@@ -33,13 +39,13 @@ interface EventData {
   staff_count?: number;
   student_count?: number;
   screened_count?: number;
-  staff?: StaffMember[];
 }
 
 interface StaffMember {
   username: string;
   name: string;
   designation: string;
+  specialization?: string;
   assigned_at?: string;
 }
 
@@ -53,24 +59,43 @@ interface EventStats {
   staff: StaffMember[];
 }
 
+// ── Helpers ──
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = String(d.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+}
+
+function isValidPhone(phone: string): boolean {
+  if (!phone) return true;
+  return /^[+]?[\d\s\-()]{7,15}$/.test(phone.trim());
+}
+
+function isValidEmail(email: string): boolean {
+  if (!email) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 // ══════════════════════════════════════════
 // ██ ADMIN DASHBOARD
 // ══════════════════════════════════════════
 export default function AdminDashboard({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'events' | 'roster' | 'register' | 'records'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'register'>('events');
 
   const tabs = [
     { key: 'events' as const, label: 'Events', icon: <Calendar className="w-4 h-4" /> },
-    { key: 'roster' as const, label: 'Roster', icon: <Users className="w-4 h-4" /> },
     { key: 'register' as const, label: 'Register Users', icon: <UserPlus className="w-4 h-4" /> },
-    { key: 'records' as const, label: 'Camp Records', icon: <BarChart3 className="w-4 h-4" /> },
   ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
       <div>
         <h2 className="text-2xl font-bold text-white tracking-tight">Admin Dashboard ⚙️</h2>
-        <p className="text-slate-400 text-sm mt-0.5">Manage events, staff rosters, and camp records.</p>
+        <p className="text-slate-400 text-sm mt-0.5">Manage events, staff assignments, and camp records.</p>
       </div>
 
       {/* Tab Navigation */}
@@ -92,15 +117,13 @@ export default function AdminDashboard({ user }: { user: User }) {
       </div>
 
       {activeTab === 'events' && <EventsTab user={user} />}
-      {activeTab === 'roster' && <RosterTab user={user} />}
       {activeTab === 'register' && <RegisterTab user={user} />}
-      {activeTab === 'records' && <RecordsTab user={user} />}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════
-// TAB 1: EVENTS
+// TAB 1: EVENTS (with inline roster + records)
 // ═══════════════════════════════════════════
 function EventsTab({ user }: { user: User }) {
   const [events, setEvents] = useState<EventData[]>([]);
@@ -170,7 +193,7 @@ function EventsTab({ user }: { user: User }) {
                   <div className="min-w-0">
                     <h4 className="text-white font-semibold truncate">{event.school_name}</h4>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {event.start_date}{event.end_date ? ` → ${event.end_date}` : ''} · {event.operational_hours || 'TBD'}
+                      {formatDateDisplay(event.start_date)}{event.end_date ? ` → ${formatDateDisplay(event.end_date)}` : ''} · {event.operational_hours || 'TBD'}
                     </p>
                   </div>
                 </div>
@@ -198,18 +221,9 @@ function EventsTab({ user }: { user: User }) {
                 </div>
               </button>
 
-              {/* Expanded Details */}
+              {/* Expanded: Details + Staff + Records */}
               {expandedId === event.event_id && (
-                <div className="px-6 pb-5 border-t border-slate-800/50 pt-4">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                    <DetailItem icon={<MapPin className="w-3.5 h-3.5" />} label="Address" value={event.school_address} />
-                    <DetailItem icon={<Users className="w-3.5 h-3.5" />} label="PoC Name" value={event.poc_name} />
-                    <DetailItem icon={<Tag className="w-3.5 h-3.5" />} label="PoC Designation" value={event.poc_designation} />
-                    <DetailItem icon={<Phone className="w-3.5 h-3.5" />} label="PoC Phone" value={event.poc_phone} />
-                    <DetailItem icon={<Mail className="w-3.5 h-3.5" />} label="PoC Email" value={event.poc_email} />
-                    <DetailItem icon={<Clock className="w-3.5 h-3.5" />} label="Hours" value={event.operational_hours} />
-                  </div>
-                </div>
+                <EventExpandedPanel eventId={event.event_id} event={event} user={user} onStaffChange={fetchEvents} />
               )}
             </div>
           ))}
@@ -218,6 +232,246 @@ function EventsTab({ user }: { user: User }) {
 
       {/* Create Event Modal */}
       {showCreate && <CreateEventModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); fetchEvents(); }} user={user} />}
+    </div>
+  );
+}
+
+// ── Expanded panel for each event (details + staff + records) ──
+function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
+  eventId: number; event: EventData; user: User; onStaffChange: () => void;
+}) {
+  const [activeSection, setActiveSection] = useState<'details' | 'staff' | 'records'>('details');
+  const [assignedStaff, setAssignedStaff] = useState<StaffMember[]>([]);
+  const [stats, setStats] = useState<EventStats | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/events/${eventId}`).then(r => r.json()).then(data => {
+      setAssignedStaff(data.staff || []);
+    });
+    doSearch('');
+  }, [eventId]);
+
+  useEffect(() => {
+    if (activeSection === 'records') {
+      fetch(`/api/events/${eventId}/stats`).then(r => r.json()).then(setStats);
+    }
+  }, [activeSection, eventId]);
+
+  const doSearch = async (q: string) => {
+    setSearchQuery(q);
+    const res = await fetch(`/api/staff/search?q=${encodeURIComponent(q)}`);
+    setSearchResults(await res.json());
+  };
+
+  const assignStaff = async (username: string) => {
+    setLoading(true);
+    await fetch(`/api/events/${eventId}/staff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, user_id: user.username }),
+    });
+    const eventRes = await fetch(`/api/events/${eventId}`);
+    const eventData = await eventRes.json();
+    setAssignedStaff(eventData.staff || []);
+    onStaffChange();
+    setLoading(false);
+  };
+
+  const removeStaff = async (username: string) => {
+    await fetch(`/api/events/${eventId}/staff/${username}?user_id=${user.username}`, { method: 'DELETE' });
+    setAssignedStaff(prev => prev.filter(s => s.username !== username));
+    onStaffChange();
+  };
+
+  const assignedUsernames = new Set(assignedStaff.map(s => s.username));
+  const availableStaff = searchResults.filter(s => !assignedUsernames.has(s.username));
+
+  const sectionBtns = [
+    { key: 'details' as const, label: 'Details', icon: <MapPin className="w-3.5 h-3.5" /> },
+    { key: 'staff' as const, label: 'Medical Staff', icon: <Users className="w-3.5 h-3.5" /> },
+    { key: 'records' as const, label: 'Camp Records', icon: <FileText className="w-3.5 h-3.5" /> },
+  ];
+
+  return (
+    <div className="border-t border-slate-800/50">
+      {/* Section Tabs */}
+      <div className="flex space-x-1 px-6 pt-3">
+        {sectionBtns.map(s => (
+          <button key={s.key} onClick={() => setActiveSection(s.key)}
+            className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+              activeSection === s.key
+                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/25'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}>
+            {s.icon}<span>{s.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="px-6 pb-5 pt-3">
+        {/* DETAILS */}
+        {activeSection === 'details' && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <DetailItem icon={<MapPin className="w-3.5 h-3.5" />} label="Address" value={event.school_address} />
+            <DetailItem icon={<Users className="w-3.5 h-3.5" />} label="PoC Name" value={event.poc_name} />
+            <DetailItem icon={<Tag className="w-3.5 h-3.5" />} label="PoC Designation" value={event.poc_designation} />
+            <DetailItem icon={<Phone className="w-3.5 h-3.5" />} label="PoC Phone" value={event.poc_phone} />
+            <DetailItem icon={<Mail className="w-3.5 h-3.5" />} label="PoC Email" value={event.poc_email} />
+            <DetailItem icon={<Clock className="w-3.5 h-3.5" />} label="Hours" value={event.operational_hours} />
+          </div>
+        )}
+
+        {/* MEDICAL STAFF */}
+        {activeSection === 'staff' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Assigned */}
+            <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+              <h4 className="text-sm font-semibold text-white mb-3 flex items-center">
+                <Stethoscope className="w-4 h-4 mr-2 text-emerald-400" />
+                Assigned ({assignedStaff.length})
+              </h4>
+              {assignedStaff.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-4">No staff assigned yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {assignedStaff.map(s => (
+                    <div key={s.username} className="flex items-center justify-between bg-slate-900 px-3 py-2.5 rounded-lg border border-slate-800">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-xs">
+                          {s.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-white text-sm font-medium">{s.name}</p>
+                          <p className="text-xs text-slate-400">{s.designation}{s.specialization ? ` · ${s.specialization}` : ''}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => removeStaff(s.username)}
+                        className="text-slate-500 hover:text-red-400 transition-colors p-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Search & Add */}
+            <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+              <h4 className="text-sm font-semibold text-white mb-3 flex items-center">
+                <Search className="w-4 h-4 mr-2 text-cyan-400" />
+                Search & Add Staff
+              </h4>
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 w-3.5 h-3.5" />
+                <input type="text" placeholder="Search by name, designation, specialization..."
+                  value={searchQuery} onChange={e => doSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
+              </div>
+              <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                {availableStaff.length === 0 ? (
+                  <p className="text-slate-500 text-xs text-center py-3">No available staff found.</p>
+                ) : (
+                  availableStaff.map(s => (
+                    <div key={s.username} className="flex items-center justify-between bg-slate-900 px-3 py-2.5 rounded-lg border border-slate-800 hover:border-cyan-500/30 transition-all">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
+                          {s.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-white text-sm font-medium">{s.name}</p>
+                          <p className="text-xs text-slate-400">{s.designation}{s.specialization ? ` · ${s.specialization}` : ''}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => assignStaff(s.username)} disabled={loading}
+                        className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/40 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center space-x-1">
+                        <Plus className="w-3 h-3" /><span>Add</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CAMP RECORDS */}
+        {activeSection === 'records' && (
+          stats ? (
+            <div className="space-y-4">
+              {/* Stats */}
+              <div className="grid grid-cols-5 gap-3">
+                <MiniStat label="Students" value={stats.total_students} color="text-cyan-400" />
+                <MiniStat label="Screened" value={stats.screened} color="text-blue-400" />
+                <MiniStat label="Normal" value={stats.normal} color="text-emerald-400" />
+                <MiniStat label="Observation" value={stats.observation} color="text-amber-400" />
+                <MiniStat label="Referred" value={stats.referred} color="text-red-400" />
+              </div>
+
+              {/* Staff */}
+              {stats.staff.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {stats.staff.map(s => (
+                    <span key={s.username} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+                      <span className="font-medium text-white">{s.name}</span>
+                      <span className="text-slate-500 ml-1">({s.designation})</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Records */}
+              {stats.records.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-4">No records yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="text-slate-500 border-b border-slate-800">
+                      <tr>
+                        <th className="pb-2 pr-4 font-medium text-xs">Student</th>
+                        <th className="pb-2 pr-4 font-medium text-xs">Doctor</th>
+                        <th className="pb-2 pr-4 font-medium text-xs">Assessment</th>
+                        <th className="pb-2 font-medium text-xs">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {stats.records.map((rec: any) => {
+                        let assessment = '—';
+                        try {
+                          const d = JSON.parse(rec.json_data);
+                          assessment = d.assessment === 'N' ? 'Normal' : d.assessment === 'O' ? 'Observation' : d.assessment === 'R' ? 'Referred' : '—';
+                        } catch {}
+                        const assessColor = assessment === 'Normal' ? 'text-emerald-400' : assessment === 'Referred' ? 'text-red-400' : assessment === 'Observation' ? 'text-amber-400' : 'text-slate-400';
+                        return (
+                          <tr key={rec.record_id} className="hover:bg-slate-800/30">
+                            <td className="py-2.5 pr-4 text-white font-medium text-xs">{rec.student_name}</td>
+                            <td className="py-2.5 pr-4 text-cyan-400 text-xs">{rec.doctor_id}</td>
+                            <td className={`py-2.5 pr-4 font-semibold text-xs ${assessColor}`}>{assessment}</td>
+                            <td className="py-2.5 text-slate-400 text-xs">{new Date(rec.timestamp).toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-slate-400 text-sm text-center py-6">Loading...</p>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 text-center">
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">{label}</p>
     </div>
   );
 }
@@ -233,20 +487,35 @@ function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: stri
   );
 }
 
-// ── Create Event Modal ──
+// ── Create Event Modal (with validation) ──
 function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; onCreated: () => void; user: User }) {
   const [f, setF] = useState({
     school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
     start_date: '', end_date: '', operational_hours: '', tag: 'Upcoming',
   });
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
-  const upd = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+  const upd = (k: string, v: string) => {
+    setF(p => ({ ...p, [k]: v }));
+    setErrors(p => ({ ...p, [k]: '' }));
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!f.school_name.trim()) e.school_name = 'Required';
+    if (!f.start_date) e.start_date = 'Required';
+    if (f.poc_phone && !isValidPhone(f.poc_phone)) e.poc_phone = 'Invalid phone number';
+    if (f.poc_email && !isValidEmail(f.poc_email)) e.poc_email = 'Invalid email address';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     setSaving(true);
     try {
       const res = await fetch('/api/events', {
@@ -270,7 +539,7 @@ function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; o
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">School Information</h4>
             <div className="grid grid-cols-1 gap-3">
-              <ModalInput ref={nameRef} label="School Name *" value={f.school_name} onChange={v => upd('school_name', v)} placeholder="e.g. Govt High School, Bathinda" required />
+              <ModalInput ref={nameRef} label="School Name *" value={f.school_name} onChange={v => upd('school_name', v)} placeholder="e.g. Govt High School, Bathinda" required error={errors.school_name} />
               <ModalInput label="School Address" value={f.school_address} onChange={v => upd('school_address', v)} placeholder="Full address" />
             </div>
           </div>
@@ -281,8 +550,8 @@ function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; o
             <div className="grid grid-cols-2 gap-3">
               <ModalInput label="PoC Name" value={f.poc_name} onChange={v => upd('poc_name', v)} placeholder="e.g. Principal Singh" />
               <ModalInput label="PoC Designation" value={f.poc_designation} onChange={v => upd('poc_designation', v)} placeholder="e.g. Principal" />
-              <ModalInput label="PoC Phone" value={f.poc_phone} onChange={v => upd('poc_phone', v)} placeholder="e.g. 9876543210" type="tel" />
-              <ModalInput label="PoC Email" value={f.poc_email} onChange={v => upd('poc_email', v)} placeholder="e.g. poc@school.edu" type="email" />
+              <ModalInput label="PoC Phone" value={f.poc_phone} onChange={v => upd('poc_phone', v)} placeholder="e.g. 9876543210" type="tel" error={errors.poc_phone} />
+              <ModalInput label="PoC Email" value={f.poc_email} onChange={v => upd('poc_email', v)} placeholder="e.g. poc@school.edu" type="email" error={errors.poc_email} />
             </div>
           </div>
 
@@ -290,7 +559,7 @@ function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; o
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Scheduling</h4>
             <div className="grid grid-cols-3 gap-3">
-              <ModalInput label="Start Date *" value={f.start_date} onChange={v => upd('start_date', v)} type="date" required />
+              <ModalInput label="Start Date *" value={f.start_date} onChange={v => upd('start_date', v)} type="date" required error={errors.start_date} />
               <ModalInput label="End Date" value={f.end_date} onChange={v => upd('end_date', v)} type="date" />
               <ModalInput label="Operational Hours" value={f.operational_hours} onChange={v => upd('operational_hours', v)} placeholder="e.g. 9 AM - 4 PM" />
             </div>
@@ -319,180 +588,24 @@ function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; o
   );
 }
 
-// ── Modal Input Helper ──
+// ── Modal Input Helper (with error support) ──
 const ModalInput = React.forwardRef<HTMLInputElement, {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string; required?: boolean;
-}>(({ label, value, onChange, placeholder, type = 'text', required }, ref) => (
+  placeholder?: string; type?: string; required?: boolean; error?: string;
+}>(({ label, value, onChange, placeholder, type = 'text', required, error }, ref) => (
   <div>
     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">{label}</label>
     <input ref={ref} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} required={required}
-      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600" />
+      className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 ${error ? 'border-red-500/50' : 'border-slate-800'}`} />
+    {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
   </div>
 ));
 
 // ═══════════════════════════════════════════
-// TAB 2: ROSTER MANAGEMENT
-// ═══════════════════════════════════════════
-function RosterTab({ user }: { user: User }) {
-  const [events, setEvents] = useState<EventData[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [assignedStaff, setAssignedStaff] = useState<StaffMember[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/events').then(r => r.json()).then(data => {
-      setEvents(data);
-      if (data.length > 0 && !selectedEventId) setSelectedEventId(data[0].event_id);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (selectedEventId) {
-      fetch(`/api/events/${selectedEventId}`).then(r => r.json()).then(data => {
-        setAssignedStaff(data.staff || []);
-      });
-    }
-  }, [selectedEventId]);
-
-  const doSearch = async (q: string) => {
-    setSearchQuery(q);
-    if (q.length === 0) {
-      // Show all staff when empty
-      const res = await fetch('/api/staff/search?q=');
-      setSearchResults(await res.json());
-      return;
-    }
-    const res = await fetch(`/api/staff/search?q=${encodeURIComponent(q)}`);
-    setSearchResults(await res.json());
-  };
-
-  // Load all staff on mount
-  useEffect(() => { doSearch(''); }, []);
-
-  const assignStaff = async (username: string) => {
-    if (!selectedEventId) return;
-    setLoading(true);
-    const res = await fetch(`/api/events/${selectedEventId}/staff`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, user_id: user.username }),
-    });
-    const data = await res.json();
-    if (!data.success && data.message) {
-      alert(data.message);
-    }
-    // Refresh assigned list
-    const eventRes = await fetch(`/api/events/${selectedEventId}`);
-    const eventData = await eventRes.json();
-    setAssignedStaff(eventData.staff || []);
-    setLoading(false);
-  };
-
-  const removeStaff = async (username: string) => {
-    if (!selectedEventId) return;
-    await fetch(`/api/events/${selectedEventId}/staff/${username}?user_id=${user.username}`, { method: 'DELETE' });
-    setAssignedStaff(prev => prev.filter(s => s.username !== username));
-  };
-
-  const assignedUsernames = new Set(assignedStaff.map(s => s.username));
-  const availableStaff = searchResults.filter(s => !assignedUsernames.has(s.username));
-
-  return (
-    <div className="space-y-4">
-      {/* Event Selector */}
-      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800">
-        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Select Event</label>
-        <select value={selectedEventId ?? ''} onChange={e => setSelectedEventId(Number(e.target.value))}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm">
-          {events.map(ev => (
-            <option key={ev.event_id} value={ev.event_id}>
-              {ev.school_name} — {ev.start_date} ({ev.tag})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Assigned Staff */}
-        <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800 shadow-xl">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center">
-            <Users className="w-4 h-4 mr-2 text-emerald-400" />
-            Assigned Staff ({assignedStaff.length})
-          </h3>
-          {assignedStaff.length === 0 ? (
-            <p className="text-slate-500 text-sm text-center py-6">No staff assigned yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {assignedStaff.map(s => (
-                <div key={s.username} className="flex items-center justify-between bg-slate-950 px-4 py-3 rounded-xl border border-slate-800">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-sm">
-                      {s.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-white text-sm font-medium">{s.name}</p>
-                      <p className="text-xs text-slate-400">{s.designation} · @{s.username}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => removeStaff(s.username)}
-                    className="text-slate-500 hover:text-red-400 transition-colors p-1">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Staff Search */}
-        <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800 shadow-xl">
-          <h3 className="text-sm font-semibold text-white mb-4 flex items-center">
-            <Search className="w-4 h-4 mr-2 text-cyan-400" />
-            Search & Add Staff
-          </h3>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 w-4 h-4" />
-            <input type="text" placeholder="Search by name, designation..."
-              value={searchQuery} onChange={e => doSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
-          </div>
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {availableStaff.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-4">No available staff found.</p>
-            ) : (
-              availableStaff.map(s => (
-                <div key={s.username} className="flex items-center justify-between bg-slate-950 px-4 py-3 rounded-xl border border-slate-800 hover:border-cyan-500/30 transition-all">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm">
-                      {s.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-white text-sm font-medium">{s.name}</p>
-                      <p className="text-xs text-slate-400">{s.designation}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => assignStaff(s.username)} disabled={loading}
-                    className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/40 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center space-x-1">
-                    <Plus className="w-3 h-3" /><span>Add</span>
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════
-// TAB 3: REGISTER USERS
+// TAB 2: REGISTER USERS (with specialization)
 // ═══════════════════════════════════════════
 function RegisterTab({ user }: { user: User }) {
-  const [f, setF] = useState({ username: '', password: '', name: '', role: 'Medical Staff', designation: '' });
+  const [f, setF] = useState({ username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '' });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -511,7 +624,7 @@ function RegisterTab({ user }: { user: User }) {
       const data = await res.json();
       if (data.success) {
         setMessage({ type: 'success', text: `Successfully registered ${f.name} as ${f.role}` });
-        setF({ username: '', password: '', name: '', role: 'Medical Staff', designation: '' });
+        setF({ username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '' });
       } else {
         setMessage({ type: 'error', text: data.message || 'Registration failed' });
       }
@@ -564,21 +677,39 @@ function RegisterTab({ user }: { user: User }) {
           </div>
 
           {f.role === 'Medical Staff' && (
-            <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Designation</label>
-              <div className="flex flex-wrap gap-2">
-                {['Doctor', 'Nurse', 'Dentist', 'Paramedic', 'Specialist'].map(d => (
-                  <button key={d} type="button" onClick={() => upd('designation', d)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
-                      f.designation === d
-                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-                    }`}>
-                    {f.designation === d && <Check className="w-3 h-3 inline mr-1" />}{d}
-                  </button>
-                ))}
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Designation</label>
+                <div className="flex flex-wrap gap-2">
+                  {['Doctor', 'Nurse', 'Dentist', 'Paramedic', 'Specialist'].map(d => (
+                    <button key={d} type="button" onClick={() => upd('designation', d)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                        f.designation === d
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                      }`}>
+                      {f.designation === d && <Check className="w-3 h-3 inline mr-1" />}{d}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Specialization</label>
+                <div className="flex flex-wrap gap-2">
+                  {SPECIALIZATIONS.map(s => (
+                    <button key={s} type="button" onClick={() => upd('specialization', s)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                        f.specialization === s
+                          ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                      }`}>
+                      {f.specialization === s && <Check className="w-3 h-3 inline mr-1" />}{s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
 
           <button type="submit" disabled={saving}
@@ -587,146 +718,6 @@ function RegisterTab({ user }: { user: User }) {
           </button>
         </form>
       </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════
-// TAB 4: CAMP RECORDS
-// ═══════════════════════════════════════════
-function RecordsTab({ user }: { user: User }) {
-  const [events, setEvents] = useState<EventData[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [stats, setStats] = useState<EventStats | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/events').then(r => r.json()).then(data => {
-      setEvents(data);
-      if (data.length > 0) setSelectedEventId(data[0].event_id);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (selectedEventId) {
-      setLoading(true);
-      fetch(`/api/events/${selectedEventId}/stats`).then(r => r.json()).then(data => {
-        setStats(data);
-        setLoading(false);
-      });
-    }
-  }, [selectedEventId]);
-
-  return (
-    <div className="space-y-4">
-      {/* Event Selector */}
-      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800">
-        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Select Event</label>
-        <select value={selectedEventId ?? ''} onChange={e => setSelectedEventId(Number(e.target.value))}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm">
-          {events.map(ev => (
-            <option key={ev.event_id} value={ev.event_id}>
-              {ev.school_name} — {ev.start_date} ({ev.tag})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-12 text-slate-400">Loading stats...</div>
-      ) : stats ? (
-        <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <StatCard label="Total Students" value={stats.total_students} color="cyan" />
-            <StatCard label="Screened" value={stats.screened} color="blue" />
-            <StatCard label="Normal" value={stats.normal} color="emerald" />
-            <StatCard label="Observation" value={stats.observation} color="amber" />
-            <StatCard label="Referred" value={stats.referred} color="red" />
-          </div>
-
-          {/* Staff on this event */}
-          <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800 shadow-xl">
-            <h3 className="text-sm font-semibold text-white mb-3 flex items-center">
-              <Stethoscope className="w-4 h-4 mr-2 text-emerald-400" />
-              Assigned Staff
-            </h3>
-            {stats.staff.length === 0 ? (
-              <p className="text-slate-500 text-sm">No staff assigned.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {stats.staff.map(s => (
-                  <span key={s.username} className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-300">
-                    <span className="font-medium text-white">{s.name}</span>
-                    <span className="text-slate-500 ml-1.5">({s.designation})</span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Records Table */}
-          <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800 shadow-xl">
-            <h3 className="text-sm font-semibold text-white mb-3 flex items-center">
-              <FileText className="w-4 h-4 mr-2 text-cyan-400" />
-              Health Records ({stats.records.length})
-            </h3>
-            {stats.records.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-6">No records yet for this event.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-slate-500 border-b border-slate-800">
-                    <tr>
-                      <th className="pb-3 pr-4 font-medium">Student</th>
-                      <th className="pb-3 pr-4 font-medium">Doctor</th>
-                      <th className="pb-3 pr-4 font-medium">Assessment</th>
-                      <th className="pb-3 font-medium">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50">
-                    {stats.records.map((rec: any) => {
-                      let assessment = '—';
-                      try {
-                        const d = JSON.parse(rec.json_data);
-                        assessment = d.assessment === 'N' ? 'Normal' : d.assessment === 'O' ? 'Observation' : d.assessment === 'R' ? 'Referred' : '—';
-                      } catch {}
-                      const assessColor = assessment === 'Normal' ? 'text-emerald-400' : assessment === 'Referred' ? 'text-red-400' : assessment === 'Observation' ? 'text-amber-400' : 'text-slate-400';
-                      return (
-                        <tr key={rec.record_id} className="hover:bg-slate-800/30">
-                          <td className="py-3 pr-4 text-white font-medium">{rec.student_name}</td>
-                          <td className="py-3 pr-4 text-cyan-400">{rec.doctor_id}</td>
-                          <td className={`py-3 pr-4 font-semibold ${assessColor}`}>{assessment}</td>
-                          <td className="py-3 text-slate-400">{new Date(rec.timestamp).toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="text-center py-12 text-slate-500">Select an event to view records.</div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  const colors: Record<string, string> = {
-    cyan: 'text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]',
-    blue: 'text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.8)]',
-    emerald: 'text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]',
-    amber: 'text-amber-400 drop-shadow-[0_0_10px_rgba(245,158,11,0.8)]',
-    red: 'text-red-400 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]',
-  };
-  return (
-    <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden group hover:border-slate-700 transition-all">
-      <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full blur-2xl -mr-6 -mt-6 group-hover:bg-white/10 transition-all" />
-      <h4 className="text-xs font-medium text-slate-400 mb-1 uppercase tracking-wider">{label}</h4>
-      <p className={`text-3xl font-bold ${colors[color]}`}>{value}</p>
     </div>
   );
 }

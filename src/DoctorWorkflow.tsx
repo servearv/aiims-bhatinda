@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, X, Save,
   ArrowRight, AlertTriangle, Eye, Ear, Stethoscope,
-  Activity, Wifi, WifiOff, Check, UserPlus
+  Activity, Check, UserPlus, Calendar
 } from 'lucide-react';
 
 // ── Types ──
@@ -54,14 +54,14 @@ const DEFAULT_EXAM: ExamData = {
   remarks: '',
 };
 
-const VISION_OPTIONS = ['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60'];
-const EYE_GENERAL = ['Normal', 'Redness', 'Watering'];
-const EAR_OPTIONS = ['NAD', 'Wax', 'Pain', 'Discharge'];
-const NOSE_OPTIONS = ['NAD', 'DNS', 'Blocked'];
-const THROAT_OPTIONS = ['NAD', 'Infection', 'Hypertrophy'];
-const DENTAL_OPTIONS = ['NAD', 'Cavities', 'Missing', 'Rotten'];
-const SYSTEMIC = ['NAD', 'Needs Observation', 'Abnormal'];
-const ANAEMIA_OPTIONS = ['NAD', 'Mild', 'Severe'];
+const VISION_OPTIONS = ['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', 'Other'];
+const EYE_GENERAL = ['Normal', 'Redness', 'Watering', 'Other'];
+const EAR_OPTIONS = ['NAD', 'Wax', 'Pain', 'Discharge', 'Other'];
+const NOSE_OPTIONS = ['NAD', 'DNS', 'Blocked', 'Other'];
+const THROAT_OPTIONS = ['NAD', 'Infection', 'Hypertrophy', 'Other'];
+const DENTAL_OPTIONS = ['NAD', 'Cavities', 'Missing', 'Rotten', 'Other'];
+const SYSTEMIC = ['NAD', 'Needs Observation', 'Abnormal', 'Other'];
+const ANAEMIA_OPTIONS = ['NAD', 'Mild', 'Severe', 'Other'];
 const SYMPTOM_LIST = [
   'Headache', 'Cannot see board', 'Ear pain', 'Bad breath',
   'Nail biting', 'Breathlessness', 'Frequent urination',
@@ -130,13 +130,29 @@ function bmiCategory(bmi: string): string {
 function FormSelect({ label, value, onChange, options, id }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; id: string;
 }) {
+  const [customValue, setCustomValue] = useState('');
+  const isOther = value === 'Other' || (value && !options.includes(value) && value !== '');
+  const showCustom = options.includes('Other') && isOther;
+
   return (
     <div>
       <label htmlFor={id} className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">{label}</label>
-      <select id={id} value={value} onChange={e => onChange(e.target.value)}
+      <select id={id} value={isOther && value !== 'Other' ? 'Other' : value} onChange={e => {
+        if (e.target.value === 'Other') {
+          onChange('Other');
+        } else {
+          onChange(e.target.value);
+          setCustomValue('');
+        }
+      }}
         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all">
         {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
       </select>
+      {showCustom && (
+        <input type="text" placeholder="Specify..." value={value === 'Other' ? customValue : value}
+          onChange={e => { setCustomValue(e.target.value); onChange(e.target.value || 'Other'); }}
+          className="w-full mt-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 placeholder-slate-600" />
+      )}
     </div>
   );
 }
@@ -173,23 +189,38 @@ function SectionCard({ title, icon, children, defaultOpen = true }: {
 }
 
 // ── Add Student Modal ──
-function AddStudentModal({ onClose, onCreated, userId }: {
-  onClose: () => void; onCreated: (s: Student) => void; userId: string;
+function AddStudentModal({ onClose, onCreated, userId, campId }: {
+  onClose: () => void; onCreated: (s: Student) => void; userId: string; campId: number;
 }) {
-  const [f, setF] = useState({ name: '', age: '', dob: '', gender: 'M', student_class: '', section: '', blood_group: '', father_name: '', phone: '' });
+  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '' });
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
 
-  const upd = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+  const upd = (k: string, v: string) => {
+    setF(p => ({ ...p, [k]: v }));
+    setErrors(p => ({ ...p, [k]: '' }));
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!f.name.trim()) e.name = 'Name is required';
+    if (!f.student_class) e.student_class = 'Class is required';
+    if (!f.dob) e.dob = 'Date of birth is required';
+    if (!f.gender) e.gender = 'Sex is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     setSaving(true);
     try {
       const res = await fetch('/api/students', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...f, age: f.age ? parseInt(f.age) : null, user_id: userId }),
+        body: JSON.stringify({ ...f, age: f.age ? parseInt(f.age) : null, user_id: userId, event_id: campId }),
       });
       const data = await res.json();
       if (data.success) { onCreated(data.student); onClose(); }
@@ -207,16 +238,52 @@ function AddStudentModal({ onClose, onCreated, userId }: {
             <div className="col-span-2">
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Student Name *</label>
               <input ref={nameRef} value={f.name} onChange={e => upd('name', e.target.value)} required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 placeholder-slate-600" placeholder="Full name" />
+                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 placeholder-slate-600 ${errors.name ? 'border-red-500/50' : 'border-slate-800'}`} placeholder="Full name" />
+              {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
             </div>
             <FormInput label="Age" value={f.age} onChange={v => upd('age', v)} type="number" id="add-age" placeholder="e.g. 12" />
-            <FormSelect label="Sex *" value={f.gender} onChange={v => upd('gender', v)} options={['M', 'F']} id="add-gender" />
-            <FormSelect label="Class *" value={f.student_class} onChange={v => upd('student_class', v)} options={CLASSES} id="add-class" />
+
+            {/* Sex as checkboxes */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Sex *</label>
+              <div className="flex space-x-3 mt-1">
+                {[{ v: 'M', label: 'Male' }, { v: 'F', label: 'Female' }].map(opt => (
+                  <button key={opt.v} type="button" onClick={() => upd('gender', opt.v)}
+                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center space-x-2 ${
+                      f.gender === opt.v
+                        ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                    }`}>
+                    {f.gender === opt.v && <Check className="w-3.5 h-3.5" />}
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              {errors.gender && <p className="text-red-400 text-xs mt-1">{errors.gender}</p>}
+            </div>
+
+            {/* Class (required) */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Class *</label>
+              <select value={f.student_class} onChange={e => upd('student_class', e.target.value)}
+                className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all ${errors.student_class ? 'border-red-500/50' : 'border-slate-800'}`}>
+                {CLASSES.map(o => <option key={o} value={o}>{o || '— Select —'}</option>)}
+              </select>
+              {errors.student_class && <p className="text-red-400 text-xs mt-1">{errors.student_class}</p>}
+            </div>
+
             <FormSelect label="Section" value={f.section} onChange={v => upd('section', v)} options={SECTIONS} id="add-section" />
             <FormSelect label="Blood Group" value={f.blood_group} onChange={v => upd('blood_group', v)} options={BLOOD_GROUPS} id="add-bg" />
             <FormInput label="Father's Name" value={f.father_name} onChange={v => upd('father_name', v)} id="add-father" placeholder="Optional" />
             <FormInput label="Phone" value={f.phone} onChange={v => upd('phone', v)} id="add-phone" placeholder="Optional" type="tel" />
-            <FormInput label="Date of Birth" value={f.dob} onChange={v => upd('dob', v)} id="add-dob" type="date" />
+
+            {/* DOB (required) */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Date of Birth *</label>
+              <input type="date" value={f.dob} onChange={e => upd('dob', e.target.value)}
+                className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all ${errors.dob ? 'border-red-500/50' : 'border-slate-800'}`} />
+              {errors.dob && <p className="text-red-400 text-xs mt-1">{errors.dob}</p>}
+            </div>
           </div>
           <button type="submit" disabled={saving}
             className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 mt-2">
@@ -229,9 +296,95 @@ function AddStudentModal({ onClose, onCreated, userId }: {
 }
 
 // ════════════════════════════════════════════════
+// ██ CAMP SELECTION LANDING
+// ════════════════════════════════════════════════
+function CampSelectionScreen({ user, onSelect }: { user: User; onSelect: (campId: number, campName: string) => void }) {
+  const [camps, setCamps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/events/my?username=${encodeURIComponent(user.username)}`)
+      .then(r => r.json())
+      .then(data => { setCamps(data); setLoading(false); })
+      .catch(() => {
+        // Fallback: fetch all events if endpoint doesn't exist
+        fetch('/api/events').then(r => r.json()).then(data => { setCamps(data); setLoading(false); });
+      });
+  }, [user.username]);
+
+  const formatDate = (d: string) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return d;
+    return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getFullYear()).slice(-2)}`;
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl mx-auto">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-white tracking-tight">Select Camp 🏥</h2>
+        <p className="text-slate-400 text-sm mt-1">Choose the camp you are assigned to for today's screening.</p>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-slate-400">Loading camps...</div>
+      ) : camps.length === 0 ? (
+        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
+          <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+          <p className="text-slate-400">No camps assigned to you.</p>
+          <p className="text-slate-500 text-sm mt-1">Contact an administrator to be assigned to a camp.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {camps.map((camp: any) => (
+            <button key={camp.event_id} onClick={() => onSelect(camp.event_id, camp.school_name)}
+              className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all p-5 group shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-all">
+                    <Calendar className="w-6 h-6 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-lg group-hover:text-cyan-300 transition-colors">{camp.school_name}</h3>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                      {formatDate(camp.start_date)}{camp.end_date ? ` → ${formatDate(camp.end_date)}` : ''}
+                      {camp.operational_hours ? ` · ${camp.operational_hours}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${
+                    camp.tag === 'Ongoing' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                    camp.tag === 'Upcoming' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                    'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                  }`}>{camp.tag}</span>
+                  <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════
 // ██ MAIN DOCTOR WORKFLOW
 // ════════════════════════════════════════════════
 export default function DoctorWorkflow({ user }: { user: User }) {
+  // Camp selection
+  const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
+  const [selectedCampName, setSelectedCampName] = useState('');
+
+  if (!selectedCampId) {
+    return <CampSelectionScreen user={user} onSelect={(id, name) => { setSelectedCampId(id); setSelectedCampName(name); }} />;
+  }
+
+  return <ClinicalWorkflow user={user} campId={selectedCampId} campName={selectedCampName} onBack={() => { setSelectedCampId(null); setSelectedCampName(''); }} />;
+}
+
+function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; campId: number; campName: string; onBack: () => void }) {
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Student[]>([]);
@@ -284,9 +437,10 @@ export default function DoctorWorkflow({ user }: { user: User }) {
     if (filterClass) params.set('class', filterClass);
     if (filterSection) params.set('section', filterSection);
     if (filterExamined) params.set('examined', filterExamined);
+    params.set('event_id', String(campId));
     const res = await fetch(`/api/students/search?${params}`);
     setSearchResults(await res.json());
-  }, [searchQuery, filterClass, filterSection, filterExamined]);
+  }, [searchQuery, filterClass, filterSection, filterExamined, campId]);
 
   useEffect(() => { doSearch(); }, [filterClass, filterSection, filterExamined]);
 
@@ -308,7 +462,7 @@ export default function DoctorWorkflow({ user }: { user: User }) {
     setSaving(true);
     const payload = {
       student_id: selectedStudent.student_id,
-      camp_id: 1,
+      camp_id: campId,
       doctor_id: user.username,
       exam_data: { ...exam, bmi: calcBMI(exam.height, exam.weight) },
     };
@@ -341,18 +495,19 @@ export default function DoctorWorkflow({ user }: { user: User }) {
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Clinical Screening 🩺</h2>
-          <p className="text-slate-400 text-sm mt-0.5">Fast medical examination workflow</p>
+          <div className="flex items-center space-x-3">
+            <button onClick={onBack} className="text-slate-400 hover:text-cyan-400 transition-colors text-sm flex items-center space-x-1">
+              <ChevronRight className="w-4 h-4 rotate-180" /><span>Back</span>
+            </button>
+            <h2 className="text-2xl font-bold text-white tracking-tight">Clinical Screening 🩺</h2>
+          </div>
+          <p className="text-slate-400 text-sm mt-0.5">{campName}</p>
         </div>
         <div className="flex items-center space-x-3">
           <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm">
             <span className="text-slate-400">Today: </span>
             <span className="text-cyan-400 font-bold">{todayCount}</span>
             <span className="text-slate-500"> examined</span>
-          </div>
-          <div className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-medium ${online ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-            {online ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-            <span>{online ? 'Online' : 'Offline'}</span>
           </div>
         </div>
       </div>
@@ -440,7 +595,7 @@ export default function DoctorWorkflow({ user }: { user: User }) {
             </div>
             <button onClick={() => { setSelectedStudent(null); setExam({ ...DEFAULT_EXAM }); setAlerts([]); searchRef.current?.focus(); }}
               className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border border-slate-700 text-white flex items-center space-x-2">
-              <ArrowRight className="w-4 h-4" /><span>Next Student</span>
+              <X className="w-4 h-4" /><span>Cancel</span>
             </button>
           </div>
 
@@ -589,18 +744,17 @@ export default function DoctorWorkflow({ user }: { user: User }) {
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 resize-none" />
           </SectionCard>
 
-          {/* Save & Next */}
+          {/* Save Button (renamed from "Save & Next Student") */}
           <button onClick={saveExam} disabled={saving}
             className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-all disabled:opacity-50 text-lg flex items-center justify-center space-x-3">
             <Save className="w-5 h-5" />
-            <span>{saving ? 'Saving...' : 'Save & Next Student'}</span>
-            <ArrowRight className="w-5 h-5" />
+            <span>{saving ? 'Saving...' : 'Save'}</span>
           </button>
         </>
       )}
 
       {/* Add Student Modal */}
-      {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onCreated={handleStudentCreated} userId={user.username} />}
+      {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onCreated={handleStudentCreated} userId={user.username} campId={campId} />}
     </div>
   );
 }
