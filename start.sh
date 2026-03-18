@@ -9,10 +9,15 @@ echo ""
 
 cd "$(dirname "$0")"
 
-# --- Step 1: Install Python dependencies ---
-echo "[1/4] Installing Python dependencies..."
-pip install flask >/dev/null 2>&1 || pip3 install flask >/dev/null 2>&1
-echo "  OK - Flask installed."
+# --- Step 1: Set up Python virtual environment ---
+echo "[1/4] Setting up Python environment..."
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+    echo "  Created virtual environment."
+fi
+source venv/bin/activate
+pip install --quiet flask
+echo "  OK - Python environment ready."
 echo ""
 
 # --- Step 2: Install Node.js dependencies ---
@@ -37,9 +42,8 @@ echo ""
 
 echo "  ============================================"
 echo "   Starting server on http://localhost:3000"
-echo "   Login: admin/admin (Admin)"
-echo "          doctor/doc (Medical Staff)"
+echo "   Login: Admin / admin"
 echo "  ============================================"
 echo ""
 
-python server.py || python3 server.py
+python server.py

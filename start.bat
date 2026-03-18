@@ -6,16 +6,20 @@ echo   AIIMS Bathinda - Enterprise Portal
 echo  ======================================
 echo.
 
-REM --- Step 1: Install Python dependencies ---
-echo [1/4] Installing Python dependencies...
-pip install flask >nul 2>&1
+REM --- Step 1: Set up Python virtual environment ---
+echo [1/4] Setting up Python environment...
+if not exist venv (
+    python -m venv venv
+    echo  Created virtual environment.
+)
+call venv\Scripts\activate.bat
+pip install --quiet flask >nul 2>&1
 if errorlevel 1 (
-    echo  ERROR: pip install failed. Make sure Python and pip are installed.
-    echo  Try: python -m pip install flask
+    echo  ERROR: pip install failed. Make sure Python is installed.
     pause
     exit /b 1
 )
-echo  OK - Flask installed.
+echo  OK - Python environment ready.
 echo.
 
 REM --- Step 2: Install Node.js dependencies ---
@@ -50,8 +54,7 @@ echo.
 
 echo  ============================================
 echo   Starting server on http://localhost:3000
-echo   Login: admin/admin (Admin)
-echo          doctor/doc (Medical Staff)
+echo   Login: Admin / admin
 echo  ============================================
 echo.
 
