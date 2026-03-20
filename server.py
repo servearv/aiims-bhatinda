@@ -268,12 +268,15 @@ def init_db():
         );
     """)
 
+    conn.commit()
+
     # Idempotent migrations: add columns if missing
     for col_def in ["designation TEXT DEFAULT ''", "specialization TEXT DEFAULT ''"]:
         try:
             cur.execute(f"ALTER TABLE Users ADD COLUMN {col_def}")
+            conn.commit()
         except Exception:
-            pass
+            conn.rollback()
 
     student_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
                     "blood_group TEXT", "father_name TEXT", "phone TEXT",
@@ -287,13 +290,15 @@ def init_db():
     for col_def in student_cols:
         try:
             cur.execute(f"ALTER TABLE Students ADD COLUMN {col_def}")
+            conn.commit()
         except Exception:
-            pass
+            conn.rollback()
 
     try:
         cur.execute("ALTER TABLE Events ADD COLUMN school_id INTEGER")
+        conn.commit()
     except Exception:
-        pass
+        conn.rollback()
 
     # --- Migration: Medical Staff → Specialist roles ---
     try:
@@ -302,10 +307,11 @@ def init_db():
         ).fetchall()
         for u in staff_users:
             new_role = SPEC_TO_ROLE.get(u['specialization'], 'Other')
-            cur.execute("UPDATE Users SET role = ? WHERE username = ?",
+            cur.execute("UPDATE Users SET role = %s WHERE username = %s",
                         (new_role, u['username']))
+        conn.commit()
     except Exception:
-        pass
+        conn.rollback()
 
     # --- Migration: Copy Event_Staff → Event_Volunteers ---
     try:
@@ -315,20 +321,20 @@ def init_db():
         ).fetchall()
         for row in existing:
             try:
-                try:
-                    cur.execute(
-                        "INSERT INTO Event_Volunteers "
-                        "(event_id, username, category, joined_at, active) "
-                        "VALUES (%s,%s,%s,%s,1)",
-                        (row['event_id'], row['username'], row['role'],
-                         row['assigned_at']),
-                    )
-                except psycopg2.IntegrityError:
-                    pass
+                cur.execute(
+                    "INSERT INTO Event_Volunteers "
+                    "(event_id, username, category, joined_at, active) "
+                    "VALUES (%s,%s,%s,%s,1)",
+                    (row['event_id'], row['username'], row['role'],
+                     row['assigned_at']),
+                )
+                conn.commit()
+            except psycopg2.IntegrityError:
+                conn.rollback()
             except Exception:
-                pass
+                conn.rollback()
     except Exception:
-        pass
+        conn.rollback()
 
     # Seed only when Users table is empty
     row = cur.execute("SELECT COUNT(*) AS count FROM Users").fetchone()
@@ -598,7 +604,8 @@ def api_volunteer_join(event_id):
                 (event_id, username, category, now),
             )
         conn.commit()
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
+        conn.rollback()
         conn.close()
         return jsonify({"success": False, "message": "Already volunteering"}), 409
     conn.close()
@@ -981,7 +988,9 @@ def api_bulk_create_students():
             success_list.append({
                 "row": row_num, "student_id": cur.fetchone()["student_id"], "name": name
             })
+            conn.commit()
         except Exception as exc:
+            conn.rollback()
             error_list.append({
                 "row": row_num, "data": row,
                 "errors": [{"column": "db", "reason": str(exc)}],

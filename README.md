@@ -50,9 +50,16 @@ A comprehensive digital health management system for AIIMS Bathinda school scree
 ## ☁️ Deployment (Render)
 
 This application is configured for one-click deployment using **Render** (Free Tier).
-Since Render's free tier does not support persistent disks, the application has been refactored to use **PostgreSQL**. You will need a free external PostgreSQL database (e.g., [Supabase](https://supabase.com/), [Neon](https://neon.tech/), or Render's free Postgres).
+Since Render's free tier does not support persistent disks, the application has been refactored to use **PostgreSQL**. The best and easiest option is to use **Render's Free PostgreSQL Database** since it natively works together perfectly.
 
-### Option 1: Render Dashboard (Manual Setup)
+### Step 1: Create a PostgreSQL Database on Render
+1. Go to your [Render Dashboard](https://dashboard.render.com/).
+2. Click **New** -> **PostgreSQL**.
+3. Name your database (e.g., `aiims-db`), leave the defaults, and ensure the **Free** tier is selected.
+4. Click **Create Database**.
+5. Once created, scroll down to the **Connections** section and copy the **Internal Database URL** (e.g., `postgres://user:password@dpg-...-a/aiims_db`). Keep this copied for the next step.
+
+### Step 2: Create the Web Service (Manual Setup)
 
 1. Create a new **Web Service** on [Render.com](https://render.com).
 2. Connect this GitHub repository.
@@ -63,7 +70,7 @@ Since Render's free tier does not support persistent disks, the application has 
 4. Add Environment Variables:
    - `PYTHON_VERSION`: `3.11.0`
    - `NODE_VERSION`: `20`
-   - `DATABASE_URL`: *(Paste your Supabase/Neon connection string here)*
+   - `DATABASE_URL`: *(Paste the **Internal Database URL** you copied from your Render Postgres Database)*
    - `SECRET_KEY`: *(Generate a secure random string)*
 5. Click **Create Web Service** at the bottom of the page.
 
