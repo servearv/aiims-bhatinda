@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar, Users, UserPlus, Search, Plus, X, Check,
   MapPin, Phone, Mail, Clock, Tag, ChevronDown, ChevronRight,
-  Activity, FileText, Stethoscope, Trash2
+  Activity, FileText, Stethoscope, Trash2, School, ExternalLink
 } from 'lucide-react';
 
 type User = { username: string; role: string; name: string };
@@ -85,6 +85,12 @@ function isValidEmail(email: string): boolean {
 // ══════════════════════════════════════════
 export default function AdminDashboard({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<'events' | 'register'>('events');
+  const [defaultRole, setDefaultRole] = useState('');
+
+  const switchToRegisterSchool = () => {
+    setDefaultRole('School POC');
+    setActiveTab('register');
+  };
 
   const tabs = [
     { key: 'events' as const, label: 'Events', icon: <Calendar className="w-4 h-4" /> },
@@ -103,7 +109,7 @@ export default function AdminDashboard({ user }: { user: User }) {
         {tabs.map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { setActiveTab(tab.key); if (tab.key !== 'register') setDefaultRole(''); }}
             className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
               activeTab === tab.key
                 ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
@@ -116,8 +122,8 @@ export default function AdminDashboard({ user }: { user: User }) {
         ))}
       </div>
 
-      {activeTab === 'events' && <EventsTab user={user} />}
-      {activeTab === 'register' && <RegisterTab user={user} />}
+      {activeTab === 'events' && <EventsTab user={user} onAddNewSchool={switchToRegisterSchool} />}
+      {activeTab === 'register' && <RegisterTab user={user} defaultRole={defaultRole} onRoleConsumed={() => setDefaultRole('')} />}
     </div>
   );
 }
@@ -125,7 +131,7 @@ export default function AdminDashboard({ user }: { user: User }) {
 // ═══════════════════════════════════════════
 // TAB 1: EVENTS (with inline roster + records)
 // ═══════════════════════════════════════════
-function EventsTab({ user }: { user: User }) {
+function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () => void }) {
   const [events, setEvents] = useState<EventData[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [filterTag, setFilterTag] = useState('');
@@ -231,7 +237,7 @@ function EventsTab({ user }: { user: User }) {
       )}
 
       {/* Create Event Modal */}
-      {showCreate && <CreateEventModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); fetchEvents(); }} user={user} />}
+      {showCreate && <CreateEventModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); fetchEvents(); }} user={user} onAddNewSchool={() => { setShowCreate(false); onAddNewSchool(); }} />}
     </div>
   );
 }
@@ -487,16 +493,49 @@ function DetailItem({ icon, label, value }: { icon: React.ReactNode; label: stri
   );
 }
 
-// ── Create Event Modal (with validation) ──
-function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; onCreated: () => void; user: User }) {
+// ── Create Event Modal (with school dropdown) ──
+interface SchoolOption {
+  school_id: number;
+  school_name: string;
+  school_address: string;
+  poc_name: string;
+  poc_designation: string;
+  poc_phone: string;
+  poc_email: string;
+}
+
+function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
+  onClose: () => void; onCreated: () => void; user: User; onAddNewSchool: () => void;
+}) {
   const [f, setF] = useState({
-    school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
+    school_id: null as number | null,
     start_date: '', end_date: '', operational_hours: '', tag: 'Upcoming',
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const nameRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { nameRef.current?.focus(); }, []);
+  const [schoolSearch, setSchoolSearch] = useState('');
+  const [schoolResults, setSchoolResults] = useState<SchoolOption[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<SchoolOption | null>(null);
+  const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch schools on search
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      fetch(`/api/schools/search?q=${encodeURIComponent(schoolSearch)}`)
+        .then(r => r.json())
+        .then(setSchoolResults);
+    }, 200);
+  }, [schoolSearch]);
+
+  const selectSchool = (s: SchoolOption) => {
+    setSelectedSchool(s);
+    setF(p => ({ ...p, school_id: s.school_id }));
+    setSchoolSearch(s.school_name);
+    setShowSchoolDropdown(false);
+    setErrors(p => ({ ...p, school_id: '' }));
+  };
 
   const upd = (k: string, v: string) => {
     setF(p => ({ ...p, [k]: v }));
@@ -505,10 +544,8 @@ function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; o
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!f.school_name.trim()) e.school_name = 'Required';
+    if (!f.school_id) e.school_id = 'Please select a school';
     if (!f.start_date) e.start_date = 'Required';
-    if (f.poc_phone && !isValidPhone(f.poc_phone)) e.poc_phone = 'Invalid phone number';
-    if (f.poc_email && !isValidEmail(f.poc_email)) e.poc_email = 'Invalid email address';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -535,24 +572,59 @@ function CreateEventModal({ onClose, onCreated, user }: { onClose: () => void; o
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
         <h3 className="text-xl font-bold text-white mb-5 flex items-center"><Calendar className="w-5 h-5 mr-2 text-cyan-400" /> Create New Event</h3>
         <form onSubmit={handleSave} className="space-y-4">
-          {/* School Info */}
+          {/* School Selection */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">School Information</h4>
-            <div className="grid grid-cols-1 gap-3">
-              <ModalInput ref={nameRef} label="School Name *" value={f.school_name} onChange={v => upd('school_name', v)} placeholder="e.g. Govt High School, Bathinda" required error={errors.school_name} />
-              <ModalInput label="School Address" value={f.school_address} onChange={v => upd('school_address', v)} placeholder="Full address" />
-            </div>
-          </div>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">School</h4>
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 w-3.5 h-3.5" />
+                <input
+                  type="text"
+                  value={schoolSearch}
+                  onChange={e => { setSchoolSearch(e.target.value); setShowSchoolDropdown(true); setSelectedSchool(null); setF(p => ({ ...p, school_id: null })); }}
+                  onFocus={() => setShowSchoolDropdown(true)}
+                  placeholder="Search for a school..."
+                  className={`w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 ${errors.school_id ? 'border-red-500/50' : 'border-slate-800'}`}
+                />
+              </div>
+              {errors.school_id && <p className="text-red-400 text-xs mt-1">{errors.school_id}</p>}
 
-          {/* PoC */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">School Point of Contact</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <ModalInput label="PoC Name" value={f.poc_name} onChange={v => upd('poc_name', v)} placeholder="e.g. Principal Singh" />
-              <ModalInput label="PoC Designation" value={f.poc_designation} onChange={v => upd('poc_designation', v)} placeholder="e.g. Principal" />
-              <ModalInput label="PoC Phone" value={f.poc_phone} onChange={v => upd('poc_phone', v)} placeholder="e.g. 9876543210" type="tel" error={errors.poc_phone} />
-              <ModalInput label="PoC Email" value={f.poc_email} onChange={v => upd('poc_email', v)} placeholder="e.g. poc@school.edu" type="email" error={errors.poc_email} />
+              {showSchoolDropdown && (
+                <div className="absolute z-20 w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl max-h-48 overflow-y-auto shadow-2xl">
+                  {schoolResults.length === 0 ? (
+                    <p className="text-slate-500 text-xs text-center py-3">No schools found.</p>
+                  ) : (
+                    schoolResults.map(s => (
+                      <button key={s.school_id} type="button" onClick={() => selectSchool(s)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-slate-800 transition-colors flex items-center justify-between">
+                        <div>
+                          <p className="text-white text-sm font-medium">{s.school_name}</p>
+                          <p className="text-xs text-slate-400">{s.poc_name}{s.school_address ? ` · ${s.school_address}` : ''}</p>
+                        </div>
+                        {selectedSchool?.school_id === s.school_id && <Check className="w-4 h-4 text-emerald-400" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Selected school details preview */}
+            {selectedSchool && (
+              <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+                <p className="text-white font-medium">{selectedSchool.school_name}</p>
+                {selectedSchool.school_address && <p className="text-slate-400"><MapPin className="w-3 h-3 inline mr-1" />{selectedSchool.school_address}</p>}
+                {selectedSchool.poc_name && <p className="text-slate-400"><Users className="w-3 h-3 inline mr-1" />PoC: {selectedSchool.poc_name} ({selectedSchool.poc_designation})</p>}
+                {selectedSchool.poc_phone && <p className="text-slate-400"><Phone className="w-3 h-3 inline mr-1" />{selectedSchool.poc_phone}</p>}
+              </div>
+            )}
+
+            {/* Add New School Link */}
+            <button type="button" onClick={onAddNewSchool}
+              className="flex items-center space-x-1.5 text-cyan-400 hover:text-cyan-300 text-xs font-medium transition-colors">
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Register a new school →</span>
+            </button>
           </div>
 
           {/* Scheduling */}
@@ -602,12 +674,24 @@ const ModalInput = React.forwardRef<HTMLInputElement, {
 ));
 
 // ═══════════════════════════════════════════
-// TAB 2: REGISTER USERS (with specialization)
+// TAB 2: REGISTER USERS (with School POC support)
 // ═══════════════════════════════════════════
-function RegisterTab({ user }: { user: User }) {
-  const [f, setF] = useState({ username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '' });
+function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaultRole?: string; onRoleConsumed?: () => void }) {
+  const [f, setF] = useState({
+    username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '',
+    // School POC fields
+    school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
+  });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Apply default role if passed from parent
+  useEffect(() => {
+    if (defaultRole) {
+      setF(p => ({ ...p, role: defaultRole }));
+      onRoleConsumed?.();
+    }
+  }, [defaultRole]);
 
   const upd = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
 
@@ -616,15 +700,38 @@ function RegisterTab({ user }: { user: User }) {
     setSaving(true);
     setMessage(null);
     try {
+      let payload = { ...f, admin_user: user.username };
+      
+      let generatedUsername = '';
+      let generatedPassword = '';
+      
+      // Auto-generate required fields for School POC
+      if (f.role === 'School POC') {
+        const cleanSchoolName = f.school_name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 10);
+        generatedUsername = `school_${cleanSchoolName}_${Math.floor(Math.random() * 1000)}`;
+        generatedPassword = `aiims123`;
+        
+        payload.username = generatedUsername;
+        payload.password = generatedPassword;
+        payload.name = f.poc_name || f.school_name; // Backend needs a name for the User record
+      }
+
       const res = await fetch('/api/users/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...f, admin_user: user.username }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
-        setMessage({ type: 'success', text: `Successfully registered ${f.name} as ${f.role}` });
-        setF({ username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '' });
+        let successMsg = `Successfully registered ${payload.name} as ${f.role}`;
+        if (f.role === 'School POC') {
+          successMsg = `Successfully registered ${f.school_name}. Username: ${generatedUsername}, Password: ${generatedPassword}`;
+        }
+        setMessage({ type: 'success', text: successMsg });
+        setF({
+          username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '',
+          school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
+        });
       } else {
         setMessage({ type: 'error', text: data.message || 'Registration failed' });
       }
@@ -654,22 +761,29 @@ function RegisterTab({ user }: { user: User }) {
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <ModalInput label="Username *" value={f.username} onChange={v => upd('username', v)} placeholder="e.g. doc_kumar" required />
-            <ModalInput label="Password *" value={f.password} onChange={v => upd('password', v)} placeholder="Min 4 chars" type="password" required />
-          </div>
-          <ModalInput label="Full Name *" value={f.name} onChange={v => upd('name', v)} placeholder="e.g. Dr. Anil Kumar" required />
+          {f.role !== 'School POC' && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <ModalInput label="Username *" value={f.username} onChange={v => upd('username', v)} placeholder="e.g. doc_kumar" required />
+                <ModalInput label="Password *" value={f.password} onChange={v => upd('password', v)} placeholder="Min 4 chars" type="password" required />
+              </div>
+              <ModalInput label="Full Name *" value={f.name} onChange={v => upd('name', v)} placeholder="e.g. Dr. Anil Kumar" required />
+            </>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Role</label>
             <div className="flex space-x-3">
-              {['Admin', 'Medical Staff'].map(role => (
+              {['Admin', 'Medical Staff', 'School POC'].map(role => (
                 <button key={role} type="button" onClick={() => upd('role', role)}
                   className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border ${
                     f.role === role
-                      ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                      ? role === 'School POC'
+                        ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
+                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
                   }`}>
+                  {role === 'School POC' && <School className="w-3.5 h-3.5 inline mr-1" />}
                   {role}
                 </button>
               ))}
@@ -698,7 +812,7 @@ function RegisterTab({ user }: { user: User }) {
                 <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Specialization</label>
                 <div className="flex flex-wrap gap-2">
                   {SPECIALIZATIONS.map(s => (
-                    <button key={s} type="button" onClick={() => upd('specialization', s)}
+                    <button key={s} type="button" onClick={() => upd('specialization', f.specialization === s ? '' : s)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                         f.specialization === s
                           ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
@@ -710,6 +824,23 @@ function RegisterTab({ user }: { user: User }) {
                 </div>
               </div>
             </>
+          )}
+
+          {/* School POC specific fields */}
+          {f.role === 'School POC' && (
+            <div className="space-y-3 p-4 bg-violet-500/5 border border-violet-500/20 rounded-2xl">
+              <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center">
+                <School className="w-3.5 h-3.5 mr-1.5" /> School Information
+              </h4>
+              <ModalInput label="School Name *" value={f.school_name} onChange={v => upd('school_name', v)} placeholder="e.g. Govt High School, Bathinda" required />
+              <ModalInput label="School Address" value={f.school_address} onChange={v => upd('school_address', v)} placeholder="Full address" />
+              <ModalInput label="PoC Name *" value={f.poc_name} onChange={v => upd('poc_name', v)} placeholder="e.g. Principal Sharma" required />
+              <div className="grid grid-cols-2 gap-3">
+                <ModalInput label="PoC Designation" value={f.poc_designation} onChange={v => upd('poc_designation', v)} placeholder="e.g. Principal" />
+                <ModalInput label="PoC Phone" value={f.poc_phone} onChange={v => upd('poc_phone', v)} placeholder="e.g. 9876543210" type="tel" />
+              </div>
+              <ModalInput label="PoC Email" value={f.poc_email} onChange={v => upd('poc_email', v)} placeholder="e.g. poc@school.edu" type="email" />
+            </div>
           )}
 
           <button type="submit" disabled={saving}
