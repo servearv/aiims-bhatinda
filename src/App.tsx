@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import DoctorWorkflow from './DoctorWorkflow';
 import AdminDashboard from './AdminDashboard';
+import SchoolDashboard from './SchoolDashboard';
 import {
   Activity, Stethoscope, ActivitySquare,
-  LogOut, ShieldCheck, Sun, Moon
+  LogOut, ShieldCheck, Sun, Moon, School
 } from 'lucide-react';
 
 // --- Types ---
@@ -91,6 +92,7 @@ export default function App() {
         <div className="p-8 relative z-10">
           {user.role === 'Admin' && <AdminDashboard user={user} />}
           {user.role === 'Medical Staff' && <DoctorWorkflow user={user} />}
+          {user.role === 'School POC' && <SchoolDashboard user={user} />}
         </div>
       </main>
     </div>
@@ -101,6 +103,7 @@ function getRoleIcon(role: string) {
   switch (role) {
     case 'Admin': return <Activity className="w-5 h-5" />;
     case 'Medical Staff': return <Stethoscope className="w-5 h-5" />;
+    case 'School POC': return <School className="w-5 h-5" />;
     default: return <Activity className="w-5 h-5" />;
   }
 }
@@ -188,7 +191,7 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
         </form>
         
         <div className="mt-8 pt-6 border-t border-slate-800/50 text-center">
-          <p className="text-xs text-slate-500">Login: Admin / admin</p>
+          <p className="text-xs text-slate-500">Admin / admin · school1 / school1</p>
         </div>
       </div>
     </div>

@@ -1,11 +1,14 @@
 import os
+import io
+import csv
 import json
 import random
 import string
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime
+import re
+from datetime import datetime, date
 
 from flask import Flask, request, jsonify, send_from_directory, Response
 
@@ -49,6 +52,19 @@ def init_db():
             specialization TEXT DEFAULT ''
         );
 
+        CREATE TABLE IF NOT EXISTS Schools (
+            school_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            school_name TEXT NOT NULL,
+            school_address TEXT DEFAULT '',
+            poc_username TEXT,
+            poc_name TEXT DEFAULT '',
+            poc_designation TEXT DEFAULT '',
+            poc_phone TEXT DEFAULT '',
+            poc_email TEXT DEFAULT '',
+            created_at TEXT,
+            FOREIGN KEY(poc_username) REFERENCES Users(username)
+        );
+
         CREATE TABLE IF NOT EXISTS Events (
             event_id INTEGER PRIMARY KEY AUTOINCREMENT,
             school_name TEXT NOT NULL,
@@ -57,13 +73,15 @@ def init_db():
             poc_designation TEXT DEFAULT '',
             poc_phone TEXT DEFAULT '',
             poc_email TEXT DEFAULT '',
+            school_id INTEGER,
             start_date TEXT NOT NULL,
             end_date TEXT DEFAULT '',
             operational_hours TEXT DEFAULT '',
             tag TEXT DEFAULT 'Upcoming',
             created_at TEXT,
             created_by TEXT,
-            FOREIGN KEY(created_by) REFERENCES Users(username)
+            FOREIGN KEY(created_by) REFERENCES Users(username),
+            FOREIGN KEY(school_id) REFERENCES Schools(school_id)
         );
 
         CREATE TABLE IF NOT EXISTS Event_Staff (
@@ -88,6 +106,8 @@ def init_db():
             father_name TEXT,
             phone TEXT,
             qr_code_hash TEXT,
+            added_by TEXT DEFAULT '',
+            status TEXT DEFAULT 'Pending Examination',
             FOREIGN KEY(event_id) REFERENCES Events(event_id)
         );
 
@@ -129,15 +149,20 @@ def init_db():
     # Idempotent migration: add new columns to Students if they don't exist
     student_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
                     "blood_group TEXT", "father_name TEXT", "phone TEXT",
-                    "event_id INTEGER"]
+                    "event_id INTEGER", "added_by TEXT DEFAULT ''",
+                    "status TEXT DEFAULT 'Pending Examination'"]
     for col_def in student_cols:
         try:
             cur.execute(f"ALTER TABLE Students ADD COLUMN {col_def}")
         except Exception:
             pass
 
-    # Idempotent migration: rename school_id to event_id alias in Students (keep backward compat)
-    # We keep the column if exists; new inserts use event_id
+    # Idempotent migration: add school_id to Events
+    try:
+        cur.execute("ALTER TABLE Events ADD COLUMN school_id INTEGER")
+    except Exception:
+        pass
+
 
     # Seed only when Users table is empty
     row = cur.execute("SELECT COUNT(*) AS count FROM Users").fetchone()
@@ -235,17 +260,38 @@ def api_create_event():
     now = datetime.utcnow().isoformat()
     conn = get_db()
     cur = conn.cursor()
+
+    # If school_id is provided, pull school details from Schools table
+    school_id = data.get("school_id")
+    school_name = data.get("school_name", "")
+    school_address = data.get("school_address", "")
+    poc_name = data.get("poc_name", "")
+    poc_designation = data.get("poc_designation", "")
+    poc_phone = data.get("poc_phone", "")
+    poc_email = data.get("poc_email", "")
+
+    if school_id:
+        school_row = conn.execute("SELECT * FROM Schools WHERE school_id = ?", (school_id,)).fetchone()
+        if school_row:
+            school_name = school_row["school_name"]
+            school_address = school_row["school_address"]
+            poc_name = school_row["poc_name"]
+            poc_designation = school_row["poc_designation"]
+            poc_phone = school_row["poc_phone"]
+            poc_email = school_row["poc_email"]
+
     cur.execute("""
         INSERT INTO Events (school_name, school_address, poc_name, poc_designation, poc_phone, poc_email,
-                            start_date, end_date, operational_hours, tag, created_at, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                            school_id, start_date, end_date, operational_hours, tag, created_at, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
-        data.get("school_name", ""),
-        data.get("school_address", ""),
-        data.get("poc_name", ""),
-        data.get("poc_designation", ""),
-        data.get("poc_phone", ""),
-        data.get("poc_email", ""),
+        school_name,
+        school_address,
+        poc_name,
+        poc_designation,
+        poc_phone,
+        poc_email,
+        school_id,
         data.get("start_date", ""),
         data.get("end_date", ""),
         data.get("operational_hours", ""),
@@ -256,7 +302,7 @@ def api_create_event():
     new_id = cur.lastrowid
     conn.commit()
     conn.close()
-    log_audit(data.get("created_by", "admin"), "CREATE_EVENT", f"Created event {new_id}: {data.get('school_name')}")
+    log_audit(data.get("created_by", "admin"), "CREATE_EVENT", f"Created event {new_id}: {school_name}")
     return jsonify({"success": True, "event_id": new_id})
 
 
@@ -349,8 +395,8 @@ def api_register_user():
     if not username or not password or not name:
         return jsonify({"success": False, "message": "Username, password, and name are required"}), 400
 
-    if role not in ("Admin", "Medical Staff"):
-        return jsonify({"success": False, "message": "Role must be Admin or Medical Staff"}), 400
+    if role not in ("Admin", "Medical Staff", "School POC"):
+        return jsonify({"success": False, "message": "Role must be Admin, Medical Staff, or School POC"}), 400
 
     conn = get_db()
     existing = conn.execute("SELECT username FROM Users WHERE username = ?", (username,)).fetchone()
@@ -360,10 +406,56 @@ def api_register_user():
 
     conn.execute("INSERT INTO Users (username, password, role, name, designation, specialization) VALUES (?,?,?,?,?,?)",
                  (username, password, role, name, designation, specialization))
+
+    # If School POC, auto-create a School record linked to this user
+    school_id = None
+    if role == "School POC":
+        school_name = data.get("school_name", "").strip()
+        school_address = data.get("school_address", "").strip()
+        poc_designation = data.get("poc_designation", "").strip()
+        poc_phone = data.get("poc_phone", "").strip()
+        poc_email = data.get("poc_email", "").strip()
+        now = datetime.utcnow().isoformat()
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO Schools (school_name, school_address, poc_username, poc_name,
+               poc_designation, poc_phone, poc_email, created_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (school_name, school_address, username, name, poc_designation, poc_phone, poc_email, now),
+        )
+        school_id = cur.lastrowid
+
     conn.commit()
     conn.close()
     log_audit(admin_user, "REGISTER_USER", f"Registered {role} user: {username} ({name})")
-    return jsonify({"success": True})
+    result = {"success": True}
+    if school_id:
+        result["school_id"] = school_id
+    return jsonify(result)
+
+
+# ---- Schools ----
+@app.route("/api/schools")
+def api_list_schools():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM Schools ORDER BY school_name").fetchall()
+    conn.close()
+    return jsonify(rows_to_list(rows))
+
+
+@app.route("/api/schools/search")
+def api_search_schools():
+    q = request.args.get("q", "").strip()
+    conn = get_db()
+    if q:
+        rows = conn.execute(
+            "SELECT * FROM Schools WHERE school_name LIKE ? OR poc_name LIKE ? ORDER BY school_name",
+            (f"%{q}%", f"%{q}%"),
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM Schools ORDER BY school_name").fetchall()
+    conn.close()
+    return jsonify(rows_to_list(rows))
 
 
 # ---- Event Stats ----
@@ -436,10 +528,33 @@ def api_my_events():
     return jsonify(rows_to_list(events))
 
 
+# ---- School Events (for School POC dashboard) ----
+@app.route("/api/events/school")
+def api_school_events():
+    username = request.args.get("username", "")
+    conn = get_db()
+    # Find the school linked to this POC user
+    school = conn.execute("SELECT school_id FROM Schools WHERE poc_username = ?", (username,)).fetchone()
+    if not school:
+        conn.close()
+        return jsonify([])
+    school_id = school["school_id"]
+    events = conn.execute("""
+        SELECT e.*,
+               (SELECT COUNT(*) FROM Students s WHERE s.event_id = e.event_id) AS student_count,
+               (SELECT COUNT(*) FROM Health_Records hr WHERE hr.event_id = e.event_id AND hr.category = 'FullExam') AS screened_count
+        FROM Events e
+        WHERE e.school_id = ?
+        ORDER BY e.start_date DESC
+    """, (school_id,)).fetchall()
+    conn.close()
+    return jsonify(rows_to_list(events))
+
+
 # ---- Students (kept for DoctorWorkflow compatibility) ----
 @app.route("/api/students", methods=["POST"])
 def api_create_student():
-    """Create a single student (used by doctor workflow)."""
+    """Create a single student (used by doctor workflow and school dashboard)."""
     data = request.get_json(force=True)
     name = data.get("name", "").strip()
     age = data.get("age")
@@ -452,6 +567,8 @@ def api_create_student():
     phone = data.get("phone", "")
     user_id = data.get("user_id", "")
     event_id = data.get("event_id", 1)
+    added_by = data.get("added_by", user_id or "")
+    status = data.get("status", "Pending Examination")
 
     if not name:
         return jsonify({"success": False, "message": "Name is required"}), 400
@@ -461,9 +578,9 @@ def api_create_student():
     cur = conn.cursor()
     cur.execute(
         """INSERT INTO Students
-           (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_code_hash)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-        (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_hash),
+           (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_code_hash, added_by, status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_hash, added_by, status),
     )
     new_id = cur.lastrowid
     conn.commit()
@@ -472,6 +589,96 @@ def api_create_student():
     conn.close()
     log_audit(user_id or "doctor", "CREATE_STUDENT", f"Created student {name} (ID {new_id})")
     return jsonify({"success": True, "student": row_to_dict(student)})
+
+
+# ---- Bulk Student Upload ----
+@app.route("/api/students/bulk", methods=["POST"])
+def api_bulk_create_students():
+    """Bulk create students from a list. Returns success/error arrays."""
+    data = request.get_json(force=True)
+    students_data = data.get("students", [])
+    event_id = data.get("event_id", 1)
+    added_by = data.get("added_by", "")
+
+    success_list = []
+    error_list = []
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    for idx, row in enumerate(students_data):
+        row_num = idx + 1
+        row_errors = []
+
+        name = str(row.get("name", "")).strip()
+        if not name:
+            row_errors.append({"column": "name", "reason": "Name is required"})
+
+        gender = str(row.get("gender", "")).strip().upper()
+        if gender and gender not in ("M", "F"):
+            row_errors.append({"column": "gender", "reason": "Must be M or F"})
+
+        dob = str(row.get("dob", "")).strip()
+        if dob:
+            try:
+                date.fromisoformat(dob)
+            except (ValueError, TypeError):
+                row_errors.append({"column": "dob", "reason": "Invalid date format (use YYYY-MM-DD)"})
+
+        phone = str(row.get("phone", "")).strip()
+        if phone and not re.match(r'^[+]?[\d\s\-()]{7,15}$', phone):
+            row_errors.append({"column": "phone", "reason": "Invalid phone number"})
+
+        if row_errors:
+            error_list.append({"row": row_num, "data": row, "errors": row_errors})
+            continue
+
+        age = row.get("age")
+        if age is not None:
+            try:
+                age = int(age)
+            except (ValueError, TypeError):
+                age = None
+
+        qr_hash = "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
+        try:
+            cur.execute(
+                """INSERT INTO Students
+                   (event_id, name, age, dob, gender, student_class, section, blood_group, father_name, phone, qr_code_hash, added_by, status)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    event_id, name, age, dob, gender,
+                    str(row.get("student_class", "")).strip(),
+                    str(row.get("section", "")).strip(),
+                    str(row.get("blood_group", "")).strip(),
+                    str(row.get("father_name", "")).strip(),
+                    phone, qr_hash, added_by, "Pending Examination",
+                ),
+            )
+            success_list.append({"row": row_num, "student_id": cur.lastrowid, "name": name})
+        except Exception as exc:
+            error_list.append({"row": row_num, "data": row, "errors": [{"column": "db", "reason": str(exc)}]})
+
+    conn.commit()
+    conn.close()
+    log_audit(added_by or "school", "BULK_CREATE_STUDENTS", f"Bulk uploaded {len(success_list)} students for event {event_id}")
+    return jsonify({"success": True, "inserted": success_list, "errors": error_list})
+
+
+# ---- CSV Template Download ----
+@app.route("/api/students/csv-template")
+def api_csv_template():
+    """Return a CSV template for bulk student upload."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["name", "gender", "dob", "age", "student_class", "section", "blood_group", "father_name", "phone"])
+    writer.writerow(["John Doe", "M", "2012-05-15", "13", "8", "A", "B+", "James Doe", "9876543210"])
+    csv_content = output.getvalue()
+    return Response(
+        csv_content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=student_upload_template.csv"},
+    )
 
 
 @app.route("/api/students/search")
