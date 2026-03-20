@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, Plus, ChevronDown, ChevronRight, X, Save,
   ArrowRight, AlertTriangle, Eye, Ear, Stethoscope,
-  Activity, Check, UserPlus, Calendar
+  Activity, Check, UserPlus, Calendar, HeartPulse, Scan,
+  Users, CheckCircle
 } from 'lucide-react';
 
 // ── Types ──
-type User = { username: string; role: string; name: string };
+type User = { username: string; role: string; name: string; specialization?: string };
 
 interface Student {
   student_id: number;
@@ -20,6 +21,7 @@ interface Student {
   father_name: string;
   phone: string;
   is_examined?: number;
+  examined_categories?: string; // comma-separated categories like "Dental,ENT"
 }
 
 interface ExamData {
@@ -31,6 +33,8 @@ interface ExamData {
   ear: string; nose: string; throat: string;
   // Dental
   dental: string;
+  // Skin
+  skin: string;
   // Systemic
   locomotor: string; abdomen: string; respiratory: string;
   cardiovascular: string; cns: string;
@@ -47,6 +51,7 @@ const DEFAULT_EXAM: ExamData = {
   rightEyeVision: '6/6', leftEyeVision: '6/6', generalEye: 'Normal',
   ear: 'NAD', nose: 'NAD', throat: 'NAD',
   dental: 'NAD',
+  skin: 'NAD',
   locomotor: 'NAD', abdomen: 'NAD', respiratory: 'NAD',
   cardiovascular: 'NAD', cns: 'NAD',
   symptoms: [],
@@ -60,6 +65,7 @@ const EAR_OPTIONS = ['NAD', 'Wax', 'Pain', 'Discharge', 'Other'];
 const NOSE_OPTIONS = ['NAD', 'DNS', 'Blocked', 'Other'];
 const THROAT_OPTIONS = ['NAD', 'Infection', 'Hypertrophy', 'Other'];
 const DENTAL_OPTIONS = ['NAD', 'Cavities', 'Missing', 'Rotten', 'Other'];
+const SKIN_OPTIONS = ['NAD', 'Rash', 'Fungal', 'Eczema', 'Scabies', 'Lesion', 'Other'];
 const SYSTEMIC = ['NAD', 'Needs Observation', 'Abnormal', 'Other'];
 const ANAEMIA_OPTIONS = ['NAD', 'Mild', 'Severe', 'Other'];
 const SYMPTOM_LIST = [
@@ -67,11 +73,20 @@ const SYMPTOM_LIST = [
   'Nail biting', 'Breathlessness', 'Frequent urination',
   'Diarrhoea', 'Vomiting', 'Speech issues', 'Fainting', 'Other'
 ];
-const REFERRAL_DEPTS = ['Eye', 'ENT', 'Dental', 'General Medicine'];
+const REFERRAL_DEPTS = ['Eye', 'ENT', 'Dental', 'General Medicine', 'Dermatology'];
 const REMARK_CHIPS = ['Vit D', 'Calcium', 'Albendazole', 'Eye checkup', 'Iron-Folic Acid', 'Deworming'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const CLASSES = ['', 'Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const SECTIONS = ['', 'A', 'B', 'C', 'D', 'E'];
+
+// Specialist domain progress bar categories
+const DOMAIN_TAGS = [
+  { key: 'Community_Medicine', short: 'CM', color: 'bg-rose-500' },
+  { key: 'Dental', short: 'D', color: 'bg-sky-500' },
+  { key: 'ENT', short: 'ENT', color: 'bg-amber-500' },
+  { key: 'Eye_Specialist', short: 'EYE', color: 'bg-emerald-500' },
+  { key: 'Skin_Specialist', short: 'SKIN', color: 'bg-violet-500' },
+];
 
 // ── IndexedDB Offline Queue ──
 const DB_NAME = 'aiims_offline';
@@ -242,17 +257,13 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
               {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
             </div>
             <FormInput label="Age" value={f.age} onChange={v => upd('age', v)} type="number" id="add-age" placeholder="e.g. 12" />
-
-            {/* Sex as checkboxes */}
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Sex *</label>
               <div className="flex space-x-3 mt-1">
                 {[{ v: 'M', label: 'Male' }, { v: 'F', label: 'Female' }].map(opt => (
                   <button key={opt.v} type="button" onClick={() => upd('gender', opt.v)}
                     className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center space-x-2 ${
-                      f.gender === opt.v
-                        ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                      f.gender === opt.v ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
                     }`}>
                     {f.gender === opt.v && <Check className="w-3.5 h-3.5" />}
                     <span>{opt.label}</span>
@@ -261,8 +272,6 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
               </div>
               {errors.gender && <p className="text-red-400 text-xs mt-1">{errors.gender}</p>}
             </div>
-
-            {/* Class (required) */}
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Class *</label>
               <select value={f.student_class} onChange={e => upd('student_class', e.target.value)}
@@ -271,13 +280,10 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
               </select>
               {errors.student_class && <p className="text-red-400 text-xs mt-1">{errors.student_class}</p>}
             </div>
-
             <FormSelect label="Section" value={f.section} onChange={v => upd('section', v)} options={SECTIONS} id="add-section" />
             <FormSelect label="Blood Group" value={f.blood_group} onChange={v => upd('blood_group', v)} options={BLOOD_GROUPS} id="add-bg" />
             <FormInput label="Father's Name" value={f.father_name} onChange={v => upd('father_name', v)} id="add-father" placeholder="Optional" />
             <FormInput label="Phone" value={f.phone} onChange={v => upd('phone', v)} id="add-phone" placeholder="Optional" type="tel" />
-
-            {/* DOB (required) */}
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Date of Birth *</label>
               <input type="date" value={f.dob} onChange={e => upd('dob', e.target.value)}
@@ -296,21 +302,22 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
 }
 
 // ════════════════════════════════════════════════
-// ██ CAMP SELECTION LANDING
+// ██ ACTIVE CAMPS DIRECTORY (replaces old CampSelectionScreen)
 // ════════════════════════════════════════════════
-function CampSelectionScreen({ user, onSelect }: { user: User; onSelect: (campId: number, campName: string) => void }) {
+function ActiveCampsDirectory({ user, onVolunteer }: {
+  user: User;
+  onVolunteer: (campId: number, campName: string) => void;
+}) {
   const [camps, setCamps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch(`/api/events/my?username=${encodeURIComponent(user.username)}`)
+    fetch('/api/events/active')
       .then(r => r.json())
       .then(data => { setCamps(data); setLoading(false); })
-      .catch(() => {
-        // Fallback: fetch all events if endpoint doesn't exist
-        fetch('/api/events').then(r => r.json()).then(data => { setCamps(data); setLoading(false); });
-      });
-  }, [user.username]);
+      .catch(() => setLoading(false));
+  }, []);
 
   const formatDate = (d: string) => {
     if (!d) return '';
@@ -319,11 +326,27 @@ function CampSelectionScreen({ user, onSelect }: { user: User; onSelect: (campId
     return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getFullYear()).slice(-2)}`;
   };
 
+  const handleVolunteer = async (camp: any) => {
+    setJoining(camp.event_id);
+    try {
+      await fetch(`/api/events/${camp.event_id}/volunteer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username, category: user.role }),
+      });
+      onVolunteer(camp.event_id, camp.school_name);
+    } catch {
+      alert('Failed to join camp');
+    } finally {
+      setJoining(null);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl mx-auto">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-white tracking-tight">Select Camp 🏥</h2>
-        <p className="text-slate-400 text-sm mt-1">Choose the camp you are assigned to for today's screening.</p>
+        <h2 className="text-2xl font-bold text-white tracking-tight">Active Camps 🏥</h2>
+        <p className="text-slate-400 text-sm mt-1">Volunteer for a camp to start screening students.</p>
       </div>
 
       {loading ? (
@@ -331,21 +354,21 @@ function CampSelectionScreen({ user, onSelect }: { user: User; onSelect: (campId
       ) : camps.length === 0 ? (
         <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
           <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400">No camps assigned to you.</p>
-          <p className="text-slate-500 text-sm mt-1">Contact an administrator to be assigned to a camp.</p>
+          <p className="text-slate-400">No active camps available.</p>
+          <p className="text-slate-500 text-sm mt-1">Check back when camps are scheduled.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {camps.map((camp: any) => (
-            <button key={camp.event_id} onClick={() => onSelect(camp.event_id, camp.school_name)}
-              className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all p-5 group shadow-xl">
+            <div key={camp.event_id}
+              className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all p-5 shadow-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-all">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center">
                     <Calendar className="w-6 h-6 text-cyan-400" />
                   </div>
                   <div>
-                    <h3 className="text-white font-semibold text-lg group-hover:text-cyan-300 transition-colors">{camp.school_name}</h3>
+                    <h3 className="text-white font-semibold text-lg">{camp.school_name}</h3>
                     <p className="text-sm text-slate-400 mt-0.5">
                       {formatDate(camp.start_date)}{camp.end_date ? ` → ${formatDate(camp.end_date)}` : ''}
                       {camp.operational_hours ? ` · ${camp.operational_hours}` : ''}
@@ -353,15 +376,29 @@ function CampSelectionScreen({ user, onSelect }: { user: User; onSelect: (campId
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
+                  <div className="text-right mr-2">
+                    <span className="text-xs text-slate-500 block">
+                      <Users className="w-3.5 h-3.5 inline mr-1" />{camp.volunteer_count ?? 0} volunteers
+                    </span>
+                    <span className="text-xs text-slate-500 block mt-0.5">
+                      <Activity className="w-3.5 h-3.5 inline mr-1" />{camp.screened_count ?? 0}/{camp.student_count ?? 0} screened
+                    </span>
+                  </div>
                   <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${
                     camp.tag === 'Ongoing' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                    camp.tag === 'Upcoming' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                    'bg-slate-500/20 text-slate-400 border-slate-500/30'
-                  }`}>{camp.tag}</span>
-                  <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-cyan-400 transition-colors" />
+                    'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                  }`}>{camp.tag === 'Ongoing' ? 'Live' : camp.tag}</span>
+                  <button
+                    onClick={() => handleVolunteer(camp)}
+                    disabled={joining === camp.event_id}
+                    className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center space-x-2 shadow-lg disabled:opacity-50"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    <span>{joining === camp.event_id ? 'Joining...' : 'Volunteer for Camp'}</span>
+                  </button>
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -369,22 +406,55 @@ function CampSelectionScreen({ user, onSelect }: { user: User; onSelect: (campId
   );
 }
 
+
+// ════════════════════════════════════════════════
+// ██ SPECIALIST DOMAIN PROGRESS BAR
+// ════════════════════════════════════════════════
+function DomainProgressBar({ examinedCategories }: { examinedCategories?: string }) {
+  const done = new Set((examinedCategories || '').split(',').filter(Boolean));
+  return (
+    <div className="flex items-center space-x-1">
+      {DOMAIN_TAGS.map(d => {
+        const isDone = done.has(d.key) || done.has('FullExam');
+        return (
+          <div key={d.key} className={`flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+            isDone
+              ? `${d.color}/20 border-current text-white`
+              : 'bg-slate-800 border-slate-700 text-slate-500'
+          }`}>
+            {isDone && <CheckCircle className="w-2.5 h-2.5" />}
+            <span>{d.short}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
 // ════════════════════════════════════════════════
 // ██ MAIN DOCTOR WORKFLOW
 // ════════════════════════════════════════════════
 export default function DoctorWorkflow({ user }: { user: User }) {
-  // Camp selection
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedCampName, setSelectedCampName] = useState('');
 
   if (!selectedCampId) {
-    return <CampSelectionScreen user={user} onSelect={(id, name) => { setSelectedCampId(id); setSelectedCampName(name); }} />;
+    return <ActiveCampsDirectory user={user} onVolunteer={(id, name) => { setSelectedCampId(id); setSelectedCampName(name); }} />;
   }
 
   return <ClinicalWorkflow user={user} campId={selectedCampId} campName={selectedCampName} onBack={() => { setSelectedCampId(null); setSelectedCampName(''); }} />;
 }
 
-function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; campId: number; campName: string; onBack: () => void }) {
+
+// ════════════════════════════════════════════════
+// ██ CLINICAL WORKFLOW (scoped per specialist)
+// ════════════════════════════════════════════════
+function ClinicalWorkflow({ user, campId, campName, onBack }: {
+  user: User; campId: number; campName: string; onBack: () => void;
+}) {
+  const specialistCategory = user.role;
+
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Student[]>([]);
@@ -419,6 +489,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
     if (exam.leftEyeVision !== '6/6' && exam.leftEyeVision !== '6/9') a.push('Left eye vision reduced → Eye referral suggested');
     if (exam.dental === 'Cavities' || exam.dental === 'Rotten') a.push('Dental issue → Dental referral suggested');
     if (exam.anaemia === 'Severe') a.push('Severe anaemia → Immediate intervention needed');
+    if (exam.skin !== 'NAD' && exam.skin !== '') a.push('Skin condition detected → Dermatology review');
     const abnormals = [exam.locomotor, exam.abdomen, exam.respiratory, exam.cardiovascular, exam.cns]
       .filter(v => v !== 'NAD').length;
     if (abnormals >= 2) a.push('Multiple systemic abnormalities → Referral recommended');
@@ -452,18 +523,29 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
     setAlerts([]);
   };
 
-  const handleStudentCreated = (s: Student) => {
-    selectStudent(s);
+  const handleStudentCreated = (s: Student) => { selectStudent(s); };
+
+  // Leave camp on back
+  const handleBack = async () => {
+    try {
+      await fetch(`/api/events/${campId}/volunteer`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.username }),
+      });
+    } catch {}
+    onBack();
   };
 
-  // Save exam
+  // Save exam (per specialist category)
   const saveExam = async () => {
     if (!selectedStudent) return;
     setSaving(true);
     const payload = {
       student_id: selectedStudent.student_id,
-      camp_id: campId,
+      event_id: campId,
       doctor_id: user.username,
+      specialist_category: specialistCategory,
       exam_data: { ...exam, bmi: calcBMI(exam.height, exam.weight) },
     };
     try {
@@ -478,6 +560,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
       setSelectedStudent(null);
       setExam({ ...DEFAULT_EXAM });
       setAlerts([]);
+      doSearch();
       setTimeout(() => searchRef.current?.focus(), 100);
     } catch {
       await queueOffline(payload);
@@ -489,21 +572,45 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
   const bmi = calcBMI(exam.height, exam.weight);
   const bmiCat = bmiCategory(bmi);
 
-  // ── RENDER ──
+  // Which sections to show based on specialist category
+  const showVitals = ['Community_Medicine', 'Other'].includes(specialistCategory);
+  const showVitalsReadonly = !showVitals; // other specialists see vitals read-only
+  const showEye = ['Eye_Specialist', 'Other'].includes(specialistCategory);
+  const showENT = ['ENT', 'Other'].includes(specialistCategory);
+  const showDental = ['Dental', 'Other'].includes(specialistCategory);
+  const showSkin = ['Skin_Specialist', 'Other'].includes(specialistCategory);
+  const showSystemic = ['Community_Medicine', 'Other'].includes(specialistCategory);
+  const showSymptoms = ['Community_Medicine', 'Other'].includes(specialistCategory);
+
   return (
     <div className="space-y-4 animate-in fade-in duration-500 max-w-5xl mx-auto">
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center space-x-3">
-            <button onClick={onBack} className="text-slate-400 hover:text-cyan-400 transition-colors text-sm flex items-center space-x-1">
-              <ChevronRight className="w-4 h-4 rotate-180" /><span>Back</span>
+            <button onClick={handleBack} className="text-slate-400 hover:text-cyan-400 transition-colors text-sm flex items-center space-x-1">
+              <ChevronRight className="w-4 h-4 rotate-180" /><span>Leave Camp</span>
             </button>
             <h2 className="text-2xl font-bold text-white tracking-tight">Clinical Screening 🩺</h2>
           </div>
-          <p className="text-slate-400 text-sm mt-0.5">{campName}</p>
+          <p className="text-slate-400 text-sm mt-0.5">
+            {campName}
+            <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold border ${
+              specialistCategory === 'Community_Medicine' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+              specialistCategory === 'Dental' ? 'bg-sky-500/20 text-sky-400 border-sky-500/30' :
+              specialistCategory === 'ENT' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+              specialistCategory === 'Eye_Specialist' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+              specialistCategory === 'Skin_Specialist' ? 'bg-violet-500/20 text-violet-400 border-violet-500/30' :
+              'bg-slate-500/20 text-slate-400 border-slate-500/30'
+            }`}>
+              {specialistCategory.replace(/_/g, ' ')}
+            </span>
+          </p>
         </div>
         <div className="flex items-center space-x-3">
+          {!online && (
+            <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold">Offline</span>
+          )}
           <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm">
             <span className="text-slate-400">Today: </span>
             <span className="text-cyan-400 font-bold">{todayCount}</span>
@@ -569,14 +676,17 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
                     </span>
                   </div>
                 </div>
-                <span className="text-xs text-slate-500 group-hover:text-cyan-400 transition-colors">Select →</span>
+                <div className="flex items-center space-x-2">
+                  <DomainProgressBar examinedCategories={s.examined_categories} />
+                  <span className="text-xs text-slate-500 group-hover:text-cyan-400 transition-colors">Select →</span>
+                </div>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Selected Student Header (sticky) */}
+      {/* Selected Student Header */}
       {selectedStudent && (
         <>
           <div className="sticky top-0 z-30 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 backdrop-blur-xl p-4 rounded-2xl border border-cyan-500/20 flex items-center justify-between shadow-lg">
@@ -590,6 +700,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
                   {selectedStudent.age && <span className="bg-slate-800 px-2 py-0.5 rounded">{selectedStudent.age}y / {selectedStudent.gender}</span>}
                   {selectedStudent.student_class && <span className="bg-slate-800 px-2 py-0.5 rounded">Class {selectedStudent.student_class}{selectedStudent.section && `-${selectedStudent.section}`}</span>}
                   {selectedStudent.blood_group && <span className="bg-red-500/10 text-red-300 px-2 py-0.5 rounded border border-red-500/20">{selectedStudent.blood_group}</span>}
+                  <DomainProgressBar examinedCategories={selectedStudent.examined_categories} />
                 </div>
               </div>
             </div>
@@ -609,87 +720,100 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
             </div>
           )}
 
-          {/* Section 1: Basic Info */}
-          <SectionCard title="Basic Information" icon={<Activity className="w-4 h-4 text-cyan-400" />} defaultOpen={false}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div><span className="text-slate-500 text-xs">Name</span><p className="text-white font-medium">{selectedStudent.name}</p></div>
-              <div><span className="text-slate-500 text-xs">Age / Sex</span><p className="text-white font-medium">{selectedStudent.age || '-'} / {selectedStudent.gender}</p></div>
-              <div><span className="text-slate-500 text-xs">Class</span><p className="text-white font-medium">{selectedStudent.student_class || '-'}{selectedStudent.section && ` - ${selectedStudent.section}`}</p></div>
-              <div><span className="text-slate-500 text-xs">Blood Group</span><p className="text-white font-medium">{selectedStudent.blood_group || '-'}</p></div>
-              {selectedStudent.father_name && <div><span className="text-slate-500 text-xs">Father</span><p className="text-white font-medium">{selectedStudent.father_name}</p></div>}
-              {selectedStudent.phone && <div><span className="text-slate-500 text-xs">Phone</span><p className="text-white font-medium">{selectedStudent.phone}</p></div>}
-            </div>
-          </SectionCard>
-
-          {/* Section 2: Vitals */}
-          <SectionCard title="Vitals" icon={<Stethoscope className="w-4 h-4 text-emerald-400" />}>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <FormInput label="Height (cm)" value={exam.height} onChange={v => updateExam('height', v)} type="number" id="vitals-height" placeholder="e.g. 140" />
-              <FormInput label="Weight (kg)" value={exam.weight} onChange={v => updateExam('weight', v)} type="number" id="vitals-weight" placeholder="e.g. 35" />
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">BMI</label>
-                <div className={`bg-slate-950 border rounded-xl px-3 py-2.5 text-sm font-bold ${bmiCat === 'Normal' ? 'border-emerald-500/30 text-emerald-400' : bmi !== '--' ? 'border-amber-500/30 text-amber-400' : 'border-slate-800 text-slate-500'}`}>
-                  {bmi} {bmiCat && <span className="text-xs font-normal ml-1">({bmiCat})</span>}
+          {/* Section: Vitals (Community Med + Other editable, others read-only) */}
+          {(showVitals || showVitalsReadonly) && (
+            <SectionCard title="Vitals" icon={<Stethoscope className="w-4 h-4 text-emerald-400" />} defaultOpen={showVitals}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                <FormInput label="Height (cm)" value={exam.height} onChange={v => updateExam('height', v)} type="number" id="vitals-height" placeholder="e.g. 140" />
+                <FormInput label="Weight (kg)" value={exam.weight} onChange={v => updateExam('weight', v)} type="number" id="vitals-weight" placeholder="e.g. 35" />
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">BMI</label>
+                  <div className={`bg-slate-950 border rounded-xl px-3 py-2.5 text-sm font-bold ${bmiCat === 'Normal' ? 'border-emerald-500/30 text-emerald-400' : bmi !== '--' ? 'border-amber-500/30 text-amber-400' : 'border-slate-800 text-slate-500'}`}>
+                    {bmi} {bmiCat && <span className="text-xs font-normal ml-1">({bmiCat})</span>}
+                  </div>
                 </div>
+                <FormInput label="Blood Pressure" value={exam.bp} onChange={v => updateExam('bp', v)} id="vitals-bp" placeholder="120/80" />
+                <FormInput label="Pulse Rate" value={exam.pulse} onChange={v => updateExam('pulse', v)} type="number" id="vitals-pulse" placeholder="Optional" />
+                <FormSelect label="Anaemia" value={exam.anaemia} onChange={v => updateExam('anaemia', v)} options={ANAEMIA_OPTIONS} id="vitals-anaemia" />
               </div>
-              <FormInput label="Blood Pressure" value={exam.bp} onChange={v => updateExam('bp', v)} id="vitals-bp" placeholder="120/80" />
-              <FormInput label="Pulse Rate" value={exam.pulse} onChange={v => updateExam('pulse', v)} type="number" id="vitals-pulse" placeholder="Optional" />
-              <FormSelect label="Anaemia" value={exam.anaemia} onChange={v => updateExam('anaemia', v)} options={ANAEMIA_OPTIONS} id="vitals-anaemia" />
-            </div>
-          </SectionCard>
+            </SectionCard>
+          )}
 
-          {/* Section 3: Clinical Examination */}
-          <SectionCard title="Clinical Examination" icon={<Eye className="w-4 h-4 text-blue-400" />}>
-            {/* Eye */}
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 mt-1">👁️ Eye</h4>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <FormSelect label="Right Eye" value={exam.rightEyeVision} onChange={v => updateExam('rightEyeVision', v)} options={VISION_OPTIONS} id="eye-right" />
-              <FormSelect label="Left Eye" value={exam.leftEyeVision} onChange={v => updateExam('leftEyeVision', v)} options={VISION_OPTIONS} id="eye-left" />
-              <FormSelect label="General" value={exam.generalEye} onChange={v => updateExam('generalEye', v)} options={EYE_GENERAL} id="eye-gen" />
-            </div>
-            {/* ENT */}
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">👂 ENT</h4>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <FormSelect label="Ear" value={exam.ear} onChange={v => updateExam('ear', v)} options={EAR_OPTIONS} id="ent-ear" />
-              <FormSelect label="Nose" value={exam.nose} onChange={v => updateExam('nose', v)} options={NOSE_OPTIONS} id="ent-nose" />
-              <FormSelect label="Throat" value={exam.throat} onChange={v => updateExam('throat', v)} options={THROAT_OPTIONS} id="ent-throat" />
-            </div>
-            {/* Dental */}
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">🦷 Dental</h4>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <FormSelect label="Teeth & Gums" value={exam.dental} onChange={v => updateExam('dental', v)} options={DENTAL_OPTIONS} id="dental" />
-            </div>
-            {/* Systemic */}
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">🫀 Systemic Examination</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <FormSelect label="Locomotor" value={exam.locomotor} onChange={v => updateExam('locomotor', v)} options={SYSTEMIC} id="sys-loc" />
-              <FormSelect label="Abdomen" value={exam.abdomen} onChange={v => updateExam('abdomen', v)} options={SYSTEMIC} id="sys-abd" />
-              <FormSelect label="Respiratory" value={exam.respiratory} onChange={v => updateExam('respiratory', v)} options={SYSTEMIC} id="sys-resp" />
-              <FormSelect label="Cardiovascular" value={exam.cardiovascular} onChange={v => updateExam('cardiovascular', v)} options={SYSTEMIC} id="sys-cvs" />
-              <FormSelect label="CNS" value={exam.cns} onChange={v => updateExam('cns', v)} options={SYSTEMIC} id="sys-cns" />
-            </div>
-          </SectionCard>
+          {/* Eye Section */}
+          {showEye && (
+            <SectionCard title="Eye Examination" icon={<Eye className="w-4 h-4 text-emerald-400" />}>
+              <div className="grid grid-cols-3 gap-3">
+                <FormSelect label="Right Eye" value={exam.rightEyeVision} onChange={v => updateExam('rightEyeVision', v)} options={VISION_OPTIONS} id="eye-right" />
+                <FormSelect label="Left Eye" value={exam.leftEyeVision} onChange={v => updateExam('leftEyeVision', v)} options={VISION_OPTIONS} id="eye-left" />
+                <FormSelect label="General" value={exam.generalEye} onChange={v => updateExam('generalEye', v)} options={EYE_GENERAL} id="eye-gen" />
+              </div>
+            </SectionCard>
+          )}
 
-          {/* Section 4: Symptoms */}
-          <SectionCard title="Symptoms Checklist" icon={<AlertTriangle className="w-4 h-4 text-amber-400" />}>
-            <div className="flex flex-wrap gap-2">
-              {SYMPTOM_LIST.map(s => {
-                const active = exam.symptoms.includes(s);
-                return (
-                  <button key={s} type="button" onClick={() => {
-                    updateExam('symptoms', active ? exam.symptoms.filter(x => x !== s) : [...exam.symptoms, s]);
-                  }}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
-                      active ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_8px_rgba(245,158,11,0.15)]' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-                    }`}>
-                    {active && <Check className="w-3 h-3 inline mr-1" />}{s}
-                  </button>
-                );
-              })}
-            </div>
-          </SectionCard>
+          {/* ENT Section */}
+          {showENT && (
+            <SectionCard title="ENT Examination" icon={<Ear className="w-4 h-4 text-amber-400" />}>
+              <div className="grid grid-cols-3 gap-3">
+                <FormSelect label="Ear" value={exam.ear} onChange={v => updateExam('ear', v)} options={EAR_OPTIONS} id="ent-ear" />
+                <FormSelect label="Nose" value={exam.nose} onChange={v => updateExam('nose', v)} options={NOSE_OPTIONS} id="ent-nose" />
+                <FormSelect label="Throat" value={exam.throat} onChange={v => updateExam('throat', v)} options={THROAT_OPTIONS} id="ent-throat" />
+              </div>
+            </SectionCard>
+          )}
 
-          {/* Section 5: Final Assessment */}
+          {/* Dental Section */}
+          {showDental && (
+            <SectionCard title="Dental Examination" icon={<span className="text-base">🦷</span>}>
+              <div className="grid grid-cols-3 gap-3">
+                <FormSelect label="Teeth & Gums" value={exam.dental} onChange={v => updateExam('dental', v)} options={DENTAL_OPTIONS} id="dental" />
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Skin Section */}
+          {showSkin && (
+            <SectionCard title="Skin Examination" icon={<Scan className="w-4 h-4 text-violet-400" />}>
+              <div className="grid grid-cols-3 gap-3">
+                <FormSelect label="Skin Condition" value={exam.skin} onChange={v => updateExam('skin', v)} options={SKIN_OPTIONS} id="skin" />
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Systemic Section */}
+          {showSystemic && (
+            <SectionCard title="Systemic Examination" icon={<HeartPulse className="w-4 h-4 text-rose-400" />}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <FormSelect label="Locomotor" value={exam.locomotor} onChange={v => updateExam('locomotor', v)} options={SYSTEMIC} id="sys-loc" />
+                <FormSelect label="Abdomen" value={exam.abdomen} onChange={v => updateExam('abdomen', v)} options={SYSTEMIC} id="sys-abd" />
+                <FormSelect label="Respiratory" value={exam.respiratory} onChange={v => updateExam('respiratory', v)} options={SYSTEMIC} id="sys-resp" />
+                <FormSelect label="Cardiovascular" value={exam.cardiovascular} onChange={v => updateExam('cardiovascular', v)} options={SYSTEMIC} id="sys-cvs" />
+                <FormSelect label="CNS" value={exam.cns} onChange={v => updateExam('cns', v)} options={SYSTEMIC} id="sys-cns" />
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Symptoms */}
+          {showSymptoms && (
+            <SectionCard title="Symptoms Checklist" icon={<AlertTriangle className="w-4 h-4 text-amber-400" />}>
+              <div className="flex flex-wrap gap-2">
+                {SYMPTOM_LIST.map(s => {
+                  const active = exam.symptoms.includes(s);
+                  return (
+                    <button key={s} type="button" onClick={() => {
+                      updateExam('symptoms', active ? exam.symptoms.filter(x => x !== s) : [...exam.symptoms, s]);
+                    }}
+                      className={`px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
+                        active ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_8px_rgba(245,158,11,0.15)]' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                      }`}>
+                      {active && <Check className="w-3 h-3 inline mr-1" />}{s}
+                    </button>
+                  );
+                })}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Final Assessment (all specialists) */}
           <SectionCard title="Final Assessment" icon={<Stethoscope className="w-4 h-4 text-indigo-400" />}>
             <div className="flex space-x-3 mb-4">
               {[{ v: 'N', label: 'Normal', color: 'emerald' }, { v: 'O', label: 'Observation', color: 'amber' }, { v: 'R', label: 'Referred', color: 'red' }].map(opt => (
@@ -727,8 +851,8 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
             )}
           </SectionCard>
 
-          {/* Doctor Remarks */}
-          <SectionCard title="Doctor Remarks" icon={<Stethoscope className="w-4 h-4 text-purple-400" />}>
+          {/* Doctor Remarks (all specialists) */}
+          <SectionCard title="Specialist Remarks" icon={<Stethoscope className="w-4 h-4 text-purple-400" />}>
             <div className="flex flex-wrap gap-2 mb-3">
               {REMARK_CHIPS.map(chip => (
                 <button key={chip} type="button" onClick={() => {
@@ -744,7 +868,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: { user: User; camp
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 resize-none" />
           </SectionCard>
 
-          {/* Save Button (renamed from "Save & Next Student") */}
+          {/* Save Button */}
           <button onClick={saveExam} disabled={saving}
             className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-all disabled:opacity-50 text-lg flex items-center justify-center space-x-3">
             <Save className="w-5 h-5" />

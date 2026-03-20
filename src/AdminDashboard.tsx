@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar, Users, UserPlus, Search, Plus, X, Check,
   MapPin, Phone, Mail, Clock, Tag, ChevronDown, ChevronRight,
-  Activity, FileText, Stethoscope, Trash2, School, ExternalLink
+  Activity, FileText, Stethoscope, School, ExternalLink,
+  HeartPulse, Eye, Ear, Scan
 } from 'lucide-react';
 
 type User = { username: string; role: string; name: string };
@@ -17,11 +18,55 @@ const TAG_STYLES: Record<string, string> = {
 
 const TAGS = ['Upcoming', 'Ongoing', 'Completed', 'Cancelled'];
 
-const SPECIALIZATIONS = [
-  'General Medicine', 'Pediatrics', 'Ophthalmology', 'ENT',
-  'Dentistry', 'Dermatology', 'Orthopedics', 'Cardiology',
-  'Psychiatry', 'Nursing', 'Emergency Medicine', 'Other',
+// Specialist roles for registration
+const SPECIALIST_ROLES = [
+  { key: 'Community_Medicine', label: 'Community Med' },
+  { key: 'Dental', label: 'Dental' },
+  { key: 'ENT', label: 'ENT' },
+  { key: 'Eye_Specialist', label: 'Eye' },
+  { key: 'Skin_Specialist', label: 'Skin' },
+  { key: 'Other', label: 'Other' },
 ];
+
+const ALL_REGISTER_ROLES = [
+  { key: 'Admin', label: 'Admin' },
+  { key: 'School POC', label: 'School POC' },
+  ...SPECIALIST_ROLES,
+];
+
+// Category display helpers
+function getCategoryIcon(cat: string) {
+  switch (cat) {
+    case 'Community_Medicine': return <HeartPulse className="w-3.5 h-3.5" />;
+    case 'Dental': return <span className="text-xs">🦷</span>;
+    case 'ENT': return <Ear className="w-3.5 h-3.5" />;
+    case 'Eye_Specialist': return <Eye className="w-3.5 h-3.5" />;
+    case 'Skin_Specialist': return <Scan className="w-3.5 h-3.5" />;
+    case 'Other': return <Stethoscope className="w-3.5 h-3.5" />;
+    default: return <Stethoscope className="w-3.5 h-3.5" />;
+  }
+}
+
+function getCategoryColor(cat: string): string {
+  switch (cat) {
+    case 'Community_Medicine': return 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+    case 'Dental': return 'bg-sky-500/20 text-sky-400 border-sky-500/30';
+    case 'ENT': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    case 'Eye_Specialist': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+    case 'Skin_Specialist': return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
+    case 'Other': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+  }
+}
+
+function formatCategoryLabel(cat: string): string {
+  switch (cat) {
+    case 'Community_Medicine': return 'Community Med';
+    case 'Eye_Specialist': return 'Eye';
+    case 'Skin_Specialist': return 'Skin';
+    default: return cat;
+  }
+}
 
 interface EventData {
   event_id: number;
@@ -41,12 +86,12 @@ interface EventData {
   screened_count?: number;
 }
 
-interface StaffMember {
+interface Volunteer {
   username: string;
   name: string;
   designation: string;
-  specialization?: string;
-  assigned_at?: string;
+  category: string;
+  joined_at?: string;
 }
 
 interface EventStats {
@@ -56,7 +101,7 @@ interface EventStats {
   observation: number;
   referred: number;
   records: any[];
-  staff: StaffMember[];
+  staff: Volunteer[];
 }
 
 // ── Helpers ──
@@ -68,16 +113,6 @@ function formatDateDisplay(dateStr: string): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = String(d.getFullYear()).slice(-2);
   return `${day}/${month}/${year}`;
-}
-
-function isValidPhone(phone: string): boolean {
-  if (!phone) return true;
-  return /^[+]?[\d\s\-()]{7,15}$/.test(phone.trim());
-}
-
-function isValidEmail(email: string): boolean {
-  if (!email) return true;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
 // ══════════════════════════════════════════
@@ -101,7 +136,7 @@ export default function AdminDashboard({ user }: { user: User }) {
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
       <div>
         <h2 className="text-2xl font-bold text-white tracking-tight">Admin Dashboard ⚙️</h2>
-        <p className="text-slate-400 text-sm mt-0.5">Manage events, staff assignments, and camp records.</p>
+        <p className="text-slate-400 text-sm mt-0.5">Manage events, volunteer specialists, and camp records.</p>
       </div>
 
       {/* Tab Navigation */}
@@ -129,7 +164,7 @@ export default function AdminDashboard({ user }: { user: User }) {
 }
 
 // ═══════════════════════════════════════════
-// TAB 1: EVENTS (with inline roster + records)
+// TAB 1: EVENTS
 // ═══════════════════════════════════════════
 function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () => void }) {
   const [events, setEvents] = useState<EventData[]>([]);
@@ -189,7 +224,6 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
         <div className="space-y-3">
           {filtered.map(event => (
             <div key={event.event_id} className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
-              {/* Row */}
               <button onClick={() => setExpandedId(expandedId === event.event_id ? null : event.event_id)}
                 className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-800/30 transition-colors text-left">
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -205,7 +239,7 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
                 </div>
                 <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                   <span className="text-xs text-slate-500">
-                    <Users className="w-3.5 h-3.5 inline mr-1" />{event.staff_count ?? 0} staff
+                    <Users className="w-3.5 h-3.5 inline mr-1" />{event.staff_count ?? 0} volunteers
                   </span>
                   <span className="text-xs text-slate-500">
                     <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0}/{event.student_count ?? 0} screened
@@ -227,9 +261,9 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
                 </div>
               </button>
 
-              {/* Expanded: Details + Staff + Records */}
+              {/* Expanded: Details + Records (staff tab removed) */}
               {expandedId === event.event_id && (
-                <EventExpandedPanel eventId={event.event_id} event={event} user={user} onStaffChange={fetchEvents} />
+                <EventExpandedPanel eventId={event.event_id} event={event} user={user} onRefresh={fetchEvents} />
               )}
             </div>
           ))}
@@ -242,23 +276,12 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
   );
 }
 
-// ── Expanded panel for each event (details + staff + records) ──
-function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
-  eventId: number; event: EventData; user: User; onStaffChange: () => void;
+// ── Expanded panel (details + records — NO staff tab) ──
+function EventExpandedPanel({ eventId, event, user, onRefresh }: {
+  eventId: number; event: EventData; user: User; onRefresh: () => void;
 }) {
-  const [activeSection, setActiveSection] = useState<'details' | 'staff' | 'records'>('details');
-  const [assignedStaff, setAssignedStaff] = useState<StaffMember[]>([]);
+  const [activeSection, setActiveSection] = useState<'details' | 'records'>('details');
   const [stats, setStats] = useState<EventStats | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch(`/api/events/${eventId}`).then(r => r.json()).then(data => {
-      setAssignedStaff(data.staff || []);
-    });
-    doSearch('');
-  }, [eventId]);
 
   useEffect(() => {
     if (activeSection === 'records') {
@@ -266,38 +289,8 @@ function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
     }
   }, [activeSection, eventId]);
 
-  const doSearch = async (q: string) => {
-    setSearchQuery(q);
-    const res = await fetch(`/api/staff/search?q=${encodeURIComponent(q)}`);
-    setSearchResults(await res.json());
-  };
-
-  const assignStaff = async (username: string) => {
-    setLoading(true);
-    await fetch(`/api/events/${eventId}/staff`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, user_id: user.username }),
-    });
-    const eventRes = await fetch(`/api/events/${eventId}`);
-    const eventData = await eventRes.json();
-    setAssignedStaff(eventData.staff || []);
-    onStaffChange();
-    setLoading(false);
-  };
-
-  const removeStaff = async (username: string) => {
-    await fetch(`/api/events/${eventId}/staff/${username}?user_id=${user.username}`, { method: 'DELETE' });
-    setAssignedStaff(prev => prev.filter(s => s.username !== username));
-    onStaffChange();
-  };
-
-  const assignedUsernames = new Set(assignedStaff.map(s => s.username));
-  const availableStaff = searchResults.filter(s => !assignedUsernames.has(s.username));
-
   const sectionBtns = [
     { key: 'details' as const, label: 'Details', icon: <MapPin className="w-3.5 h-3.5" /> },
-    { key: 'staff' as const, label: 'Medical Staff', icon: <Users className="w-3.5 h-3.5" /> },
     { key: 'records' as const, label: 'Camp Records', icon: <FileText className="w-3.5 h-3.5" /> },
   ];
 
@@ -330,83 +323,28 @@ function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
           </div>
         )}
 
-        {/* MEDICAL STAFF */}
-        {activeSection === 'staff' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Assigned */}
-            <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-              <h4 className="text-sm font-semibold text-white mb-3 flex items-center">
-                <Stethoscope className="w-4 h-4 mr-2 text-emerald-400" />
-                Assigned ({assignedStaff.length})
-              </h4>
-              {assignedStaff.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-4">No staff assigned yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {assignedStaff.map(s => (
-                    <div key={s.username} className="flex items-center justify-between bg-slate-900 px-3 py-2.5 rounded-lg border border-slate-800">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-xs">
-                          {s.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-white text-sm font-medium">{s.name}</p>
-                          <p className="text-xs text-slate-400">{s.designation}{s.specialization ? ` · ${s.specialization}` : ''}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => removeStaff(s.username)}
-                        className="text-slate-500 hover:text-red-400 transition-colors p-1">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Search & Add */}
-            <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-              <h4 className="text-sm font-semibold text-white mb-3 flex items-center">
-                <Search className="w-4 h-4 mr-2 text-cyan-400" />
-                Search & Add Staff
-              </h4>
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 w-3.5 h-3.5" />
-                <input type="text" placeholder="Search by name, designation, specialization..."
-                  value={searchQuery} onChange={e => doSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all" />
-              </div>
-              <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                {availableStaff.length === 0 ? (
-                  <p className="text-slate-500 text-xs text-center py-3">No available staff found.</p>
-                ) : (
-                  availableStaff.map(s => (
-                    <div key={s.username} className="flex items-center justify-between bg-slate-900 px-3 py-2.5 rounded-lg border border-slate-800 hover:border-cyan-500/30 transition-all">
-                      <div className="flex items-center space-x-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
-                          {s.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-white text-sm font-medium">{s.name}</p>
-                          <p className="text-xs text-slate-400">{s.designation}{s.specialization ? ` · ${s.specialization}` : ''}</p>
-                        </div>
-                      </div>
-                      <button onClick={() => assignStaff(s.username)} disabled={loading}
-                        className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/40 px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center space-x-1">
-                        <Plus className="w-3 h-3" /><span>Add</span>
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CAMP RECORDS */}
+        {/* CAMP RECORDS (with Active Volunteers at top) */}
         {activeSection === 'records' && (
           stats ? (
             <div className="space-y-4">
+              {/* Active Volunteers */}
+              {stats.staff.length > 0 && (
+                <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center">
+                    <Activity className="w-3.5 h-3.5 mr-1.5" /> Active Volunteers ({stats.staff.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {stats.staff.map((v: Volunteer) => (
+                      <span key={v.username} className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium ${getCategoryColor(v.category)}`}>
+                        {getCategoryIcon(v.category)}
+                        <span className="text-white font-semibold">{v.name}</span>
+                        <span className="opacity-60">{formatCategoryLabel(v.category)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Stats */}
               <div className="grid grid-cols-5 gap-3">
                 <MiniStat label="Students" value={stats.total_students} color="text-cyan-400" />
@@ -415,18 +353,6 @@ function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
                 <MiniStat label="Observation" value={stats.observation} color="text-amber-400" />
                 <MiniStat label="Referred" value={stats.referred} color="text-red-400" />
               </div>
-
-              {/* Staff */}
-              {stats.staff.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {stats.staff.map(s => (
-                    <span key={s.username} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
-                      <span className="font-medium text-white">{s.name}</span>
-                      <span className="text-slate-500 ml-1">({s.designation})</span>
-                    </span>
-                  ))}
-                </div>
-              )}
 
               {/* Records */}
               {stats.records.length === 0 ? (
@@ -437,7 +363,8 @@ function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
                     <thead className="text-slate-500 border-b border-slate-800">
                       <tr>
                         <th className="pb-2 pr-4 font-medium text-xs">Student</th>
-                        <th className="pb-2 pr-4 font-medium text-xs">Doctor</th>
+                        <th className="pb-2 pr-4 font-medium text-xs">Specialist</th>
+                        <th className="pb-2 pr-4 font-medium text-xs">Category</th>
                         <th className="pb-2 pr-4 font-medium text-xs">Assessment</th>
                         <th className="pb-2 font-medium text-xs">Time</th>
                       </tr>
@@ -454,6 +381,12 @@ function EventExpandedPanel({ eventId, event, user, onStaffChange }: {
                           <tr key={rec.record_id} className="hover:bg-slate-800/30">
                             <td className="py-2.5 pr-4 text-white font-medium text-xs">{rec.student_name}</td>
                             <td className="py-2.5 pr-4 text-cyan-400 text-xs">{rec.doctor_id}</td>
+                            <td className="py-2.5 pr-4">
+                              <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium border ${getCategoryColor(rec.category)}`}>
+                                {getCategoryIcon(rec.category)}
+                                <span>{formatCategoryLabel(rec.category)}</span>
+                              </span>
+                            </td>
                             <td className={`py-2.5 pr-4 font-semibold text-xs ${assessColor}`}>{assessment}</td>
                             <td className="py-2.5 text-slate-400 text-xs">{new Date(rec.timestamp).toLocaleString()}</td>
                           </tr>
@@ -519,7 +452,6 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
   const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch schools on search
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
@@ -609,7 +541,6 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
               )}
             </div>
 
-            {/* Selected school details preview */}
             {selectedSchool && (
               <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
                 <p className="text-white font-medium">{selectedSchool.school_name}</p>
@@ -619,7 +550,6 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
               </div>
             )}
 
-            {/* Add New School Link */}
             <button type="button" onClick={onAddNewSchool}
               className="flex items-center space-x-1.5 text-cyan-400 hover:text-cyan-300 text-xs font-medium transition-colors">
               <ExternalLink className="w-3.5 h-3.5" />
@@ -660,7 +590,7 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
   );
 }
 
-// ── Modal Input Helper (with error support) ──
+// ── Modal Input Helper ──
 const ModalInput = React.forwardRef<HTMLInputElement, {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; type?: string; required?: boolean; error?: string;
@@ -674,18 +604,17 @@ const ModalInput = React.forwardRef<HTMLInputElement, {
 ));
 
 // ═══════════════════════════════════════════
-// TAB 2: REGISTER USERS (with School POC support)
+// TAB 2: REGISTER USERS (updated roles)
 // ═══════════════════════════════════════════
 function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaultRole?: string; onRoleConsumed?: () => void }) {
   const [f, setF] = useState({
-    username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '',
+    username: '', password: '', name: '', role: 'Other', designation: '',
     // School POC fields
     school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Apply default role if passed from parent
   useEffect(() => {
     if (defaultRole) {
       setF(p => ({ ...p, role: defaultRole }));
@@ -700,20 +629,19 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
     setSaving(true);
     setMessage(null);
     try {
-      let payload = { ...f, admin_user: user.username };
-      
+      let payload = { ...f, admin_user: user.username, specialization: f.role };
+
       let generatedUsername = '';
       let generatedPassword = '';
-      
+
       // Auto-generate required fields for School POC
       if (f.role === 'School POC') {
         const cleanSchoolName = f.school_name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 10);
         generatedUsername = `school_${cleanSchoolName}_${Math.floor(Math.random() * 1000)}`;
         generatedPassword = `aiims123`;
-        
         payload.username = generatedUsername;
         payload.password = generatedPassword;
-        payload.name = f.poc_name || f.school_name; // Backend needs a name for the User record
+        payload.name = f.poc_name || f.school_name;
       }
 
       const res = await fetch('/api/users/register', {
@@ -729,7 +657,7 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         }
         setMessage({ type: 'success', text: successMsg });
         setF({
-          username: '', password: '', name: '', role: 'Medical Staff', designation: '', specialization: '',
+          username: '', password: '', name: '', role: 'Other', designation: '',
           school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
         });
       } else {
@@ -741,6 +669,9 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
       setSaving(false);
     }
   };
+
+  const isSchoolPOC = f.role === 'School POC';
+  const isSpecialist = SPECIALIST_ROLES.some(r => r.key === f.role);
 
   return (
     <div className="max-w-xl mx-auto">
@@ -761,7 +692,7 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {f.role !== 'School POC' && (
+          {!isSchoolPOC && (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <ModalInput label="Username *" value={f.username} onChange={v => upd('username', v)} placeholder="e.g. doc_kumar" required />
@@ -773,61 +704,27 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
 
           <div>
             <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Role</label>
-            <div className="flex space-x-3">
-              {['Admin', 'Medical Staff', 'School POC'].map(role => (
-                <button key={role} type="button" onClick={() => upd('role', role)}
-                  className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border ${
-                    f.role === role
-                      ? role === 'School POC'
+            <div className="flex flex-wrap gap-2">
+              {ALL_REGISTER_ROLES.map(role => (
+                <button key={role.key} type="button" onClick={() => upd('role', role.key)}
+                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all border ${
+                    f.role === role.key
+                      ? role.key === 'School POC'
                         ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
-                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                        : SPECIALIST_ROLES.some(r => r.key === role.key)
+                          ? getCategoryColor(role.key)
+                          : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
                   }`}>
-                  {role === 'School POC' && <School className="w-3.5 h-3.5 inline mr-1" />}
-                  {role}
+                  {role.key === 'School POC' && <School className="w-3.5 h-3.5 inline mr-1" />}
+                  {role.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {f.role === 'Medical Staff' && (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Designation</label>
-                <div className="flex flex-wrap gap-2">
-                  {['Doctor', 'Nurse', 'Dentist', 'Paramedic', 'Specialist'].map(d => (
-                    <button key={d} type="button" onClick={() => upd('designation', d)}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
-                        f.designation === d
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-                      }`}>
-                      {f.designation === d && <Check className="w-3 h-3 inline mr-1" />}{d}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Specialization</label>
-                <div className="flex flex-wrap gap-2">
-                  {SPECIALIZATIONS.map(s => (
-                    <button key={s} type="button" onClick={() => upd('specialization', f.specialization === s ? '' : s)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                        f.specialization === s
-                          ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-                      }`}>
-                      {f.specialization === s && <Check className="w-3 h-3 inline mr-1" />}{s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-
           {/* School POC specific fields */}
-          {f.role === 'School POC' && (
+          {isSchoolPOC && (
             <div className="space-y-3 p-4 bg-violet-500/5 border border-violet-500/20 rounded-2xl">
               <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center">
                 <School className="w-3.5 h-3.5 mr-1.5" /> School Information
