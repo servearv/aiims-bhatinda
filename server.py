@@ -4,11 +4,18 @@ import csv
 import json
 import random
 import string
-import sqlite3
 import subprocess
 import sys
 import re
 from datetime import datetime, date
+from urllib.parse import urlparse
+
+try:
+    import psycopg2
+    import psycopg2.extras
+    from psycopg2 import sql
+except ImportError:
+    pass
 
 from flask import Flask, request, jsonify, send_from_directory, Response, session
 
@@ -79,20 +86,67 @@ SPEC_TO_ROLE = {
 
 
 # ---------------------------------------------------------------------------
-# Database helpers
+# Database helpers (PostgreSQL Wrapper)
 # ---------------------------------------------------------------------------
 
+class DBCursorWrapper:
+    """Wraps psycopg2 cursor to convert SQLite '?' to Postgres '%s' and mimic sqlite3.Row dict access."""
+    def __init__(self, cur):
+        self.cur = cur
+
+    def _convert_sql(self, sql_str):
+        if '?' in sql_str:
+            return sql_str.replace('?', '%s')
+        return sql_str
+
+    def execute(self, sql_str, params=None):
+        pg_sql = self._convert_sql(sql_str)
+        if params is not None:
+            self.cur.execute(pg_sql, params)
+        else:
+            self.cur.execute(pg_sql)
+        return self
+
+    def fetchone(self):
+        return self.cur.fetchone()
+
+    def fetchall(self):
+        return self.cur.fetchall()
+
+    def executescript(self, sql_str):
+        self.cur.execute(sql_str)
+        return self
+
+class DBConnectionWrapper:
+    """Wraps psycopg2 connection to mimic sqlite3."""
+    def __init__(self, conn):
+        self.conn = conn
+
+    def cursor(self):
+        return DBCursorWrapper(self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor))
+
+    def execute(self, sql_str, params=None):
+        cur = self.cursor()
+        return cur.execute(sql_str, params)
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.conn.close()
+
 def get_db():
-    """Return a new connection (with row-factory) for the current request."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    """Return a new PostgreSQL connection (with dict-like rows) for the current request."""
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is required for PostgreSQL connection.")
+    
+    conn = psycopg2.connect(db_url)
+    return DBConnectionWrapper(conn)
 
 
 def init_db():
-    """Create the schema and seed initial data (idempotent)."""
+    """Create the schema and seed initial data (idempotent for PostgreSQL)."""
     conn = get_db()
     cur = conn.cursor()
 
@@ -107,7 +161,7 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS Schools (
-            school_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            school_id SERIAL PRIMARY KEY,
             school_name TEXT NOT NULL,
             school_address TEXT DEFAULT '',
             poc_username TEXT,
@@ -120,7 +174,7 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS Events (
-            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id SERIAL PRIMARY KEY,
             school_name TEXT NOT NULL,
             school_address TEXT DEFAULT '',
             poc_name TEXT DEFAULT '',
@@ -159,7 +213,7 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS Students (
-            student_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id SERIAL PRIMARY KEY,
             event_id INTEGER,
             name TEXT,
             age INTEGER,
@@ -177,7 +231,7 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS Health_Records (
-            record_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id SERIAL PRIMARY KEY,
             student_id INTEGER,
             event_id INTEGER,
             doctor_id TEXT,
@@ -190,7 +244,7 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS Audit_Logs (
-            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            log_id SERIAL PRIMARY KEY,
             timestamp TEXT,
             user_id TEXT,
             action TEXT,
@@ -199,7 +253,7 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS Student_General_Info (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             student_id INTEGER NOT NULL,
             event_id INTEGER NOT NULL,
             height TEXT DEFAULT '',
@@ -261,13 +315,16 @@ def init_db():
         ).fetchall()
         for row in existing:
             try:
-                cur.execute(
-                    "INSERT OR IGNORE INTO Event_Volunteers "
-                    "(event_id, username, category, joined_at, active) "
-                    "VALUES (?,?,?,?,1)",
-                    (row['event_id'], row['username'], row['role'],
-                     row['assigned_at']),
-                )
+                try:
+                    cur.execute(
+                        "INSERT INTO Event_Volunteers "
+                        "(event_id, username, category, joined_at, active) "
+                        "VALUES (%s,%s,%s,%s,1)",
+                        (row['event_id'], row['username'], row['role'],
+                         row['assigned_at']),
+                    )
+                except psycopg2.IntegrityError:
+                    pass
             except Exception:
                 pass
     except Exception:
@@ -275,10 +332,10 @@ def init_db():
 
     # Seed only when Users table is empty
     row = cur.execute("SELECT COUNT(*) AS count FROM Users").fetchone()
-    if row["count"] == 0:
+    if row and row["count"] == 0:
         cur.execute(
             "INSERT INTO Users (username,password,role,name,designation,specialization) "
-            "VALUES (?,?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s,%s)",
             ("Admin", "admin", "Admin", "Admin", "", ""),
         )
 
@@ -289,7 +346,7 @@ def init_db():
 def log_audit(user_id: str, action: str, details: str):
     conn = get_db()
     conn.execute(
-        "INSERT INTO Audit_Logs (timestamp, user_id, action, details) VALUES (?,?,?,?)",
+        "INSERT INTO Audit_Logs (timestamp, user_id, action, details) VALUES (%s,%s,%s,%s)",
         (datetime.utcnow().isoformat(), user_id, action, details),
     )
     conn.commit()
@@ -297,7 +354,7 @@ def log_audit(user_id: str, action: str, details: str):
 
 
 def row_to_dict(row):
-    """Convert a sqlite3.Row to a plain dict."""
+    """Convert a psycopg2 RealDictRow to a plain dict."""
     if row is None:
         return None
     return dict(row)
@@ -451,7 +508,7 @@ def api_create_event():
                             poc_designation, poc_phone, poc_email,
                             school_id, start_date, end_date,
                             operational_hours, tag, created_at, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING event_id
     """, (
         school_name, school_address, poc_name, poc_designation,
         poc_phone, poc_email, school_id,
@@ -460,7 +517,7 @@ def api_create_event():
         data.get("tag", "Upcoming"), now,
         data.get("created_by", "admin"),
     ))
-    new_id = cur.lastrowid
+    new_id = cur.fetchone()["event_id"]
     conn.commit()
     conn.close()
     log_audit(data.get("created_by", "admin"), "CREATE_EVENT",
@@ -644,11 +701,11 @@ def api_register_user():
         cur.execute(
             """INSERT INTO Schools (school_name, school_address, poc_username,
                poc_name, poc_designation, poc_phone, poc_email, created_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING school_id""",
             (school_name, school_address, username, name,
              poc_designation, poc_phone, poc_email, now),
         )
-        school_id = cur.lastrowid
+        school_id = cur.fetchone()["school_id"]
 
     conn.commit()
     conn.close()
@@ -832,12 +889,12 @@ def api_create_student():
            (event_id, name, age, dob, gender, student_class, section,
             blood_group, father_name, phone, qr_code_hash, added_by, status,
             mother_name, mother_occupation, father_occupation, address, pincode)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
         (event_id, name, age, dob, gender, student_class, section,
          blood_group, father_name, phone, qr_hash, added_by, status,
          mother_name, mother_occupation, father_occupation, address, pincode),
     )
-    new_id = cur.lastrowid
+    new_id = cur.fetchone()["student_id"]
     conn.commit()
 
     student = conn.execute(
@@ -911,7 +968,7 @@ def api_bulk_create_students():
                    (event_id, name, age, dob, gender, student_class, section,
                     blood_group, father_name, phone, qr_code_hash,
                     added_by, status)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
                 (
                     event_id, name, age, dob, gender,
                     str(row.get("student_class", "")).strip(),
@@ -922,7 +979,7 @@ def api_bulk_create_students():
                 ),
             )
             success_list.append({
-                "row": row_num, "student_id": cur.lastrowid, "name": name
+                "row": row_num, "student_id": cur.fetchone()["student_id"], "name": name
             })
         except Exception as exc:
             error_list.append({
@@ -1271,10 +1328,10 @@ def api_save_full_exam():
         cur.execute(
             "INSERT INTO Health_Records "
             "(student_id, event_id, doctor_id, category, json_data, timestamp) "
-            "VALUES (?,?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s,%s) RETURNING record_id",
             (student_id, event_id, doctor_id, specialist_category, json_str, ts),
         )
-        record_id = cur.lastrowid
+        record_id = cur.fetchone()["record_id"]
 
     conn.commit()
     conn.close()

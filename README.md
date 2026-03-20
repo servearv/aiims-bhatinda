@@ -49,7 +49,8 @@ A comprehensive digital health management system for AIIMS Bathinda school scree
 
 ## ☁️ Deployment (Render)
 
-This application is configured for one-click deployment using **Render** (which supports the required persistent disk for SQLite and session storage).
+This application is configured for one-click deployment using **Render** (Free Tier).
+Since Render's free tier does not support persistent disks, the application has been refactored to use **PostgreSQL**. You will need a free external PostgreSQL database (e.g., [Supabase](https://supabase.com/), [Neon](https://neon.tech/), or Render's free Postgres).
 
 ### Option 1: Render Dashboard (Manual Setup)
 
@@ -62,11 +63,9 @@ This application is configured for one-click deployment using **Render** (which 
 4. Add Environment Variables:
    - `PYTHON_VERSION`: `3.11.0`
    - `NODE_VERSION`: `20`
+   - `DATABASE_URL`: *(Paste your Supabase/Neon connection string here)*
    - `SECRET_KEY`: *(Generate a secure random string)*
-5. **CRITICAL: Add a Disk**
-   - **Name**: `aiims-data`
-   - **Mount Path**: `/opt/render/project/src/data`
-   - **Size**: 1 GB
+5. Click **Create Web Service** at the bottom of the page.
 
 ### Option 2: Render Blueprint (Automatic Setup)
 
@@ -74,4 +73,5 @@ Render can automatically detect and configure this app using the provided `rende
 
 1. Go to your Render Dashboard > Blueprints.
 2. Select this repository.
-3. Render will automatically set up the Python environment, run the `/build.sh` script, attach a persistent disk located at `/opt/render/project/src/data`, and start `gunicorn`.
+3. Render will prompt you to enter the `DATABASE_URL` for your external Postgres database.
+4. Render will automatically set up the Python environment, run the `/build.sh` script, and start `gunicorn`.
