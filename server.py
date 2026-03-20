@@ -1463,8 +1463,14 @@ def serve_spa(path):
 # ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
-if __name__ == "__main__":
+
+try:
     init_db()
+    print("Database initialized successfully.")
+except Exception as e:
+    print(f"Error initializing database: {e}")
+
+if __name__ == "__main__":
     print(f"")
     print(f"  AIIMS Bathinda - Flask Server")
     print(f"  =============================")
