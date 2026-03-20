@@ -10,7 +10,7 @@ import sys
 import re
 from datetime import datetime, date
 
-from flask import Flask, request, jsonify, send_from_directory, Response
+from flask import Flask, request, jsonify, send_from_directory, Response, session
 
 # Optional: flask-socketio for real-time updates
 try:
@@ -24,18 +24,35 @@ except ImportError:
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder=None)   # we handle static files ourselves
 app.config["JSON_SORT_KEYS"] = False
-app.config["SECRET_KEY"] = "aiims-bathinda-secret"
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "aiims-bathinda-secret-dev")
+
+# Session config — server-side filesystem sessions
+SESSION_DIR = os.path.join(DATA_DIR, "flask_sessions")
+os.makedirs(SESSION_DIR, exist_ok=True)
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_FILE_DIR"] = SESSION_DIR
+app.config["SESSION_PERMANENT"] = True
+app.config["PERMANENT_SESSION_LIFETIME"] = 86400 * 7  # 7 days
+
+try:
+    from flask_session import Session
+    Session(app)
+except ImportError:
+    # flask-session not installed; use default cookie-based sessions
+    pass
 
 if HAS_SOCKETIO:
     socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 else:
     socketio = None
 
-PORT = 3000
-DB_PATH = os.path.join(BASE_DIR, "database.db")
+PORT = int(os.environ.get("PORT", 3000))
+DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(DATA_DIR, "database.db"))
 
 # Valid specialist roles (replaces the old "Medical Staff" role)
 SPECIALIST_ROLES = [
@@ -180,6 +197,21 @@ def init_db():
             details TEXT,
             FOREIGN KEY(user_id) REFERENCES Users(username)
         );
+
+        CREATE TABLE IF NOT EXISTS Student_General_Info (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            event_id INTEGER NOT NULL,
+            height TEXT DEFAULT '',
+            weight TEXT DEFAULT '',
+            bmi TEXT DEFAULT '',
+            symptoms_json TEXT DEFAULT '[]',
+            filled_by TEXT DEFAULT '',
+            updated_at TEXT,
+            FOREIGN KEY(student_id) REFERENCES Students(student_id),
+            FOREIGN KEY(event_id) REFERENCES Events(event_id),
+            UNIQUE(student_id, event_id)
+        );
     """)
 
     # Idempotent migrations: add columns if missing
@@ -192,7 +224,12 @@ def init_db():
     student_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
                     "blood_group TEXT", "father_name TEXT", "phone TEXT",
                     "event_id INTEGER", "added_by TEXT DEFAULT ''",
-                    "status TEXT DEFAULT 'Pending Examination'"]
+                    "status TEXT DEFAULT 'Pending Examination'",
+                    "mother_name TEXT DEFAULT ''",
+                    "mother_occupation TEXT DEFAULT ''",
+                    "father_occupation TEXT DEFAULT ''",
+                    "address TEXT DEFAULT ''",
+                    "pincode TEXT DEFAULT ''"]
     for col_def in student_cols:
         try:
             cur.execute(f"ALTER TABLE Students ADD COLUMN {col_def}")
@@ -315,8 +352,30 @@ def api_login():
             "message": "Your account is not a School POC account."
         }), 403
 
+    # Store user in server-side session
+    session.permanent = True
+    session["user"] = u
+
     log_audit(username, "LOGIN", "User logged in successfully")
     return jsonify({"success": True, "user": u})
+
+
+@app.route("/api/session", methods=["GET"])
+def api_session():
+    """Return current session user (survives page refresh)."""
+    user = session.get("user")
+    if user:
+        return jsonify({"success": True, "user": user})
+    return jsonify({"success": False}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    """Clear the session."""
+    username = session.get("user", {}).get("username", "unknown")
+    session.clear()
+    log_audit(username, "LOGOUT", "User logged out")
+    return jsonify({"success": True})
 
 
 # ---- Events ----
@@ -756,6 +815,11 @@ def api_create_student():
     event_id = data.get("event_id", 1)
     added_by = data.get("added_by", user_id or "")
     status = data.get("status", "Pending Examination")
+    mother_name = data.get("mother_name", "")
+    mother_occupation = data.get("mother_occupation", "")
+    father_occupation = data.get("father_occupation", "")
+    address = data.get("address", "")
+    pincode = data.get("pincode", "")
 
     if not name:
         return jsonify({"success": False, "message": "Name is required"}), 400
@@ -766,10 +830,12 @@ def api_create_student():
     cur.execute(
         """INSERT INTO Students
            (event_id, name, age, dob, gender, student_class, section,
-            blood_group, father_name, phone, qr_code_hash, added_by, status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            blood_group, father_name, phone, qr_code_hash, added_by, status,
+            mother_name, mother_occupation, father_occupation, address, pincode)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (event_id, name, age, dob, gender, student_class, section,
-         blood_group, father_name, phone, qr_hash, added_by, status),
+         blood_group, father_name, phone, qr_hash, added_by, status,
+         mother_name, mother_occupation, father_occupation, address, pincode),
     )
     new_id = cur.lastrowid
     conn.commit()
@@ -987,6 +1053,152 @@ def api_student_by_id(student_id):
     return jsonify(row_to_dict(student))
 
 
+@app.route("/api/students/<int:student_id>", methods=["PUT"])
+def api_update_student(student_id):
+    """Update student demographics (used by teacher/admin for general info autosave)."""
+    data = request.get_json(force=True)
+    conn = get_db()
+    allowed = [
+        "name", "age", "dob", "gender", "student_class", "section",
+        "blood_group", "father_name", "phone", "mother_name",
+        "mother_occupation", "father_occupation", "address", "pincode",
+    ]
+    fields = []
+    params = []
+    for field in allowed:
+        if field in data:
+            fields.append(f"{field} = ?")
+            params.append(data[field])
+    if not fields:
+        conn.close()
+        return jsonify({"success": False, "message": "No fields"}), 400
+    params.append(student_id)
+    conn.execute(
+        f"UPDATE Students SET {', '.join(fields)} WHERE student_id = ?",
+        params,
+    )
+    conn.commit()
+    student = conn.execute(
+        "SELECT * FROM Students WHERE student_id = ?", (student_id,)
+    ).fetchone()
+    conn.close()
+    log_audit(data.get("user_id", "teacher"), "UPDATE_STUDENT",
+              f"Updated student {student_id}")
+    return jsonify({"success": True, "student": row_to_dict(student)})
+
+
+@app.route("/api/students/<int:student_id>/general-info", methods=["PUT"])
+def api_upsert_general_info(student_id):
+    """Upsert vitals + symptoms for a student (autosave endpoint)."""
+    data = request.get_json(force=True)
+    event_id = data.get("event_id", 1)
+    height = data.get("height", "")
+    weight = data.get("weight", "")
+    bmi = data.get("bmi", "")
+    symptoms_json = json.dumps(data.get("symptoms", []))
+    filled_by = data.get("filled_by", "")
+    ts = datetime.utcnow().isoformat()
+
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM Student_General_Info "
+        "WHERE student_id = ? AND event_id = ?",
+        (student_id, event_id),
+    ).fetchone()
+
+    if existing:
+        conn.execute(
+            "UPDATE Student_General_Info "
+            "SET height=?, weight=?, bmi=?, symptoms_json=?, filled_by=?, updated_at=? "
+            "WHERE id = ?",
+            (height, weight, bmi, symptoms_json, filled_by, ts, existing["id"]),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO Student_General_Info "
+            "(student_id, event_id, height, weight, bmi, symptoms_json, filled_by, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (student_id, event_id, height, weight, bmi, symptoms_json, filled_by, ts),
+        )
+
+    conn.commit()
+    conn.close()
+    log_audit(filled_by, "UPDATE_GENERAL_INFO",
+              f"Updated general info for student {student_id}")
+    return jsonify({"success": True})
+
+
+@app.route("/api/students/<int:student_id>/general-info")
+def api_get_general_info(student_id):
+    """Get vitals + symptoms for a student."""
+    event_id = request.args.get("event_id", "1")
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM Student_General_Info "
+        "WHERE student_id = ? AND event_id = ?",
+        (student_id, int(event_id)),
+    ).fetchone()
+    conn.close()
+    if row:
+        d = row_to_dict(row)
+        try:
+            d["symptoms"] = json.loads(d.get("symptoms_json", "[]"))
+        except Exception:
+            d["symptoms"] = []
+        return jsonify(d)
+    return jsonify({"height": "", "weight": "", "bmi": "", "symptoms": []})
+
+
+@app.route("/api/students/<int:student_id>/all-records")
+def api_student_all_records(student_id):
+    """Get all specialist records + general info for a student (cross-view)."""
+    event_id = request.args.get("event_id", "1")
+    conn = get_db()
+
+    # Student demographics
+    student = conn.execute(
+        "SELECT * FROM Students WHERE student_id = ?", (student_id,)
+    ).fetchone()
+
+    # General info
+    gen = conn.execute(
+        "SELECT * FROM Student_General_Info "
+        "WHERE student_id = ? AND event_id = ?",
+        (student_id, int(event_id)),
+    ).fetchone()
+
+    # All health records
+    records = conn.execute(
+        "SELECT category, json_data, timestamp, doctor_id "
+        "FROM Health_Records WHERE student_id = ? AND event_id = ? "
+        "ORDER BY timestamp DESC",
+        (student_id, int(event_id)),
+    ).fetchall()
+    conn.close()
+
+    gen_dict = row_to_dict(gen) if gen else {}
+    if gen_dict:
+        try:
+            gen_dict["symptoms"] = json.loads(gen_dict.get("symptoms_json", "[]"))
+        except Exception:
+            gen_dict["symptoms"] = []
+
+    records_list = []
+    for r in records:
+        rd = row_to_dict(r)
+        try:
+            rd["parsed_data"] = json.loads(rd.get("json_data", "{}"))
+        except Exception:
+            rd["parsed_data"] = {}
+        records_list.append(rd)
+
+    return jsonify({
+        "student": row_to_dict(student),
+        "general_info": gen_dict,
+        "records": records_list,
+    })
+
+
 # ---- Health Records ----
 @app.route("/api/health-records", methods=["POST"])
 def api_create_health_record():
@@ -1013,7 +1225,9 @@ def api_create_health_record():
 
 @app.route("/api/health-records/exam", methods=["POST"])
 def api_save_full_exam():
-    """Save a specialist examination (upsert by student + event + category)."""
+    """Save a specialist examination (upsert by student + event + category).
+    Enforces role-based ownership: the doctor's role must match specialist_category.
+    """
     data = request.get_json(force=True)
     student_id = data.get("student_id")
     event_id = data.get("event_id", data.get("camp_id", 1))
@@ -1023,7 +1237,21 @@ def api_save_full_exam():
     ts = datetime.utcnow().isoformat()
     json_str = json.dumps(exam_data) if isinstance(exam_data, dict) else str(exam_data)
 
+    # Enforce role-based ownership: doctor's role must match specialist_category
     conn = get_db()
+    user_row = conn.execute(
+        "SELECT role FROM Users WHERE username = ?", (doctor_id,)
+    ).fetchone()
+    if user_row and specialist_category != "FullExam":
+        user_role = user_row["role"]
+        if user_role != specialist_category and user_role != "Admin":
+            conn.close()
+            return jsonify({
+                "success": False,
+                "message": f"Access denied: your role ({user_role}) cannot "
+                           f"save {specialist_category} records."
+            }), 403
+
     # Upsert by student + event + specialist category
     existing = conn.execute(
         "SELECT record_id FROM Health_Records "

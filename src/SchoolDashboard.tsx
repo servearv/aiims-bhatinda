@@ -3,8 +3,9 @@ import Papa from 'papaparse';
 import {
   Calendar, Users, Plus, X, Check, ChevronRight, ArrowRight,
   Upload, Download, FileText, Activity, UserPlus, Search,
-  ChevronDown, AlertTriangle, BarChart3
+  ChevronDown, AlertTriangle, BarChart3, ClipboardList
 } from 'lucide-react';
+import GeneralInfoForm from './GeneralInfoForm';
 
 // ── Types ──
 type User = { username: string; role: string; name: string };
@@ -216,6 +217,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const fetchStudents = () => {
     setLoading(true);
@@ -232,6 +234,24 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const totalStudents = students.length;
   const examinedStudents = students.filter(s => s.is_examined).length;
   const progressPct = totalStudents > 0 ? Math.round((examinedStudents / totalStudents) * 100) : 0;
+
+  // If editing a student's general info, show the form
+  if (editingStudent) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => { setEditingStudent(null); fetchStudents(); }}
+          className="text-slate-400 hover:text-violet-400 transition-colors text-sm flex items-center space-x-1">
+          <ChevronRight className="w-4 h-4 rotate-180" /><span>Back to Roster</span>
+        </button>
+        <GeneralInfoForm
+          student={editingStudent as any}
+          eventId={eventId}
+          user={user}
+          onClose={() => { setEditingStudent(null); fetchStudents(); }}
+        />
+      </div>
+    );
+  }
 
   // Empty state
   if (!loading && students.length === 0 && !searchQuery) {
@@ -308,6 +328,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Age</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Phone</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Status</th>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
@@ -325,6 +346,12 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                       <td className="px-5 py-3 text-slate-300">{s.phone || '—'}</td>
                       <td className="px-5 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${statusStyle}`}>{statusLabel}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <button onClick={() => setEditingStudent(s)}
+                          className="bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 border border-violet-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5">
+                          <ClipboardList className="w-3 h-3" /><span>Fill Info</span>
+                        </button>
                       </td>
                     </tr>
                   );

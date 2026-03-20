@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: aiims-bathinda
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt
+      npm install
+      npm run build
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: NODE_VERSION
+        value: 20
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    disk:
+      name: aiims-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

@@ -20,11 +20,11 @@ const TAGS = ['Upcoming', 'Ongoing', 'Completed', 'Cancelled'];
 
 // Specialist roles for registration
 const SPECIALIST_ROLES = [
-  { key: 'Community_Medicine', label: 'Community Med' },
+  { key: 'Community_Medicine', label: 'Community Medicine' },
   { key: 'Dental', label: 'Dental' },
   { key: 'ENT', label: 'ENT' },
-  { key: 'Eye_Specialist', label: 'Eye' },
-  { key: 'Skin_Specialist', label: 'Skin' },
+  { key: 'Eye_Specialist', label: 'Ophthalmology' },
+  { key: 'Skin_Specialist', label: 'Dermatology' },
   { key: 'Other', label: 'Other' },
 ];
 
@@ -61,9 +61,9 @@ function getCategoryColor(cat: string): string {
 
 function formatCategoryLabel(cat: string): string {
   switch (cat) {
-    case 'Community_Medicine': return 'Community Med';
-    case 'Eye_Specialist': return 'Eye';
-    case 'Skin_Specialist': return 'Skin';
+    case 'Community_Medicine': return 'Community Medicine';
+    case 'Eye_Specialist': return 'Ophthalmology';
+    case 'Skin_Specialist': return 'Dermatology';
     default: return cat;
   }
 }
@@ -136,7 +136,7 @@ export default function AdminDashboard({ user }: { user: User }) {
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
       <div>
         <h2 className="text-2xl font-bold text-white tracking-tight">Admin Dashboard ⚙️</h2>
-        <p className="text-slate-400 text-sm mt-0.5">Manage events, volunteer specialists, and camp records.</p>
+        <p className="text-slate-400 text-sm mt-0.5">Manage screening camps, medical staff, and health records.</p>
       </div>
 
       {/* Tab Navigation */}
@@ -239,7 +239,7 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
                 </div>
                 <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                   <span className="text-xs text-slate-500">
-                    <Users className="w-3.5 h-3.5 inline mr-1" />{event.staff_count ?? 0} volunteers
+                    <Users className="w-3.5 h-3.5 inline mr-1" />{event.staff_count ?? 0} staff
                   </span>
                   <span className="text-xs text-slate-500">
                     <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0}/{event.student_count ?? 0} screened
@@ -331,7 +331,7 @@ function EventExpandedPanel({ eventId, event, user, onRefresh }: {
               {stats.staff.length > 0 && (
                 <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800">
                   <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center">
-                    <Activity className="w-3.5 h-3.5 mr-1.5" /> Active Volunteers ({stats.staff.length})
+                    <Activity className="w-3.5 h-3.5 mr-1.5" /> Screening Staff ({stats.staff.length})
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {stats.staff.map((v: Volunteer) => (

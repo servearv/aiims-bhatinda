@@ -5,7 +5,7 @@ import SchoolDashboard from './SchoolDashboard';
 import {
   Activity, Stethoscope, ActivitySquare,
   LogOut, ShieldCheck, Sun, Moon, School,
-  HeartPulse, Eye, Ear, Scan, ChevronLeft
+  HeartPulse, Eye, Ear, Scan, ChevronLeft, Menu, X
 } from 'lucide-react';
 
 // --- Types ---
@@ -30,10 +30,19 @@ function isSpecialist(role: string) {
 // --- Main App Component ---
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
     return 'light';
   });
+
+  // Restore session on mount (fixes page refresh logout)
+  useEffect(() => {
+    fetch('/api/session').then(r => r.json()).then(data => {
+      if (data.success) setUser(data.user);
+    }).catch(() => {}).finally(() => setCheckingSession(false));
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -42,6 +51,24 @@ export default function App() {
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
+  const handleLogout = async () => {
+    try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+    setUser(null);
+  };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.5)] animate-pulse">
+            <ActivitySquare className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-slate-400 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return <LoginScreen onLogin={setUser} />;
   }
@@ -49,20 +76,19 @@ export default function App() {
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
       {/* Sidebar */}
-      <aside className="w-72 bg-slate-900/80 border-r border-slate-800 backdrop-blur-xl flex flex-col relative z-20">
-        <div className="p-6 border-b border-slate-800/50">
+      <aside className={`bg-slate-900/80 border-r border-slate-800 backdrop-blur-xl flex flex-col relative z-20 transition-all duration-300 overflow-hidden ${sidebarOpen ? 'w-72' : 'w-0 border-r-0'}`}>
+        <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
           <div className="flex items-center space-x-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)] flex-shrink-0">
               <ActivitySquare className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white">AIIMS Bathinda</h1>
-              <p className="text-cyan-400 text-xs font-medium tracking-wider uppercase">Enterprise Portal</p>
             </div>
           </div>
         </div>
         
-        <div className="p-6 border-b border-slate-800/50">
+        <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
@@ -91,7 +117,7 @@ export default function App() {
             <span className="font-medium text-sm">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
           <button 
-            onClick={() => setUser(null)}
+            onClick={handleLogout}
             className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20"
           >
             <LogOut className="w-4 h-4" />
@@ -101,11 +127,22 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative">
+      <main className="flex-1 overflow-y-auto relative flex flex-col">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
         
-        <div className="p-8 relative z-10">
+        {/* Topbar with Sidebar Toggle */}
+        <div className="p-4 flex items-center relative z-20">
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all backdrop-blur-xl border border-slate-700 hover:border-cyan-500/50"
+            title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+          >
+            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <div className="px-8 pb-8 flex-1 relative z-10">
           {user.role === 'Admin' && <AdminDashboard user={user} />}
           {user.role === 'School POC' && <SchoolDashboard user={user} />}
           {isSpecialist(user.role) && <DoctorWorkflow user={user} />}
@@ -118,8 +155,8 @@ export default function App() {
 function formatRoleDisplay(role: string): string {
   switch (role) {
     case 'Community_Medicine': return 'Community Medicine';
-    case 'Eye_Specialist': return 'Eye Specialist';
-    case 'Skin_Specialist': return 'Skin Specialist';
+    case 'Eye_Specialist': return 'Ophthalmology';
+    case 'Skin_Specialist': return 'Dermatology';
     case 'School POC': return 'School POC';
     default: return role;
   }
@@ -144,8 +181,8 @@ const CATEGORIES = [
   { key: 'Community_Medicine', label: 'Community Medicine', icon: <HeartPulse className="w-7 h-7" />, color: 'from-rose-500 to-pink-600', ring: 'ring-rose-500/40', border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-400' },
   { key: 'Dental', label: 'Dental', icon: <span className="text-2xl">🦷</span>, color: 'from-sky-500 to-blue-600', ring: 'ring-sky-500/40', border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-400' },
   { key: 'ENT', label: 'ENT', icon: <Ear className="w-7 h-7" />, color: 'from-amber-500 to-orange-600', ring: 'ring-amber-500/40', border: 'border-amber-500/30', bg: 'bg-amber-500/10', text: 'text-amber-400' },
-  { key: 'Eye_Specialist', label: 'Eye Specialist', icon: <Eye className="w-7 h-7" />, color: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-500/40', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
-  { key: 'Skin_Specialist', label: 'Skin Specialist', icon: <Scan className="w-7 h-7" />, color: 'from-violet-500 to-purple-600', ring: 'ring-violet-500/40', border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-400' },
+  { key: 'Eye_Specialist', label: 'Ophthalmology', icon: <Eye className="w-7 h-7" />, color: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-500/40', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
+  { key: 'Skin_Specialist', label: 'Dermatology', icon: <Scan className="w-7 h-7" />, color: 'from-violet-500 to-purple-600', ring: 'ring-violet-500/40', border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-400' },
   { key: 'Other', label: 'Other', icon: <Stethoscope className="w-7 h-7" />, color: 'from-slate-500 to-zinc-600', ring: 'ring-slate-500/40', border: 'border-slate-500/30', bg: 'bg-slate-500/10', text: 'text-slate-400' },
 ];
 
@@ -230,7 +267,6 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
             <ActivitySquare className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white tracking-tight">AIIMS Bathinda</h2>
-          <p className="text-cyan-400 text-sm font-medium tracking-widest uppercase mt-1">Enterprise Gateway</p>
         </div>
 
         {/* Step 1: Role Selection */}
@@ -337,9 +373,7 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
                 </button>
               </form>
               
-              <div className="mt-8 pt-6 border-t border-slate-800/50 text-center">
-                <p className="text-xs text-slate-500">Admin / admin</p>
-              </div>
+
             </div>
           </div>
         )}
