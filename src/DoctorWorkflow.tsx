@@ -624,28 +624,145 @@ function StatusAndRemarks({ data, onChange, disabled }: { data: any; onChange: (
 }
 
 // ── Other Specialists' Records (Read-Only) ──
-function formatRecordValue(k: string, v: any): string | null {
-  if (v === null || v === undefined || v === '') return null;
-  if (k === 'status') return null; // handled separately
-  if (Array.isArray(v)) {
-    // Handle arrays of objects (e.g. vaccinations)
-    return v.map(item => {
-      if (typeof item === 'object' && item !== null) {
-        const parts = Object.entries(item)
-          .filter(([, val]) => val !== null && val !== undefined && val !== '')
-          .map(([key, val]) => `${key}: ${val}`);
-        return parts.join(', ');
-      }
-      return String(item);
-    }).join(' | ');
+// Per-specialist renderers so each card shows data in a structured, readable layout.
+
+function RecordField({ label, value, className = '' }: { label: string; value?: string; className?: string }) {
+  if (!value) return null;
+  return (
+    <div className={className}>
+      <span className="text-[10px] text-slate-600 uppercase tracking-wider">{label}</span>
+      <p className="text-xs text-slate-300 mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function RecordPill({ label, color }: { label: string; color: string }) {
+  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${color}`}>{label}</span>;
+}
+
+function EyeRecordCard({ d }: { d: any }) {
+  return (
+    <div className="grid grid-cols-3 gap-2 mt-1.5">
+      <RecordField label="Vision RE" value={d.rightEye} />
+      <RecordField label="Vision LE" value={d.leftEye} />
+      <RecordField label="Spectacles" value={d.accessories} />
+    </div>
+  );
+}
+
+function DentalRecordCard({ d }: { d: any }) {
+  return (
+    <div className="mt-1.5 space-y-1">
+      <RecordField label="Teeth & Gums" value={d.teethGums} />
+      <div className="grid grid-cols-2 gap-2">
+        <RecordField label="Implants" value={d.implants} />
+        <RecordField label="Braces" value={d.braces} />
+      </div>
+    </div>
+  );
+}
+
+function ENTRecordCard({ d }: { d: any }) {
+  return (
+    <div className="grid grid-cols-3 gap-2 mt-1.5">
+      <RecordField label="Ear" value={d.ear} />
+      <RecordField label="Nose" value={d.nose} />
+      <RecordField label="Throat" value={d.throat} />
+    </div>
+  );
+}
+
+function SkinRecordCard({ d }: { d: any }) {
+  return <div className="mt-1.5"><RecordField label="Skin / Nails / Hair" value={d.skinExam} /></div>;
+}
+
+function CommunityMedRecordCard({ d }: { d: any }) {
+  const vaccStatus = d.vaccinationStatus || {};
+  const vaccEntries = Object.entries(vaccStatus) as [string, string][];
+  const vaccColor = (s: string) =>
+    s === 'given' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
+    s === 'not_given' ? 'text-red-400 bg-red-500/10 border-red-500/30' :
+    'text-slate-400 bg-slate-800 border-slate-700';
+  const vaccLabel = (s: string) => s === 'given' ? '✓' : s === 'not_given' ? '✗' : '?';
+  const pastHistory = Array.isArray(d.pastHistory) ? d.pastHistory : [];
+  const SYSTEMS = ['locomotor', 'abdomen', 'respiratory', 'cardiovascular', 'cns'];
+  const sysEntries = SYSTEMS.filter(s => d[s]).map(s => ({ key: s, val: d[s], detail: d[`${s}Detail`] }));
+  return (
+    <div className="mt-1.5 space-y-2">
+      {/* Vaccinations */}
+      {vaccEntries.length > 0 && (
+        <div>
+          <span className="text-[10px] text-slate-600 uppercase tracking-wider">Immunisation</span>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {vaccEntries.map(([name, status]) => (
+              <span key={name} className={`text-[10px] font-medium px-1.5 py-0.5 rounded border inline-flex items-center space-x-1 ${vaccColor(status)}`}>
+                <span>{vaccLabel(status)}</span><span>{name}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Past History */}
+      {pastHistory.length > 0 && (
+        <div>
+          <span className="text-[10px] text-slate-600 uppercase tracking-wider">Past History</span>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {pastHistory.map((h: string) => <span key={h} className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded">{h}</span>)}
+          </div>
+        </div>
+      )}
+      {d.pastHistoryOther && <RecordField label="Other History" value={d.pastHistoryOther} />}
+      {/* Complaints & Meds */}
+      <div className="grid grid-cols-2 gap-2">
+        <RecordField label="Complaint" value={d.presentComplaint} />
+        <RecordField label="Medication" value={d.currentMedication} />
+      </div>
+      <RecordField label="Anaemia" value={d.anaemia} />
+      {/* Systemic Examination */}
+      {sysEntries.length > 0 && (
+        <div>
+          <span className="text-[10px] text-slate-600 uppercase tracking-wider">Systems</span>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {sysEntries.map(s => (
+              <span key={s.key} className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${s.val === 'NAD' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-red-400 bg-red-500/10 border-red-500/30'}`}>
+                {s.key}{s.val === 'Abnormal' && s.detail ? `: ${s.detail}` : ` ${s.val}`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.otherFindings && <RecordField label="Other Findings" value={d.otherFindings} />}
+    </div>
+  );
+}
+
+/** Fallback for unrecognized specialty — show key-value pairs cleanly. */
+function GenericRecordCard({ d }: { d: any }) {
+  const entries = Object.entries(d).filter(([k]) => k !== 'status' && k !== 'assessment');
+  if (entries.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-2 mt-1.5">
+      {entries.map(([k, v]) => {
+        if (v === null || v === undefined || v === '') return null;
+        let display: string;
+        if (Array.isArray(v)) display = v.map(i => typeof i === 'object' ? Object.entries(i).map(([a,b])=>`${a}: ${b}`).join(', ') : String(i)).join(' | ');
+        else if (typeof v === 'object') display = Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(', ');
+        else display = String(v);
+        return <div key={k}><RecordField label={k.replace(/_/g, ' ')} value={display} /></div>;
+      })}
+    </div>
+  );
+}
+
+function SpecialistRecordBody({ category, d }: { category: string; d: any }) {
+  switch (category) {
+    case 'Eye_Specialist': return <EyeRecordCard d={d} />;
+    case 'Dental': return <DentalRecordCard d={d} />;
+    case 'ENT': return <ENTRecordCard d={d} />;
+    case 'Skin_Specialist': return <SkinRecordCard d={d} />;
+    case 'Community_Medicine': return <CommunityMedRecordCard d={d} />;
+    default: return <GenericRecordCard d={d} />;
   }
-  if (typeof v === 'object') {
-    return Object.entries(v)
-      .filter(([, val]) => val !== null && val !== undefined && val !== '')
-      .map(([key, val]) => `${key}: ${val}`)
-      .join(', ');
-  }
-  return String(v);
 }
 
 function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
@@ -672,30 +789,22 @@ function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
         {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
       </button>
       {open && (
-        <div className="px-4 pb-3 border-t border-slate-800/50 pt-2 space-y-1.5">
+        <div className="px-4 pb-3 border-t border-slate-800/50 pt-2 space-y-2">
           {otherRecords.length === 0 ? (
             <p className="text-xs text-slate-500 py-1">No other specialist records yet.</p>
           ) : otherRecords.map((r, i) => {
             const d = r.parsed_data || {};
-            const entries = Object.entries(d).filter(([k]) => k !== 'status' && k !== 'assessment');
             return (
               <div key={i} className="bg-slate-950/50 rounded-lg px-3 py-2 border border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-cyan-400">{catLabel(r.category)}</span>
                   <div className="flex items-center space-x-2">
-                    {d.status && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusColor(d.status)}`}>{statusLabel(d.status)}</span>}
+                    {d.status && <RecordPill label={statusLabel(d.status)} color={statusColor(d.status)} />}
                     <span className="text-[10px] text-slate-600">{r.doctor_id}</span>
                   </div>
                 </div>
-                {entries.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                    {entries.map(([k, v]) => {
-                      const formatted = formatRecordValue(k, v);
-                      if (!formatted) return null;
-                      return <span key={k} className="text-[11px] text-slate-400"><span className="text-slate-600">{k.replace(/_/g, ' ')}:</span> {formatted}</span>;
-                    })}
-                  </div>
-                )}
+                <SpecialistRecordBody category={r.category} d={d} />
+                {d.remarks && <p className="text-[11px] text-slate-400 mt-1 italic border-t border-slate-800/50 pt-1">"{d.remarks}"</p>}
               </div>
             );
           })}
