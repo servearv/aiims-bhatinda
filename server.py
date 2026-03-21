@@ -1033,6 +1033,7 @@ def api_students_search():
     query = request.args.get("query", "").strip()
     student_class = request.args.get("class", "").strip()
     section = request.args.get("section", "").strip()
+    gender = request.args.get("gender", "").strip()
     examined = request.args.get("examined", "")   # '1' or '0'
     referred = request.args.get("referred", "")   # '1'
     event_id = request.args.get("event_id", "").strip()
@@ -1047,12 +1048,22 @@ def api_students_search():
         params.append(int(event_id))
 
     if query:
-        conditions.append(
-            "(s.name LIKE ? OR s.student_id = ? OR s.phone LIKE ? "
-            "OR s.student_class LIKE ? OR s.section LIKE ?)"
-        )
-        params.extend([f"%{query}%", query, f"%{query}%",
-                        f"%{query}%", f"%{query}%"])
+        # Try to parse as int for student_id match, otherwise skip
+        try:
+            sid_val = int(query)
+            conditions.append(
+                "(s.name ILIKE ? OR s.student_id = ? OR s.phone ILIKE ? "
+                "OR s.student_class ILIKE ? OR s.section ILIKE ?)"
+            )
+            params.extend([f"%{query}%", sid_val, f"%{query}%",
+                            f"%{query}%", f"%{query}%"])
+        except ValueError:
+            conditions.append(
+                "(s.name ILIKE ? OR s.phone ILIKE ? "
+                "OR s.student_class ILIKE ? OR s.section ILIKE ?)"
+            )
+            params.extend([f"%{query}%", f"%{query}%",
+                            f"%{query}%", f"%{query}%"])
 
     if student_class:
         conditions.append("s.student_class = ?")
@@ -1061,6 +1072,10 @@ def api_students_search():
     if section:
         conditions.append("s.section = ?")
         params.append(section)
+
+    if gender:
+        conditions.append("s.gender = ?")
+        params.append(gender)
 
     where = (" AND " + " AND ".join(conditions)) if conditions else ""
 
@@ -1073,11 +1088,13 @@ def api_students_search():
         LEFT JOIN (
             SELECT student_id,
                    COUNT(*) AS hr_count,
-                   GROUP_CONCAT(DISTINCT category) AS examined_categories
+                   STRING_AGG(DISTINCT category, ',') AS examined_categories
             FROM Health_Records
             GROUP BY student_id
         ) hr ON s.student_id = hr.student_id
         WHERE 1=1 {where}
+        ORDER BY s.name
+        LIMIT 100
     """
 
     rows = conn.execute(sql, params).fetchall()

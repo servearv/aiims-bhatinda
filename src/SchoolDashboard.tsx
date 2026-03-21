@@ -393,8 +393,8 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
   const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = 'Name is required';
-    if (!f.dob) e.dob = 'Date of birth is required';
     if (!f.gender) e.gender = 'Sex is required';
+    if (f.phone?.trim() && !/^\d{10}$/.test(f.phone.replace(/\D/g, ''))) e.phone = 'Valid 10-digit phone is required';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -541,7 +541,7 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
             if (isNaN(d.getTime())) errors.push('Invalid DOB format (use YYYY-MM-DD)');
           }
           if (row.phone?.trim()) {
-            if (!/^[+]?[\d\s\-()]{7,15}$/.test(row.phone.trim())) errors.push('Invalid phone number');
+            if (!/^\d{10}$/.test(row.phone.replace(/\D/g, ''))) errors.push('Invalid 10-digit phone number');
           }
           return { data: row, valid: errors.length === 0, errors };
         });

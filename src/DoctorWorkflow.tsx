@@ -175,6 +175,7 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
     if (!f.student_class) e.student_class = 'Class is required';
     if (!f.dob) e.dob = 'Date of birth is required';
     if (!f.gender) e.gender = 'Sex is required';
+    if (f.phone?.trim() && !/^\d{10}$/.test(f.phone.replace(/\D/g, ''))) e.phone = 'Valid 10-digit phone is required';
     setErrors(e); return Object.keys(e).length === 0;
   };
   const handleSave = async (e: React.FormEvent) => {
@@ -683,6 +684,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterClass, setFilterClass] = useState('');
   const [filterSection, setFilterSection] = useState('');
+  const [filterGender, setFilterGender] = useState('');
   const [filterExamined, setFilterExamined] = useState('');
   const [examData, setExamData] = useState<any>({ status: 'N' });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -706,13 +708,16 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
     if (query) params.set('query', query);
     if (filterClass) params.set('class', filterClass);
     if (filterSection) params.set('section', filterSection);
+    if (filterGender) params.set('gender', filterGender);
     if (filterExamined) params.set('examined', filterExamined);
     params.set('event_id', String(campId));
-    const res = await fetch(`/api/students/search?${params}`);
-    setSearchResults(await res.json());
-  }, [searchQuery, filterClass, filterSection, filterExamined, campId]);
+    try {
+      const res = await fetch(`/api/students/search?${params}`);
+      if (res.ok) setSearchResults(await res.json());
+    } catch { /* ignore network errors */ }
+  }, [searchQuery, filterClass, filterSection, filterGender, filterExamined, campId]);
 
-  useEffect(() => { doSearch(); }, [filterClass, filterSection, filterExamined]);
+  useEffect(() => { doSearch(); }, [filterClass, filterSection, filterGender, filterExamined]);
 
   // Load existing exam data when student selected
   const selectStudent = async (s: Student) => {
@@ -763,7 +768,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   const handleExamChange = (newData: any) => {
     setExamData(newData);
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    autosaveTimerRef.current = setTimeout(() => autoSave(newData), 1500);
+    autosaveTimerRef.current = setTimeout(() => autoSave(newData), 800);
   };
 
   const handleBack = async () => {
@@ -837,8 +842,11 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
           <select value={filterExamined} onChange={e => setFilterExamined(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
             <option value="">All Status</option><option value="0">Not Examined</option><option value="1">Examined</option>
           </select>
-          {(filterClass || filterSection || filterExamined) && (
-            <button onClick={() => { setFilterClass(''); setFilterSection(''); setFilterExamined(''); }} className="text-xs text-red-400 underline">Clear</button>
+          <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Sex</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
+          </select>
+          {(filterClass || filterSection || filterExamined || filterGender) && (
+            <button onClick={() => { setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender(''); }} className="text-xs text-red-400 underline">Clear</button>
           )}
         </div>
         {/* Results */}

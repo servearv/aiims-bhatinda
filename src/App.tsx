@@ -276,7 +276,7 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
             <div className="grid grid-cols-3 gap-4">
               {[
                 { key: 'Admin', label: 'Admin', icon: <ShieldCheck className="w-8 h-8" />, desc: 'System management', color: 'from-cyan-500 to-blue-600', glow: 'rgba(34,211,238,0.3)' },
-                { key: 'School', label: 'School', icon: <School className="w-8 h-8" />, desc: 'School PoC', color: 'from-violet-500 to-purple-600', glow: 'rgba(139,92,246,0.3)' },
+                { key: 'School', label: 'School', icon: <School className="w-8 h-8" />, desc: 'School', color: 'from-violet-500 to-purple-600', glow: 'rgba(139,92,246,0.3)' },
                 { key: 'Doctor', label: 'Doctor', icon: <Stethoscope className="w-8 h-8" />, desc: 'Medical specialist', color: 'from-emerald-500 to-teal-600', glow: 'rgba(16,185,129,0.3)' },
               ].map(r => (
                 <button key={r.key} onClick={() => handleRoleSelect(r.key)}
@@ -331,7 +331,7 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
                 ) : (
                   <span className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold text-sm">
                     {selectedRole === 'Admin' ? <ShieldCheck className="w-5 h-5" /> : <School className="w-5 h-5" />}
-                    <span>{selectedRole === 'Admin' ? 'Admin' : 'School PoC'}</span>
+                    <span>{selectedRole === 'Admin' ? 'Admin' : 'School'}</span>
                   </span>
                 )}
               </div>
