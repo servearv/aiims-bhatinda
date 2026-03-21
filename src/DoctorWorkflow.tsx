@@ -165,7 +165,21 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => { nameRef.current?.focus(); }, []);
-  const upd = (k: string, v: string) => { setF(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: '' })); };
+  const upd = (k: string, v: string) => {
+    setF(p => {
+      const next = { ...p, [k]: v };
+      // Auto-calc age from DOB
+      if (k === 'dob' && v) {
+        const today = new Date(); const bd = new Date(v);
+        let age = today.getFullYear() - bd.getFullYear();
+        const m = today.getMonth() - bd.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+        if (age >= 0) next.age = String(age);
+      }
+      return next;
+    });
+    setErrors(p => ({ ...p, [k]: '' }));
+  };
   const toggleSymptom = (s: string) => {
     setSymptoms(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
@@ -212,7 +226,7 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
                 className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 ${errors.name ? 'border-red-500/50' : 'border-slate-800'}`} placeholder="Full name" />
               {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
             </div>
-            <FormInput label="Age" value={f.age} onChange={v => upd('age', v)} type="number" id="add-age" placeholder="e.g. 12" />
+            <FormInput label="Age" value={f.age} onChange={() => {}} type="number" id="add-age" placeholder="Auto from DOB" disabled />
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Sex *</label>
               <div className="flex space-x-3 mt-1">
@@ -610,6 +624,30 @@ function StatusAndRemarks({ data, onChange, disabled }: { data: any; onChange: (
 }
 
 // ── Other Specialists' Records (Read-Only) ──
+function formatRecordValue(k: string, v: any): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (k === 'status') return null; // handled separately
+  if (Array.isArray(v)) {
+    // Handle arrays of objects (e.g. vaccinations)
+    return v.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        const parts = Object.entries(item)
+          .filter(([, val]) => val !== null && val !== undefined && val !== '')
+          .map(([key, val]) => `${key}: ${val}`);
+        return parts.join(', ');
+      }
+      return String(item);
+    }).join(' | ');
+  }
+  if (typeof v === 'object') {
+    return Object.entries(v)
+      .filter(([, val]) => val !== null && val !== undefined && val !== '')
+      .map(([key, val]) => `${key}: ${val}`)
+      .join(', ');
+  }
+  return String(v);
+}
+
 function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
   studentId: number; eventId: number; currentCategory: string;
 }) {
@@ -625,34 +663,42 @@ function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
   }, [open, studentId, eventId]);
   const otherRecords = records.filter(r => r.category !== currentCategory);
   const catLabel = (c: string) => c.replace(/_/g, ' ');
+  const statusLabel = (s: string) => s === 'N' ? 'Normal' : s === 'O' ? 'Observation' : s === 'R' ? 'Referred' : s;
+  const statusColor = (s: string) => s === 'N' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : s === 'R' ? 'text-red-400 bg-red-500/10 border-red-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
   return (
     <div className="bg-slate-900/60 rounded-2xl border border-slate-800">
       <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-800/50 transition-colors">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Other Specialists' Records</span>
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Other Specialists' Records ({otherRecords.length})</span>
         {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
       </button>
       {open && (
-        <div className="px-5 pb-4 border-t border-slate-800/50 pt-3 space-y-2">
+        <div className="px-4 pb-3 border-t border-slate-800/50 pt-2 space-y-1.5">
           {otherRecords.length === 0 ? (
-            <p className="text-xs text-slate-500">No other specialist records yet.</p>
-          ) : otherRecords.map((r, i) => (
-            <div key={i} className="bg-slate-950/50 rounded-xl p-3 border border-slate-800">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-cyan-400">{catLabel(r.category)}</span>
-                <span className="text-[10px] text-slate-500">by {r.doctor_id} · {new Date(r.timestamp).toLocaleDateString()}</span>
-              </div>
-              <div className="text-xs text-slate-300 space-y-0.5">
-                {r.parsed_data && Object.entries(r.parsed_data).map(([k, v]) => (
-                  v && k !== 'assessment' && <p key={k}><span className="text-slate-500">{k}:</span> {String(v)}</p>
-                ))}
-                {r.parsed_data?.status && (
-                  <p className={`font-bold ${r.parsed_data.status === 'N' ? 'text-emerald-400' : r.parsed_data.status === 'R' ? 'text-red-400' : 'text-amber-400'}`}>
-                    Status: {r.parsed_data.status === 'N' ? 'Normal' : r.parsed_data.status === 'O' ? 'Observation' : 'Referred'}
-                  </p>
+            <p className="text-xs text-slate-500 py-1">No other specialist records yet.</p>
+          ) : otherRecords.map((r, i) => {
+            const d = r.parsed_data || {};
+            const entries = Object.entries(d).filter(([k]) => k !== 'status' && k !== 'assessment');
+            return (
+              <div key={i} className="bg-slate-950/50 rounded-lg px-3 py-2 border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-cyan-400">{catLabel(r.category)}</span>
+                  <div className="flex items-center space-x-2">
+                    {d.status && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusColor(d.status)}`}>{statusLabel(d.status)}</span>}
+                    <span className="text-[10px] text-slate-600">{r.doctor_id}</span>
+                  </div>
+                </div>
+                {entries.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                    {entries.map(([k, v]) => {
+                      const formatted = formatRecordValue(k, v);
+                      if (!formatted) return null;
+                      return <span key={k} className="text-[11px] text-slate-400"><span className="text-slate-600">{k.replace(/_/g, ' ')}:</span> {formatted}</span>;
+                    })}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -891,7 +937,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
                 </div>
               </div>
             </div>
-            <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); searchRef.current?.focus(); }}
+            <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); doSearch(); searchRef.current?.focus(); }}
               className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-700 text-white flex items-center space-x-2">
               <X className="w-4 h-4" /><span>Done</span>
             </button>
