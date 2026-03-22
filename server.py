@@ -355,9 +355,9 @@ def init_db():
     row = cur.execute("SELECT COUNT(*) AS count FROM Users").fetchone()
     if row and row["count"] == 0:
         cur.execute(
-            "INSERT INTO Users (username,password,role,name,designation,specialization) "
-            "VALUES (%s,%s,%s,%s,%s,%s)",
-            ("Admin", "admin", "Admin", "Admin", "", ""),
+            "INSERT INTO Users (username,password,role,name,designation,specialization,email) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            ("Admin", "admin", "Admin", "Admin", "", "", "atharvam1580@gmail.com"),
         )
 
     conn.commit()

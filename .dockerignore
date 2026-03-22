@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.pyc
+data/
+flask_session/
+.env
+.env.*
+!.env.example
+*.db
+.DS_Store
+.git/
+.gitignore
