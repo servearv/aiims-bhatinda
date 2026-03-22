@@ -608,9 +608,9 @@ const ModalInput = React.forwardRef<HTMLInputElement, {
 // ═══════════════════════════════════════════
 function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaultRole?: string; onRoleConsumed?: () => void }) {
   const [f, setF] = useState({
-    username: '', password: '', name: '', role: 'Other', designation: '',
+    email: '', name: '', role: 'Other', designation: '',
     // School POC fields
-    school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
+    school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '',
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -629,19 +629,21 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
     setSaving(true);
     setMessage(null);
     try {
-      let payload = { ...f, admin_user: user.username, specialization: f.role };
+      const payload: Record<string, string> = {
+        email: f.email,
+        name: f.role === 'School POC' ? (f.poc_name || f.school_name) : f.name,
+        role: f.role,
+        designation: f.designation,
+        specialization: f.role,
+        admin_user: user.username,
+      };
 
-      let generatedUsername = '';
-      let generatedPassword = '';
-
-      // Auto-generate required fields for School POC
+      // Add School POC fields
       if (f.role === 'School POC') {
-        const cleanSchoolName = f.school_name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 10);
-        generatedUsername = `school_${cleanSchoolName}_${Math.floor(Math.random() * 1000)}`;
-        generatedPassword = `aiims123`;
-        payload.username = generatedUsername;
-        payload.password = generatedPassword;
-        payload.name = f.poc_name || f.school_name;
+        payload.school_name = f.school_name;
+        payload.school_address = f.school_address;
+        payload.poc_designation = f.poc_designation;
+        payload.poc_phone = f.poc_phone;
       }
 
       const res = await fetch('/api/users/register', {
@@ -651,14 +653,14 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
       });
       const data = await res.json();
       if (data.success) {
-        let successMsg = `Successfully registered ${payload.name} as ${f.role}`;
-        if (f.role === 'School POC') {
-          successMsg = `Successfully registered ${f.school_name}. Username: ${generatedUsername}, Password: ${generatedPassword}`;
-        }
-        setMessage({ type: 'success', text: successMsg });
+        const displayName = f.role === 'School POC' ? f.school_name : f.name;
+        setMessage({
+          type: 'success',
+          text: `✅ ${displayName} has been registered as ${f.role}. They can now log in using their email (${f.email}) with OTP.`
+        });
         setF({
-          username: '', password: '', name: '', role: 'Other', designation: '',
-          school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '', poc_email: '',
+          email: '', name: '', role: 'Other', designation: '',
+          school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '',
         });
       } else {
         setMessage({ type: 'error', text: data.message || 'Registration failed' });
@@ -692,14 +694,12 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
+          {/* Email — always shown */}
+          <ModalInput label="Email *" value={f.email} onChange={v => upd('email', v)} placeholder="user@example.com" type="email" required />
+
+          {/* Name — for non-School-POC roles */}
           {!isSchoolPOC && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <ModalInput label="Username *" value={f.username} onChange={v => upd('username', v)} placeholder="e.g. doc_kumar" required />
-                <ModalInput label="Password *" value={f.password} onChange={v => upd('password', v)} placeholder="Min 4 chars" type="password" required />
-              </div>
-              <ModalInput label="Full Name *" value={f.name} onChange={v => upd('name', v)} placeholder="e.g. Dr. Anil Kumar" required />
-            </>
+            <ModalInput label="Full Name *" value={f.name} onChange={v => upd('name', v)} placeholder="e.g. Dr. Anil Kumar" required />
           )}
 
           <div>
@@ -736,7 +736,6 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
                 <ModalInput label="PoC Designation" value={f.poc_designation} onChange={v => upd('poc_designation', v)} placeholder="e.g. Principal" />
                 <ModalInput label="PoC Phone" value={f.poc_phone} onChange={v => upd('poc_phone', v)} placeholder="e.g. 9876543210" type="tel" />
               </div>
-              <ModalInput label="PoC Email" value={f.poc_email} onChange={v => upd('poc_email', v)} placeholder="e.g. poc@school.edu" type="email" />
             </div>
           )}
 
@@ -749,3 +748,4 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
     </div>
   );
 }
+

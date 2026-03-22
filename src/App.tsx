@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DoctorWorkflow from './DoctorWorkflow';
 import AdminDashboard from './AdminDashboard';
 import SchoolDashboard from './SchoolDashboard';
 import {
   Activity, Stethoscope, ActivitySquare,
   LogOut, ShieldCheck, Sun, Moon, School,
-  HeartPulse, Eye, Ear, Scan, ChevronLeft, Menu, X
+  HeartPulse, Eye, Ear, Scan, Menu, X, User as UserIcon,
+  Mail, KeyRound, ArrowRight, Loader2, Check, AlertCircle, RefreshCw
 } from 'lucide-react';
 
 // --- Types ---
 type User = {
   username: string;
+  email?: string;
   role: string;
   name: string;
   specialization?: string;
@@ -32,12 +34,14 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
     return 'light';
   });
 
-  // Restore session on mount (fixes page refresh logout)
+  // Restore session on mount
   useEffect(() => {
     fetch('/api/session').then(r => r.json()).then(data => {
       if (data.success) setUser(data.user);
@@ -54,6 +58,17 @@ export default function App() {
   const handleLogout = async () => {
     try { await fetch('/api/logout', { method: 'POST' }); } catch {}
     setUser(null);
+    setNeedsPasswordSetup(false);
+    setShowProfile(false);
+  };
+
+  const handleLogin = (u: User, needsPw: boolean) => {
+    setUser(u);
+    setNeedsPasswordSetup(needsPw);
+  };
+
+  const handlePasswordSet = () => {
+    setNeedsPasswordSetup(false);
   };
 
   if (checkingSession) {
@@ -70,7 +85,12 @@ export default function App() {
   }
 
   if (!user) {
-    return <LoginScreen onLogin={setUser} />;
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  // First-time password setup wizard
+  if (needsPasswordSetup) {
+    return <PasswordSetupWizard userName={user.name} onComplete={handlePasswordSet} />;
   }
 
   return (
@@ -106,20 +126,21 @@ export default function App() {
             {getRoleIcon(user.role)}
             <span className="font-medium">{formatRoleDisplay(user.role)} Dashboard</span>
           </div>
+          <button onClick={() => setShowProfile(!showProfile)}
+            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all ${showProfile ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+            <UserIcon className="w-5 h-5" />
+            <span className="font-medium">Profile</span>
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-800/50 space-y-2">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-500/20"
-          >
+          <button onClick={toggleTheme}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-500/20">
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             <span className="font-medium text-sm">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20"
-          >
+          <button onClick={handleLogout}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20">
             <LogOut className="w-4 h-4" />
             <span className="font-medium text-sm">Logout</span>
           </button>
@@ -128,7 +149,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto relative flex flex-col">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
         
         {/* Topbar with Sidebar Toggle */}
@@ -136,16 +157,21 @@ export default function App() {
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all backdrop-blur-xl border border-slate-700 hover:border-cyan-500/50"
-            title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
-          >
+            title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
         <div className="px-8 pb-8 flex-1 relative z-10">
-          {user.role === 'Admin' && <AdminDashboard user={user} />}
-          {user.role === 'School POC' && <SchoolDashboard user={user} />}
-          {isSpecialist(user.role) && <DoctorWorkflow user={user} />}
+          {showProfile ? (
+            <ProfileSettings user={user} />
+          ) : (
+            <>
+              {user.role === 'Admin' && <AdminDashboard user={user} />}
+              {user.role === 'School POC' && <SchoolDashboard user={user} />}
+              {isSpecialist(user.role) && <DoctorWorkflow user={user} />}
+            </>
+          )}
         </div>
       </main>
     </div>
@@ -176,74 +202,45 @@ function getRoleIcon(role: string) {
   }
 }
 
-// --- Category data for login ---
-const CATEGORIES = [
-  { key: 'Community_Medicine', label: 'Community Medicine', icon: <HeartPulse className="w-7 h-7" />, color: 'from-rose-500 to-pink-600', ring: 'ring-rose-500/40', border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-400' },
-  { key: 'Dental', label: 'Dental', icon: <span className="text-2xl">🦷</span>, color: 'from-sky-500 to-blue-600', ring: 'ring-sky-500/40', border: 'border-sky-500/30', bg: 'bg-sky-500/10', text: 'text-sky-400' },
-  { key: 'ENT', label: 'ENT', icon: <Ear className="w-7 h-7" />, color: 'from-amber-500 to-orange-600', ring: 'ring-amber-500/40', border: 'border-amber-500/30', bg: 'bg-amber-500/10', text: 'text-amber-400' },
-  { key: 'Eye_Specialist', label: 'Ophthalmology', icon: <Eye className="w-7 h-7" />, color: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-500/40', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
-  { key: 'Skin_Specialist', label: 'Dermatology', icon: <Scan className="w-7 h-7" />, color: 'from-violet-500 to-purple-600', ring: 'ring-violet-500/40', border: 'border-violet-500/30', bg: 'bg-violet-500/10', text: 'text-violet-400' },
-  { key: 'Other', label: 'Other', icon: <Stethoscope className="w-7 h-7" />, color: 'from-slate-500 to-zinc-600', ring: 'ring-slate-500/40', border: 'border-slate-500/30', bg: 'bg-slate-500/10', text: 'text-slate-400' },
-];
+// ═══════════════════════════════════════════
+// ██ UNIFIED LOGIN SCREEN
+// ═══════════════════════════════════════════
+type LoginStep = 'identify' | 'password' | 'otp_send' | 'otp_verify';
 
-// --- Multi-Step Login Screen ---
-function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedRole, setSelectedRole] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [username, setUsername] = useState('');
+function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void }) {
+  const [step, setStep] = useState<LoginStep>('identify');
+  const [identifier, setIdentifier] = useState('');
+  const [userName, setUserName] = useState('');
+  const [hasPassword, setHasPassword] = useState(false);
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
-  const handleRoleSelect = (role: string) => {
-    setSelectedRole(role);
-    setError('');
-    if (role === 'Doctor') {
-      setStep(2);
-    } else {
-      setSelectedCategory('');
-      setStep(3);
-    }
-  };
-
-  const handleCategorySelect = (cat: string) => {
-    setSelectedCategory(cat);
-    setError('');
-    setStep(3);
-  };
-
-  const goBack = () => {
-    setError('');
-    if (step === 3 && selectedRole === 'Doctor') {
-      setStep(2);
-      setSelectedCategory('');
-    } else {
-      setStep(1);
-      setSelectedRole('');
-      setSelectedCategory('');
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleIdentify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!identifier.trim()) return;
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch('/api/auth/identify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username, password,
-          selectedRole,
-          selectedCategory,
-        }),
+        body: JSON.stringify({ identifier: identifier.trim() }),
       });
       const data = await res.json();
-      if (data.success) {
-        onLogin(data.user);
+      if (!data.found) {
+        setError('No account found with this email or username');
+        return;
+      }
+      setUserName(data.name);
+      setHasPassword(data.has_password);
+      if (data.has_password) {
+        setStep('password');
       } else {
-        setError(data.message);
+        // First-time user — go straight to OTP
+        setStep('otp_send');
       }
     } catch {
       setError('Connection error. Please try again.');
@@ -252,131 +249,458 @@ function LoginScreen({ onLogin }: { onLogin: (u: User) => void }) {
     }
   };
 
-  const catMeta = CATEGORIES.find(c => c.key === selectedCategory);
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identifier.trim(), password }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onLogin(data.user, false);
+      } else {
+        setError(data.message || 'Invalid password');
+      }
+    } catch {
+      setError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identifier.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpSent(true);
+        setStep('otp_verify');
+      } else {
+        setError(data.message || 'Failed to send code');
+      }
+    } catch {
+      setError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identifier.trim(), otp }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onLogin(data.user, data.needs_password_setup === true);
+      } else {
+        setError(data.message || 'Invalid code');
+      }
+    } catch {
+      setError('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goBack = () => {
+    setError('');
+    setPassword('');
+    setOtp('');
+    setOtpSent(false);
+    if (step === 'otp_verify') {
+      setStep('otp_send');
+    } else {
+      setStep('identify');
+      setUserName('');
+    }
+  };
+
+  const inputClass = "w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600";
+  const btnClass = "w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all disabled:opacity-50";
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden">
-      {/* Futuristic Background */}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-500/20 rounded-full blur-[150px] pointer-events-none"></div>
 
-      <div className="relative z-10 w-full max-w-lg px-4">
+      <div className="relative z-10 w-full max-w-md px-4">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.5)] mb-4">
             <ActivitySquare className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-white tracking-tight">AIIMS Bathinda</h2>
+          <p className="text-slate-400 text-sm mt-1">Health Screening Portal</p>
         </div>
 
-        {/* Step 1: Role Selection */}
-        {step === 1 && (
-          <div className="animate-in fade-in duration-500 space-y-4">
-            <p className="text-center text-slate-400 text-sm mb-6">Select your role to continue</p>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { key: 'Admin', label: 'Admin', icon: <ShieldCheck className="w-8 h-8" />, desc: 'System management', color: 'from-cyan-500 to-blue-600', glow: 'rgba(34,211,238,0.3)' },
-                { key: 'School', label: 'School', icon: <School className="w-8 h-8" />, desc: 'School', color: 'from-violet-500 to-purple-600', glow: 'rgba(139,92,246,0.3)' },
-                { key: 'Doctor', label: 'Doctor', icon: <Stethoscope className="w-8 h-8" />, desc: 'Medical specialist', color: 'from-emerald-500 to-teal-600', glow: 'rgba(16,185,129,0.3)' },
-              ].map(r => (
-                <button key={r.key} onClick={() => handleRoleSelect(r.key)}
-                  className="group flex flex-col items-center p-6 bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-3xl hover:border-cyan-500/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(34,211,238,0.15)] hover:-translate-y-1">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${r.color} flex items-center justify-center text-white mb-3 shadow-[0_0_20px_${r.glow}] group-hover:scale-110 transition-transform`}>
-                    {r.icon}
-                  </div>
-                  <h3 className="text-white font-bold text-sm">{r.label}</h3>
-                  <p className="text-slate-500 text-xs mt-1">{r.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="p-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
 
-        {/* Step 2: Specialist Category Selection */}
-        {step === 2 && (
-          <div className="animate-in fade-in duration-500">
-            <button onClick={goBack} className="flex items-center space-x-1.5 text-slate-400 hover:text-cyan-400 transition-colors text-sm mb-5">
-              <ChevronLeft className="w-4 h-4" /><span>Back to roles</span>
-            </button>
-            <p className="text-center text-slate-400 text-sm mb-6">Select your specialization</p>
-            <div className="grid grid-cols-3 gap-3">
-              {CATEGORIES.map(cat => (
-                <button key={cat.key} onClick={() => handleCategorySelect(cat.key)}
-                  className={`group flex flex-col items-center p-5 bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-2xl hover:${cat.border} transition-all duration-300 hover:-translate-y-1 hover:shadow-lg`}>
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-2.5 group-hover:scale-110 transition-transform`}>
-                    {cat.icon}
-                  </div>
-                  <h3 className="text-white font-semibold text-xs text-center leading-tight">{cat.label}</h3>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          {/* Step: Identify */}
+          {step === 'identify' && (
+            <form onSubmit={handleIdentify} className="space-y-5 animate-in fade-in duration-300">
+              <div className="text-center mb-2">
+                <h3 className="text-lg font-semibold text-white">Welcome back</h3>
+                <p className="text-slate-400 text-sm mt-1">Enter your email or username to continue</p>
+              </div>
+              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center flex items-center justify-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Email or Username</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
+                    className={`${inputClass} pl-10`} placeholder="you@example.com" required autoFocus />
+                </div>
+              </div>
+              <button type="submit" disabled={loading} className={btnClass}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <span className="flex items-center justify-center space-x-2"><span>Continue</span><ArrowRight className="w-4 h-4" /></span>}
+              </button>
+            </form>
+          )}
 
-        {/* Step 3: Credentials */}
-        {step === 3 && (
-          <div className="animate-in fade-in duration-500">
-            <button onClick={goBack} className="flex items-center space-x-1.5 text-slate-400 hover:text-cyan-400 transition-colors text-sm mb-5">
-              <ChevronLeft className="w-4 h-4" /><span>Back</span>
-            </button>
+          {/* Step: Password Login */}
+          {step === 'password' && (
+            <form onSubmit={handlePasswordLogin} className="space-y-5 animate-in fade-in duration-300">
+              <button type="button" onClick={goBack} className="text-slate-400 hover:text-cyan-400 text-sm flex items-center space-x-1 transition-colors">
+                <ArrowRight className="w-3 h-3 rotate-180" /><span>Back</span>
+              </button>
+              <div className="text-center">
+                <p className="text-slate-400 text-sm">Welcome back,</p>
+                <p className="text-lg font-semibold text-white">{userName}</p>
+              </div>
+              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center flex items-center justify-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Password</label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                    className={`${inputClass} pl-10`} placeholder="••••••••" required autoFocus />
+                </div>
+              </div>
+              <button type="submit" disabled={loading} className={btnClass}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Log In'}
+              </button>
+              <button type="button" onClick={() => { setError(''); setStep('otp_send'); }}
+                className="w-full text-center text-sm text-slate-500 hover:text-cyan-400 transition-colors mt-2">
+                Use OTP instead →
+              </button>
+            </form>
+          )}
 
-            <div className="p-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-              {/* Category/role chip */}
-              <div className="flex justify-center mb-6">
-                {selectedRole === 'Doctor' && catMeta ? (
-                  <span className={`inline-flex items-center space-x-2 px-4 py-2 rounded-xl ${catMeta.bg} ${catMeta.text} border ${catMeta.border} font-semibold text-sm`}>
-                    {catMeta.icon}
-                    <span>{catMeta.label}</span>
-                  </span>
+          {/* Step: OTP Send */}
+          {step === 'otp_send' && (
+            <div className="space-y-5 animate-in fade-in duration-300">
+              <button type="button" onClick={goBack} className="text-slate-400 hover:text-cyan-400 text-sm flex items-center space-x-1 transition-colors">
+                <ArrowRight className="w-3 h-3 rotate-180" /><span>Back</span>
+              </button>
+              <div className="text-center">
+                {!hasPassword ? (
+                  <>
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3">
+                      <Mail className="w-7 h-7 text-emerald-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white">Welcome, {userName}!</h3>
+                    <p className="text-slate-400 text-sm mt-1">Let's verify your email to get started.</p>
+                  </>
                 ) : (
-                  <span className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold text-sm">
-                    {selectedRole === 'Admin' ? <ShieldCheck className="w-5 h-5" /> : <School className="w-5 h-5" />}
-                    <span>{selectedRole === 'Admin' ? 'Admin' : 'School'}</span>
-                  </span>
+                  <>
+                    <h3 className="text-lg font-semibold text-white">Login with OTP</h3>
+                    <p className="text-slate-400 text-sm mt-1">We'll send a 6-digit code to your email.</p>
+                  </>
                 )}
               </div>
-
-              <form onSubmit={handleLogin} className="space-y-5">
-                {error && (
-                  <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center">
-                    {error}
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Username</label>
-                  <input 
-                    type="text" 
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600"
-                    placeholder="e.g. admin, doctor"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Password</label>
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-                <button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all disabled:opacity-50 mt-4"
-                >
-                  {loading ? 'Logging in...' : 'Login'}
-                </button>
-              </form>
-              
-
+              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center">{error}</div>}
+              <button onClick={handleSendOtp} disabled={loading} className={btnClass}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <span className="flex items-center justify-center space-x-2"><Mail className="w-4 h-4" /><span>Send Code</span></span>}
+              </button>
             </div>
+          )}
+
+          {/* Step: OTP Verify */}
+          {step === 'otp_verify' && (
+            <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in duration-300">
+              <button type="button" onClick={goBack} className="text-slate-400 hover:text-cyan-400 text-sm flex items-center space-x-1 transition-colors">
+                <ArrowRight className="w-3 h-3 rotate-180" /><span>Back</span>
+              </button>
+              <div className="text-center">
+                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto mb-3">
+                  <KeyRound className="w-7 h-7 text-cyan-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Enter Code</h3>
+                <p className="text-slate-400 text-sm mt-1">Check your email for a 6-digit code</p>
+              </div>
+              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center">{error}</div>}
+              <div>
+                <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className={`${inputClass} text-center text-2xl tracking-[0.5em] font-mono`}
+                  placeholder="000000" maxLength={6} required autoFocus />
+              </div>
+              <button type="submit" disabled={loading || otp.length < 6} className={btnClass}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Verify & Log In'}
+              </button>
+              <button type="button" onClick={() => { setOtp(''); handleSendOtp(); }}
+                className="w-full text-center text-sm text-slate-500 hover:text-cyan-400 transition-colors flex items-center justify-center space-x-1">
+                <RefreshCw className="w-3 h-3" /><span>Resend code</span>
+              </button>
+            </form>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// ██ FIRST-TIME PASSWORD SETUP WIZARD
+// ═══════════════════════════════════════════
+function PasswordSetupWizard({ userName, onComplete }: { userName: string; onComplete: () => void }) {
+  const [pw, setPw] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const match = pw.length >= 4 && pw === confirm;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!match) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/users/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_password: pw }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onComplete();
+      } else {
+        setError(data.message || 'Failed to set password');
+      }
+    } catch {
+      setError('Connection error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputClass = "w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600";
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/15 rounded-full blur-[150px] pointer-events-none"></div>
+      <div className="relative z-10 w-full max-w-md px-4">
+        <div className="p-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
+              <KeyRound className="w-8 h-8 text-emerald-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Welcome, {userName}! 👋</h2>
+            <p className="text-slate-400 text-sm mt-2">Create a password to secure your account.</p>
+          </div>
+
+          {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center mb-4">{error}</div>}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">New Password</label>
+              <input type="password" value={pw} onChange={e => setPw(e.target.value)}
+                className={inputClass} placeholder="At least 4 characters" required autoFocus />
+              {pw.length > 0 && pw.length < 4 && <p className="text-amber-400 text-xs mt-1">Must be at least 4 characters</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Confirm Password</label>
+              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
+                className={inputClass} placeholder="Type it again" required />
+              {confirm.length > 0 && (
+                <div className={`flex items-center space-x-1 mt-1 text-xs ${pw === confirm ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {pw === confirm ? <Check className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                  <span>{pw === confirm ? 'Passwords match' : 'Passwords don\'t match'}</span>
+                </div>
+              )}
+            </div>
+            <button type="submit" disabled={!match || loading}
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 mt-2">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Save & Continue →'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// ██ PROFILE SETTINGS
+// ═══════════════════════════════════════════
+function ProfileSettings({ user }: { user: User }) {
+  // --- Change Display Name ---
+  const [newUsername, setNewUsername] = useState(user.username);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameChecking, setUsernameChecking] = useState(false);
+  const [usernameMsg, setUsernameMsg] = useState('');
+  const [usernameSaving, setUsernameSaving] = useState(false);
+
+  // --- Change Password ---
+  const [oldPw, setOldPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
+  // Debounced username check
+  useEffect(() => {
+    if (newUsername === user.username || newUsername.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+    setUsernameChecking(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/users/check-username?q=${encodeURIComponent(newUsername)}`);
+        const data = await res.json();
+        setUsernameAvailable(data.available);
+      } catch {
+        setUsernameAvailable(null);
+      } finally {
+        setUsernameChecking(false);
+      }
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [newUsername, user.username]);
+
+  const handleUsernameChange = async () => {
+    if (!usernameAvailable || newUsername.length < 3) return;
+    setUsernameSaving(true);
+    setUsernameMsg('');
+    try {
+      const res = await fetch('/api/users/profile/display-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_username: newUsername }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUsernameMsg('Display name updated! Reload to see changes.');
+        user.username = data.username;
+      } else {
+        setUsernameMsg(data.message || 'Failed');
+      }
+    } catch {
+      setUsernameMsg('Connection error');
+    } finally {
+      setUsernameSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPw !== confirmPw || newPw.length < 4) return;
+    setPwSaving(true);
+    setPwMsg(null);
+    try {
+      const res = await fetch('/api/users/profile/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_password: oldPw, new_password: newPw }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPwMsg({ type: 'success', text: 'Password updated successfully!' });
+        setOldPw(''); setNewPw(''); setConfirmPw('');
+      } else {
+        setPwMsg({ type: 'error', text: data.message || 'Failed to update' });
+      }
+    } catch {
+      setPwMsg({ type: 'error', text: 'Connection error' });
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  const inputClass = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600";
+  const pwMatch = newPw.length >= 4 && newPw === confirmPw;
+
+  return (
+    <div className="max-w-xl mx-auto space-y-6 animate-in fade-in duration-500">
+      <h2 className="text-2xl font-bold text-white tracking-tight flex items-center space-x-2">
+        <UserIcon className="w-6 h-6 text-violet-400" /><span>Profile Settings</span>
+      </h2>
+
+      {/* Email (read-only) */}
+      <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800">
+        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Email</label>
+        <p className="text-white text-sm bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 opacity-60">{user.email || '(not set)'}</p>
+      </div>
+
+      {/* Display Name */}
+      <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800 space-y-3">
+        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Display Name</label>
+        <div className="flex items-center space-x-3">
+          <div className="relative flex-1">
+            <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value.replace(/[^a-zA-Z0-9._-]/g, '').toLowerCase())}
+              className={inputClass} placeholder="your.display.name" />
+            {newUsername !== user.username && newUsername.length >= 3 && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                {usernameChecking ? <Loader2 className="w-4 h-4 text-slate-500 animate-spin" /> :
+                  usernameAvailable === true ? <Check className="w-4 h-4 text-emerald-400" /> :
+                  usernameAvailable === false ? <AlertCircle className="w-4 h-4 text-red-400" /> : null}
+              </span>
+            )}
+          </div>
+          <button onClick={handleUsernameChange} disabled={!usernameAvailable || usernameSaving || newUsername === user.username}
+            className="px-4 py-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 font-bold text-sm border border-cyan-500/30 disabled:opacity-30 hover:bg-cyan-500/30 transition-all">
+            {usernameSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+          </button>
+        </div>
+        {usernameAvailable === false && <p className="text-red-400 text-xs">This name is already taken</p>}
+        {usernameMsg && <p className="text-emerald-400 text-xs">{usernameMsg}</p>}
+      </div>
+
+      {/* Change Password */}
+      <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-2xl border border-slate-800">
+        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Change Password</label>
+        {pwMsg && (
+          <div className={`p-3 rounded-xl text-sm mb-3 border ${pwMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+            {pwMsg.text}
           </div>
         )}
+        <form onSubmit={handlePasswordChange} className="space-y-3">
+          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)}
+            className={inputClass} placeholder="Current password" required />
+          <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
+            className={inputClass} placeholder="New password (min 4 chars)" required />
+          <div>
+            <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
+              className={inputClass} placeholder="Confirm new password" required />
+            {confirmPw.length > 0 && (
+              <div className={`flex items-center space-x-1 mt-1 text-xs ${newPw === confirmPw ? 'text-emerald-400' : 'text-red-400'}`}>
+                {newPw === confirmPw ? <Check className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                <span>{newPw === confirmPw ? 'Passwords match' : 'Passwords don\'t match'}</span>
+              </div>
+            )}
+          </div>
+          <button type="submit" disabled={!pwMatch || pwSaving}
+            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50 transition-all mt-1">
+            {pwSaving ? 'Saving...' : 'Update Password'}
+          </button>
+        </form>
       </div>
     </div>
   );

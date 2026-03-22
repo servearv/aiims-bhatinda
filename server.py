@@ -7,7 +7,10 @@ import string
 import subprocess
 import sys
 import re
-from datetime import datetime, date
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, date, timedelta
 from urllib.parse import urlparse
 
 try:
@@ -274,12 +277,21 @@ def init_db():
     conn.commit()
 
     # Idempotent migrations: add columns if missing
-    for col_def in ["designation TEXT DEFAULT ''", "specialization TEXT DEFAULT ''"]:
+    user_cols = ["designation TEXT DEFAULT ''", "specialization TEXT DEFAULT ''",
+                 "email TEXT", "otp_code TEXT", "otp_expires TEXT"]
+    for col_def in user_cols:
         try:
             cur.execute(f"ALTER TABLE Users ADD COLUMN {col_def}")
             conn.commit()
         except Exception:
             conn.rollback()
+
+    # Add unique constraint on email (ignore if already exists)
+    try:
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON Users(email) WHERE email IS NOT NULL")
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
     student_cols = ["dob TEXT", "student_class TEXT", "section TEXT",
                     "blood_group TEXT", "father_name TEXT", "phone TEXT",
@@ -373,57 +385,329 @@ def rows_to_list(rows):
     return [dict(r) for r in rows]
 
 
+def generate_username(name: str) -> str:
+    """Generate a username from a name: 'Dr. Anil Kumar' → 'anil.kumar.x7k'."""
+    # Strip titles
+    clean = re.sub(r'^(dr\.?|mr\.?|mrs\.?|ms\.?|prof\.?)\s*', '', name.strip(), flags=re.IGNORECASE)
+    parts = re.sub(r'[^a-zA-Z\s]', '', clean).lower().split()
+    base = '.'.join(parts[:3]) if parts else 'user'
+    suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=3))
+    return f"{base}.{suffix}"
+
+
+def send_email(to_email: str, subject: str, body_html: str):
+    """Send an email via Gmail SMTP. Requires SMTP_PASSWORD env var."""
+    smtp_pass = os.environ.get('SMTP_PASSWORD', '')
+    sender = os.environ.get('SMTP_EMAIL', '')
+    if not smtp_pass or not sender:
+        print(f"[EMAIL SKIPPED] No SMTP_PASSWORD set. Would send to {to_email}: {subject}")
+        return False
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['From'] = sender
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body_html, 'html'))
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender, smtp_pass)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"[EMAIL ERROR] {e}")
+        return False
+
+
+def _user_public(u: dict) -> dict:
+    """Return only the public fields of a user dict (no password/otp)."""
+    return {
+        'username': u.get('username'),
+        'email': u.get('email'),
+        'role': u.get('role'),
+        'name': u.get('name'),
+        'designation': u.get('designation', ''),
+        'specialization': u.get('specialization', ''),
+    }
+
+
 # ---------------------------------------------------------------------------
 # API Routes
 # ---------------------------------------------------------------------------
 
 # ---- Auth ----
-@app.route("/api/login", methods=["POST"])
-def api_login():
+
+@app.route("/api/auth/identify", methods=["POST"])
+def api_auth_identify():
+    """Step 1 of login: identify user by email or username."""
     data = request.get_json(force=True)
-    username = data.get("username", "")
-    password = data.get("password", "")
-    selected_role = data.get("selectedRole", "")      # from step-1 card
-    selected_category = data.get("selectedCategory", "")  # from step-2 picker
+    identifier = data.get("identifier", "").strip()
+    if not identifier:
+        return jsonify({"found": False})
 
     conn = get_db()
     user = conn.execute(
-        "SELECT username, role, name, designation, specialization "
-        "FROM Users WHERE username = ? AND password = ?",
-        (username, password),
+        "SELECT username, email, role, name, password FROM Users WHERE email = ? OR username = ?",
+        (identifier, identifier),
     ).fetchone()
     conn.close()
 
     if not user:
-        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+        return jsonify({"found": False})
+
+    u = row_to_dict(user)
+    return jsonify({
+        "found": True,
+        "name": u['name'],
+        "role": u['role'],
+        "has_password": u['password'] is not None and u['password'] != '',
+    })
+
+
+@app.route("/api/auth/send-otp", methods=["POST"])
+def api_auth_send_otp():
+    """Generate a 6-digit OTP and email it."""
+    data = request.get_json(force=True)
+    identifier = data.get("identifier", "").strip()
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT username, email, name FROM Users WHERE email = ? OR username = ?",
+        (identifier, identifier),
+    ).fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "message": "No account found"}), 404
+
+    u = row_to_dict(user)
+    email = u.get('email')
+    if not email:
+        conn.close()
+        return jsonify({"success": False, "message": "No email on this account. Use password login."}), 400
+
+    otp = ''.join(random.choices(string.digits, k=6))
+    expires = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
+
+    conn.execute(
+        "UPDATE Users SET otp_code = ?, otp_expires = ? WHERE username = ?",
+        (otp, expires, u['username']),
+    )
+    conn.commit()
+    conn.close()
+
+    # Send the OTP email
+    send_email(
+        email,
+        'Your AIIMS Bathinda Login Code',
+        f'<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px">'
+        f'<h2 style="color:#0891b2">AIIMS Bathinda</h2>'
+        f'<p>Hi {u["name"]},</p>'
+        f'<p>Your one-time login code is:</p>'
+        f'<div style="font-size:32px;font-weight:bold;letter-spacing:8px;'
+        f'text-align:center;background:#f1f5f9;padding:16px;border-radius:12px;'
+        f'margin:16px 0">{otp}</div>'
+        f'<p style="color:#64748b;font-size:13px">This code expires in 5 minutes.</p>'
+        f'</div>',
+    )
+
+    return jsonify({"success": True, "message": "OTP sent to your email"})
+
+
+@app.route("/api/auth/verify-otp", methods=["POST"])
+def api_auth_verify_otp():
+    """Verify OTP and log the user in."""
+    data = request.get_json(force=True)
+    identifier = data.get("identifier", "").strip()
+    otp = data.get("otp", "").strip()
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT username, email, role, name, password, designation, specialization, "
+        "otp_code, otp_expires FROM Users WHERE email = ? OR username = ?",
+        (identifier, identifier),
+    ).fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "message": "Account not found"}), 404
 
     u = row_to_dict(user)
 
-    # Validate role alignment
-    if selected_role == 'Doctor' and selected_category:
-        if u['role'] != selected_category:
-            return jsonify({
-                "success": False,
-                "message": f"Your account is registered as {u['role']}, "
-                           f"not {selected_category}."
-            }), 403
-    elif selected_role == 'Admin' and u['role'] != 'Admin':
-        return jsonify({
-            "success": False,
-            "message": "Your account is not an Admin account."
-        }), 403
-    elif selected_role == 'School' and u['role'] != 'School POC':
-        return jsonify({
-            "success": False,
-            "message": "Your account is not a School POC account."
-        }), 403
+    if not u.get('otp_code') or u['otp_code'] != otp:
+        conn.close()
+        return jsonify({"success": False, "message": "Incorrect code"}), 401
 
-    # Store user in server-side session
+    # Check expiry
+    try:
+        expires = datetime.fromisoformat(u['otp_expires'])
+        if datetime.utcnow() > expires:
+            conn.close()
+            return jsonify({"success": False, "message": "Code expired. Request a new one."}), 401
+    except Exception:
+        conn.close()
+        return jsonify({"success": False, "message": "Code expired"}), 401
+
+    # Clear OTP
+    conn.execute(
+        "UPDATE Users SET otp_code = NULL, otp_expires = NULL WHERE username = ?",
+        (u['username'],),
+    )
+    conn.commit()
+    conn.close()
+
+    pub = _user_public(u)
+    needs_password = u['password'] is None or u['password'] == ''
+
     session.permanent = True
-    session["user"] = u
+    session["user"] = pub
 
-    log_audit(username, "LOGIN", "User logged in successfully")
-    return jsonify({"success": True, "user": u})
+    log_audit(u['username'], "LOGIN_OTP", "User logged in via OTP")
+    return jsonify({"success": True, "user": pub, "needs_password_setup": needs_password})
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    """Password-based login. Accepts email or username as identifier."""
+    data = request.get_json(force=True)
+    identifier = data.get("identifier", "").strip()
+    password = data.get("password", "")
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT username, email, role, name, password, designation, specialization "
+        "FROM Users WHERE (email = ? OR username = ?) AND password = ?",
+        (identifier, identifier, password),
+    ).fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"success": False, "message": "Invalid email or password"}), 401
+
+    u = row_to_dict(user)
+    pub = _user_public(u)
+
+    session.permanent = True
+    session["user"] = pub
+
+    log_audit(u['username'], "LOGIN", "User logged in with password")
+    return jsonify({"success": True, "user": pub})
+
+
+@app.route("/api/users/set-password", methods=["POST"])
+def api_set_password():
+    """First-time password setup (user has no password yet). Requires active session."""
+    sess_user = session.get("user")
+    if not sess_user:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    data = request.get_json(force=True)
+    new_password = data.get("new_password", "").strip()
+    if len(new_password) < 4:
+        return jsonify({"success": False, "message": "Password must be at least 4 characters"}), 400
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE Users SET password = ? WHERE username = ?",
+        (new_password, sess_user['username']),
+    )
+    conn.commit()
+    conn.close()
+
+    log_audit(sess_user['username'], "SET_PASSWORD", "User set their password for the first time")
+    return jsonify({"success": True})
+
+
+@app.route("/api/users/profile/password", methods=["POST"])
+def api_change_password():
+    """Change password for a user who already has one."""
+    sess_user = session.get("user")
+    if not sess_user:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    data = request.get_json(force=True)
+    old_password = data.get("old_password", "")
+    new_password = data.get("new_password", "").strip()
+
+    if len(new_password) < 4:
+        return jsonify({"success": False, "message": "Password must be at least 4 characters"}), 400
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT password FROM Users WHERE username = ?",
+        (sess_user['username'],),
+    ).fetchone()
+
+    if not user or row_to_dict(user).get('password') != old_password:
+        conn.close()
+        return jsonify({"success": False, "message": "Current password is incorrect"}), 401
+
+    conn.execute(
+        "UPDATE Users SET password = ? WHERE username = ?",
+        (new_password, sess_user['username']),
+    )
+    conn.commit()
+    conn.close()
+
+    log_audit(sess_user['username'], "CHANGE_PASSWORD", "User changed their password")
+    return jsonify({"success": True})
+
+
+@app.route("/api/users/profile/display-name", methods=["POST"])
+def api_change_display_name():
+    """Change the user's display username."""
+    sess_user = session.get("user")
+    if not sess_user:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    data = request.get_json(force=True)
+    new_username = data.get("new_username", "").strip()
+    if not new_username or len(new_username) < 3:
+        return jsonify({"success": False, "message": "Username must be at least 3 characters"}), 400
+
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT username FROM Users WHERE username = ?", (new_username,)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"success": False, "message": "This username is already taken"}), 409
+
+    old_username = sess_user['username']
+    # Update username in all related tables
+    conn.execute("UPDATE Users SET username = ? WHERE username = ?", (new_username, old_username))
+    for table_col in [
+        ("Event_Volunteers", "username"), ("Event_Staff", "username"),
+        ("Audit_Logs", "user_id"), ("Health_Records", "doctor_id"),
+        ("Schools", "poc_username"), ("Events", "created_by"),
+        ("Students", "added_by"),
+    ]:
+        try:
+            conn.execute(
+                f"UPDATE {table_col[0]} SET {table_col[1]} = ? WHERE {table_col[1]} = ?",
+                (new_username, old_username),
+            )
+        except Exception:
+            pass  # table/column might not exist
+    conn.commit()
+    conn.close()
+
+    # Update session
+    sess_user['username'] = new_username
+    session['user'] = sess_user
+
+    log_audit(new_username, "CHANGE_USERNAME", f"Changed from {old_username} to {new_username}")
+    return jsonify({"success": True, "username": new_username})
+
+
+@app.route("/api/users/check-username")
+def api_check_username():
+    """Real-time uniqueness check for usernames."""
+    q = request.args.get("q", "").strip()
+    if not q or len(q) < 3:
+        return jsonify({"available": False})
+    conn = get_db()
+    existing = conn.execute("SELECT username FROM Users WHERE username = ?", (q,)).fetchone()
+    conn.close()
+    return jsonify({"available": existing is None})
 
 
 @app.route("/api/session", methods=["GET"])
@@ -663,19 +947,26 @@ def api_event_volunteers(event_id):
 # ---- User Registration ----
 @app.route("/api/users/register", methods=["POST"])
 def api_register_user():
+    """Admin registers a new user. No password — user sets it on first login via OTP."""
     data = request.get_json(force=True)
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
+    email = data.get("email", "").strip().lower()
     name = data.get("name", "").strip()
     role = data.get("role", "Other")
     designation = data.get("designation", "").strip()
     specialization = data.get("specialization", "").strip()
     admin_user = data.get("admin_user", "admin")
 
-    if not username or not password or not name:
+    if not email or not name:
         return jsonify({
             "success": False,
-            "message": "Username, password, and name are required"
+            "message": "Email and name are required"
+        }), 400
+
+    # Basic email format check
+    if '@' not in email or '.' not in email.split('@')[-1]:
+        return jsonify({
+            "success": False,
+            "message": "Please enter a valid email address"
         }), 400
 
     if role not in ALL_ROLES:
@@ -685,17 +976,25 @@ def api_register_user():
         }), 400
 
     conn = get_db()
+
+    # Check email uniqueness
     existing = conn.execute(
-        "SELECT username FROM Users WHERE username = ?", (username,)
+        "SELECT username FROM Users WHERE email = ?", (email,)
     ).fetchone()
     if existing:
         conn.close()
-        return jsonify({"success": False, "message": "Username already exists"}), 409
+        return jsonify({"success": False, "message": "An account with this email already exists"}), 409
+
+    # Auto-generate username from name
+    username = generate_username(name)
+    # Ensure uniqueness
+    while conn.execute("SELECT username FROM Users WHERE username = ?", (username,)).fetchone():
+        username = generate_username(name)
 
     conn.execute(
-        "INSERT INTO Users (username, password, role, name, designation, specialization) "
-        "VALUES (?,?,?,?,?,?)",
-        (username, password, role, name, designation, specialization),
+        "INSERT INTO Users (username, password, email, role, name, designation, specialization) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (username, None, email, role, name, designation, specialization),
     )
 
     # If School POC, auto-create a School record linked to this user
@@ -705,7 +1004,7 @@ def api_register_user():
         school_address = data.get("school_address", "").strip()
         poc_designation = data.get("poc_designation", "").strip()
         poc_phone = data.get("poc_phone", "").strip()
-        poc_email = data.get("poc_email", "").strip()
+        poc_email = email
         now = datetime.utcnow().isoformat()
         cur = conn.cursor()
         cur.execute(
@@ -720,8 +1019,8 @@ def api_register_user():
     conn.commit()
     conn.close()
     log_audit(admin_user, "REGISTER_USER",
-              f"Registered {role} user: {username} ({name})")
-    result = {"success": True}
+              f"Registered {role} user: {username} ({name}, {email})")
+    result = {"success": True, "username": username, "email": email}
     if school_id:
         result["school_id"] = school_id
     return jsonify(result)
