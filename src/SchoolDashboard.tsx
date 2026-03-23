@@ -77,7 +77,7 @@ const CLASSES = ['', 'Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7',
 const SECTIONS = ['', 'A', 'B', 'C', 'D', 'E'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-/** Normalize dd-mm-yyyy or dd/mm/yyyy → yyyy-mm-dd; pass-through if already iso */
+/** Normalize dates: Handles DD/MM/YYYY and MM/DD/YYYY smartly */
 function normalizeDateStr(raw: string): string {
   if (!raw) return raw;
   raw = raw.trim();
@@ -85,7 +85,14 @@ function normalizeDateStr(raw: string): string {
     const parts = raw.split(sep);
     if (parts.length === 3) {
       const [a, b, c] = parts;
-      if (a.length <= 2 && c.length === 4) {
+      if (a.length <= 2 && b.length <= 2 && c.length === 4) {
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
+        // If middle part > 12, it MUST be the day -> MM/DD/YYYY format
+        if (numB > 12) {
+          return `${c}-${a.padStart(2, '0')}-${b.padStart(2, '0')}`;
+        }
+        // Otherwise assume DD/MM/YYYY format as standard
         return `${c}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`;
       }
     }
@@ -588,6 +595,7 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
 }) {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: any[]; errors: any[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -599,10 +607,24 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadError(null);
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
       complete: (results) => {
+        if (results.data.length > 0) {
+          const firstRow = results.data[0] as Record<string, any>;
+          // Check if at least one expected column exists
+          if (firstRow.name === undefined && firstRow.gender === undefined && firstRow.dob === undefined) {
+             const detected = results.meta?.fields?.join(', ') || 'None';
+             setUploadError(`Invalid columns detected. Expected 'name', 'dob', etc. \n\nFound: [${detected}]. \n\nIf you see gibberish, you uploaded an Excel (.xlsx) file instead of CSV. If columns are joined with semicolons, save the CSV properly.`);
+             setParsedRows([]);
+             return;
+          }
+        }
+
         const rows: ParsedRow[] = results.data.map((row: any) => {
           const errors: string[] = [];
           if (!row.name?.trim()) errors.push('Name is required');
@@ -663,6 +685,15 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
             </button>
             <input ref={fileRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
           </div>
+
+          {uploadError && (
+            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl mt-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-300 font-medium whitespace-pre-wrap">{uploadError}</div>
+              </div>
+            </div>
+          )}
 
           {/* Dry Run Preview */}
           {parsedRows.length > 0 && !result && (

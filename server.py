@@ -450,23 +450,28 @@ def _user_public(u: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Date helper: accept dd-mm-yyyy, dd/mm/yyyy, and yyyy-mm-dd
+# Date helper: smartly accept dd-mm-yyyy, mm/dd/yyyy, and yyyy-mm-dd
 # ---------------------------------------------------------------------------
 def _normalize_date(raw: str) -> str:
-    """Convert dd-mm-yyyy or dd/mm/yyyy to yyyy-mm-dd; pass through if already iso."""
+    """Convert dd-mm-yyyy or mm-dd-yyyy to yyyy-mm-dd; pass through if already iso."""
     raw = raw.strip()
     if not raw:
         return raw
-    # Try dd-mm-yyyy or dd/mm/yyyy
     for sep in ('-', '/'):
         parts = raw.split(sep)
         if len(parts) == 3:
             a, b, c = parts
-            # If first part looks like a day (1–2 digits) and last is 4-digit year
-            if len(a) <= 2 and len(c) == 4:
+            # If first two parts are 1-2 digits and last is 4 digits
+            if len(a) <= 2 and len(b) <= 2 and len(c) == 4:
                 try:
+                    num_a = int(a)
+                    num_b = int(b)
+                    # If middle part > 12, it MUST be the day -> MM/DD/YYYY format
+                    if num_b > 12:
+                        return f"{c}-{a.zfill(2)}-{b.zfill(2)}"
+                    # Otherwise assume DD/MM/YYYY format as standard
                     return f"{c}-{b.zfill(2)}-{a.zfill(2)}"
-                except Exception:
+                except ValueError:
                     pass
     # Already yyyy-mm-dd or unrecognized — return as-is
     return raw
@@ -1394,8 +1399,8 @@ def api_bulk_create_students():
             val = str(row.get(sym_key, "")).strip().lower()
             if val in ("yes", "y", "true", "1"):
                 # converting to human readable feature: e.g. symptom_rubs_eyes -> Rubs Eyes
-                readable = sym_key.replace("symptom_", "").replace("_", " ").title()
-                symptoms_checked.append({'name': readable, 'checked': True})
+                readable = sym_key.replace("symptom_", "").replace("_", " ").capitalize()
+                symptoms_checked.append(readable)
 
         try:
             cur.execute(
@@ -1744,7 +1749,15 @@ def api_student_all_records(student_id):
     gen_dict = row_to_dict(gen) if gen else {}
     if gen_dict:
         try:
-            gen_dict["symptoms"] = json.loads(gen_dict.get("symptoms_json", "[]"))
+            raw_sym = json.loads(gen_dict.get("symptoms_json", "[]"))
+            clean_sym = []
+            if isinstance(raw_sym, list):
+                for item in raw_sym:
+                    if isinstance(item, dict) and "name" in item:
+                        clean_sym.append(item["name"])
+                    elif isinstance(item, str):
+                        clean_sym.append(item)
+            gen_dict["symptoms"] = clean_sym
         except Exception:
             gen_dict["symptoms"] = []
 
