@@ -654,9 +654,12 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
       const data = await res.json();
       if (data.success) {
         const displayName = f.role === 'School POC' ? f.school_name : f.name;
+        const emailNote = data.email_sent
+          ? `📧 A welcome email with credentials has been sent to ${f.email}.`
+          : `⚠️ Email could not be sent (SMTP not configured). Please share credentials manually.`;
         setMessage({
           type: 'success',
-          text: `✅ ${displayName} has been registered as ${f.role}. They can now log in using their email (${f.email}) with OTP.`
+          text: `✅ ${displayName} registered as ${f.role}.\n\n🔑 User ID: ${data.username}\n🔒 Password: ${data.password}\n\n${emailNote}`
         });
         setF({
           email: '', name: '', role: 'Other', designation: '',
@@ -684,7 +687,7 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         </h3>
 
         {message && (
-          <div className={`p-3 rounded-xl text-sm mb-4 border ${
+          <div className={`p-3 rounded-xl text-sm mb-4 border whitespace-pre-line ${
             message.type === 'success'
               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
               : 'bg-red-500/10 border-red-500/30 text-red-400'

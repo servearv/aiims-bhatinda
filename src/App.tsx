@@ -236,12 +236,8 @@ function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void
       }
       setUserName(data.name);
       setHasPassword(data.has_password);
-      if (data.has_password) {
-        setStep('password');
-      } else {
-        // First-time user — go straight to OTP
-        setStep('otp_send');
-      }
+      // Always default to OTP login flow
+      setStep('otp_send');
     } catch {
       setError('Connection error. Please try again.');
     } finally {
@@ -428,6 +424,12 @@ function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void
               <button onClick={handleSendOtp} disabled={loading} className={btnClass}>
                 {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <span className="flex items-center justify-center space-x-2"><Mail className="w-4 h-4" /><span>Send Code</span></span>}
               </button>
+              {hasPassword && (
+                <button type="button" onClick={() => { setError(''); setStep('password'); }}
+                  className="w-full text-center text-sm text-slate-500 hover:text-cyan-400 transition-colors mt-2">
+                  Login using password →
+                </button>
+              )}
             </div>
           )}
 

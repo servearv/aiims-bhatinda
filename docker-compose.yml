@@ -33,6 +33,8 @@ services:
     environment:
       DATABASE_URL: postgresql://aiims:aiims_pass@db:5432/aiims_db
       SECRET_KEY: local-dev-secret-key
+      SMTP_EMAIL: ${SMTP_EMAIL:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
     depends_on:
       db:
         condition: service_healthy

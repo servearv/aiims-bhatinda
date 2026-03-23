@@ -34,5 +34,5 @@ EXPOSE 5000
 ENV PORT=5000
 ENV SECRET_KEY=change-me-in-production
 
-# Start with gunicorn (same as Render)
-CMD ["gunicorn", "server:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120"]
+# Start with database initialization, then gunicorn (same as Render)
+CMD sh -c 'python -c "import server; server.init_db()" && exec gunicorn server:app --bind 0.0.0.0:5000 --workers 2 --timeout 120'

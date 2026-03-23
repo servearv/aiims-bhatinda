@@ -36,6 +36,7 @@ interface Student {
   status: string;
   is_examined?: number;
   last_exam_data?: string;
+  assessment?: string;
 }
 
 interface EventStats {
@@ -44,6 +45,7 @@ interface EventStats {
   normal: number;
   observation: number;
   referred: number;
+  absent: number;
   records: any[];
   staff: any[];
 }
@@ -217,19 +219,30 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const fetchStudents = () => {
     setLoading(true);
     const params = new URLSearchParams({ event_id: String(eventId) });
     if (searchQuery) params.set('query', searchQuery);
+    if (statusFilter) params.set('assessment', statusFilter);
     fetch(`/api/students/search?${params}`)
       .then(r => r.json())
       .then(data => { setStudents(data); setLoading(false); })
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchStudents(); }, [eventId, searchQuery]);
+  useEffect(() => { fetchStudents(); }, [eventId, searchQuery, statusFilter]);
+
+  const toggleAbsent = async (studentId: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'Absent' ? 'Pending Examination' : 'Absent';
+    await fetch(`/api/students/${studentId}/status`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    fetchStudents();
+  };
 
   const totalStudents = students.length;
   const examinedStudents = students.filter(s => s.is_examined).length;
@@ -295,21 +308,30 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 
       {/* Search + Actions */}
       <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800">
-        <div className="flex space-x-3">
+        <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-500 w-4 h-4" />
             <input type="text" placeholder="Search students..."
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all text-sm" />
           </div>
-          <button onClick={() => setShowAddModal(true)}
-            className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white px-5 py-3 rounded-xl font-bold transition-all flex items-center space-x-2 shadow-lg whitespace-nowrap text-sm">
-            <Plus className="w-4 h-4" /><span>Add Student</span>
-          </button>
-          <button onClick={() => setShowCSVUpload(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-violet-400 border border-slate-700 hover:border-violet-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center space-x-2 whitespace-nowrap text-sm">
-            <Upload className="w-4 h-4" /><span>CSV Upload</span>
-          </button>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="w-full md:w-auto bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all">
+            <option value="">All Statuses</option>
+            <option value="N">Normal</option>
+            <option value="O">Observation</option>
+            <option value="R">Referral</option>
+          </select>
+          <div className="flex space-x-3">
+            <button onClick={() => setShowAddModal(true)}
+              className="flex-1 md:flex-none bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 shadow-lg whitespace-nowrap text-sm">
+              <Plus className="w-4 h-4" /><span>Add Student</span>
+            </button>
+            <button onClick={() => setShowCSVUpload(true)}
+              className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 text-violet-400 border border-slate-700 hover:border-violet-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 whitespace-nowrap text-sm">
+              <Upload className="w-4 h-4" /><span>CSV Upload</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -333,10 +355,18 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {students.map(s => {
-                  const statusStyle = s.is_examined
-                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-                  const statusLabel = s.is_examined ? 'Examined' : (s.status || 'Pending Examination');
+                  let statusStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                  let statusLabel = s.status || 'Pending Examination';
+                  
+                  if (s.is_examined) {
+                    if (s.assessment === 'N') { statusLabel = 'Normal'; statusStyle = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'; }
+                    else if (s.assessment === 'O') { statusLabel = 'Observation'; statusStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30'; }
+                    else if (s.assessment === 'R') { statusLabel = 'Referred'; statusStyle = 'bg-red-500/20 text-red-400 border-red-500/30'; }
+                    else { statusLabel = 'Examined'; statusStyle = 'bg-blue-500/20 text-blue-400 border-blue-500/30'; }
+                  } else if (s.status === 'Absent') {
+                    statusStyle = 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+                  }
+
                   return (
                     <tr key={s.student_id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="px-5 py-3 text-white font-medium">{s.name}</td>
@@ -347,11 +377,17 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                       <td className="px-5 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${statusStyle}`}>{statusLabel}</span>
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 flex space-x-2">
                         <button onClick={() => setEditingStudent(s)}
                           className="bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 border border-violet-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5">
-                          <ClipboardList className="w-3 h-3" /><span>Fill Info</span>
+                          <ClipboardList className="w-3 h-3" /><span className="hidden sm:inline">Fill Info</span>
                         </button>
+                        {!s.is_examined && (
+                          <button onClick={() => toggleAbsent(s.student_id, s.status)}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">
+                            {s.status === 'Absent' ? 'Present' : 'Absent'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -689,12 +725,13 @@ function ProgressTracking({ eventId }: { eventId: number }) {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <StatCard label="Total Students" value={stats.total_students} color="text-violet-400" />
         <StatCard label="Screened" value={stats.screened} color="text-blue-400" />
         <StatCard label="Normal" value={stats.normal} color="text-emerald-400" />
         <StatCard label="Observation" value={stats.observation} color="text-amber-400" />
         <StatCard label="Referred" value={stats.referred} color="text-red-400" />
+        <StatCard label="Absent" value={stats.absent} color="text-slate-400" />
       </div>
 
       {/* Screening Progress */}

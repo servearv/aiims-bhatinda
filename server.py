@@ -281,7 +281,7 @@ def init_db():
                  "email TEXT", "otp_code TEXT", "otp_expires TEXT"]
     for col_def in user_cols:
         try:
-            cur.execute(f"ALTER TABLE Users ADD COLUMN {col_def}")
+            cur.execute(f"ALTER TABLE Users ADD COLUMN IF NOT EXISTS {col_def}")
             conn.commit()
         except Exception:
             conn.rollback()
@@ -304,13 +304,13 @@ def init_db():
                     "pincode TEXT DEFAULT ''"]
     for col_def in student_cols:
         try:
-            cur.execute(f"ALTER TABLE Students ADD COLUMN {col_def}")
+            cur.execute(f"ALTER TABLE Students ADD COLUMN IF NOT EXISTS {col_def}")
             conn.commit()
         except Exception:
             conn.rollback()
 
     try:
-        cur.execute("ALTER TABLE Events ADD COLUMN school_id INTEGER")
+        cur.execute("ALTER TABLE Events ADD COLUMN IF NOT EXISTS school_id INTEGER")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -357,8 +357,18 @@ def init_db():
         cur.execute(
             "INSERT INTO Users (username,password,role,name,designation,specialization,email) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            ("Admin", "admin", "Admin", "Admin", "", "", "atharvam1580@gmail.com"),
+            ("Admin", "admin", "Admin", "Admin", "", "", "nachiketavachat@gmail.com"),
         )
+
+    # Migration: update existing admin email from old to new
+    try:
+        cur.execute(
+            "UPDATE Users SET email = %s WHERE username = %s AND email = %s",
+            ("nachiketavachat@gmail.com", "Admin", "atharvam1580@gmail.com"),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
     conn.commit()
     conn.close()
@@ -386,13 +396,23 @@ def rows_to_list(rows):
 
 
 def generate_username(name: str) -> str:
-    """Generate a username from a name: 'Dr. Anil Kumar' → 'anil.kumar.x7k'."""
+    """Generate a username from a name: 'Dr. Anil Kumar' → 'anil.kum.x7k' (max 15 chars)."""
     # Strip titles
     clean = re.sub(r'^(dr\.?|mr\.?|mrs\.?|ms\.?|prof\.?)\s*', '', name.strip(), flags=re.IGNORECASE)
     parts = re.sub(r'[^a-zA-Z\s]', '', clean).lower().split()
-    base = '.'.join(parts[:3]) if parts else 'user'
+    base = '.'.join(parts[:2]) if parts else 'user'
     suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=3))
-    return f"{base}.{suffix}"
+    result = f"{base}.{suffix}"
+    # Cap at 15 characters
+    if len(result) > 15:
+        result = result[:11] + '.' + suffix
+    return result[:15]
+
+
+def generate_password(length: int = 10) -> str:
+    """Generate a random alphanumeric password (max 10 chars)."""
+    chars = string.ascii_letters + string.digits
+    return ''.join(random.choices(chars, k=min(length, 10)))
 
 
 def send_email(to_email: str, subject: str, body_html: str):
@@ -947,7 +967,7 @@ def api_event_volunteers(event_id):
 # ---- User Registration ----
 @app.route("/api/users/register", methods=["POST"])
 def api_register_user():
-    """Admin registers a new user. No password — user sets it on first login via OTP."""
+    """Admin registers a new user. Generates temp user_id and password, emails them."""
     data = request.get_json(force=True)
     email = data.get("email", "").strip().lower()
     name = data.get("name", "").strip()
@@ -985,16 +1005,18 @@ def api_register_user():
         conn.close()
         return jsonify({"success": False, "message": "An account with this email already exists"}), 409
 
-    # Auto-generate username from name
+    # Auto-generate username (≤15 chars) and temp password (≤10 chars)
     username = generate_username(name)
     # Ensure uniqueness
     while conn.execute("SELECT username FROM Users WHERE username = ?", (username,)).fetchone():
         username = generate_username(name)
 
+    temp_password = generate_password(10)
+
     conn.execute(
         "INSERT INTO Users (username, password, email, role, name, designation, specialization) "
         "VALUES (?,?,?,?,?,?,?)",
-        (username, None, email, role, name, designation, specialization),
+        (username, temp_password, email, role, name, designation, specialization),
     )
 
     # If School POC, auto-create a School record linked to this user
@@ -1020,7 +1042,50 @@ def api_register_user():
     conn.close()
     log_audit(admin_user, "REGISTER_USER",
               f"Registered {role} user: {username} ({name}, {email})")
-    result = {"success": True, "username": username, "email": email}
+
+    # Send welcome email with credentials
+    role_display = role.replace('_', ' ')
+    email_sent = send_email(
+        email,
+        'Welcome to AIIMS Bathinda Health Portal',
+        f'<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;'
+        f'background:#0f172a;color:#e2e8f0;border-radius:16px">'
+        f'<div style="text-align:center;margin-bottom:24px">'
+        f'<h1 style="color:#22d3ee;margin:0">AIIMS Bathinda</h1>'
+        f'<p style="color:#94a3b8;font-size:14px;margin:4px 0 0">Health Screening Portal</p>'
+        f'</div>'
+        f'<p style="color:#e2e8f0">Hi <strong>{name}</strong>,</p>'
+        f'<p style="color:#cbd5e1">You have been registered as '
+        f'<strong style="color:#22d3ee">{role_display}</strong> on the AIIMS Bathinda portal.</p>'
+        f'<p style="color:#cbd5e1">Here are your login credentials:</p>'
+        f'<div style="background:#1e293b;padding:20px;border-radius:12px;margin:16px 0;'
+        f'border:1px solid #334155">'
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<tr><td style="color:#94a3b8;padding:6px 0;font-size:13px">Email</td>'
+        f'<td style="color:#f1f5f9;font-weight:bold;padding:6px 0">{email}</td></tr>'
+        f'<tr><td style="color:#94a3b8;padding:6px 0;font-size:13px">User ID</td>'
+        f'<td style="color:#22d3ee;font-weight:bold;font-family:monospace;padding:6px 0">{username}</td></tr>'
+        f'<tr><td style="color:#94a3b8;padding:6px 0;font-size:13px">Password</td>'
+        f'<td style="color:#fbbf24;font-weight:bold;font-family:monospace;padding:6px 0">{temp_password}</td></tr>'
+        f'</table></div>'
+        f'<p style="color:#cbd5e1;font-size:14px">You can log in using:</p>'
+        f'<ul style="color:#cbd5e1;font-size:14px;padding-left:20px">'
+        f'<li><strong>Email + OTP</strong> (a code will be sent to this email)</li>'
+        f'<li><strong>Email + Password</strong> (use the password above)</li>'
+        f'</ul>'
+        f'<p style="color:#64748b;font-size:12px;margin-top:24px;border-top:1px solid #334155;'
+        f'padding-top:16px">'
+        f'You can change your User ID and password after logging in from Profile Settings.</p>'
+        f'</div>',
+    )
+
+    result = {
+        "success": True,
+        "username": username,
+        "password": temp_password,
+        "email": email,
+        "email_sent": email_sent,
+    }
     if school_id:
         result["school_id"] = school_id
     return jsonify(result)
@@ -1059,6 +1124,11 @@ def api_event_stats(event_id):
     conn = get_db()
     total_students = conn.execute(
         "SELECT COUNT(*) AS c FROM Students WHERE event_id = ?",
+        (event_id,),
+    ).fetchone()["c"]
+
+    absent = conn.execute(
+        "SELECT COUNT(*) AS c FROM Students WHERE event_id = ? AND status = 'Absent'",
         (event_id,),
     ).fetchone()["c"]
 
@@ -1115,6 +1185,7 @@ def api_event_stats(event_id):
         "normal": normal,
         "observation": observation,
         "referred": referred,
+        "absent": absent,
         "records": rows_to_list(hr_rows),
         "staff": rows_to_list(volunteers),   # keep key for frontend compat
     })
@@ -1230,6 +1301,16 @@ def api_bulk_create_students():
     conn = get_db()
     cur = conn.cursor()
 
+    SYMPTOM_KEYS = [
+        "symptom_rubs_eyes", "symptom_cannot_see_board", "symptom_pokes_ear",
+        "symptom_breathes_mouth", "symptom_black_teeth", "symptom_bad_breath",
+        "symptom_cracks_mouth", "symptom_scratches_head", "symptom_white_patches",
+        "symptom_bites_nails", "symptom_headaches", "symptom_fainting",
+        "symptom_breathlessness", "symptom_limping", "symptom_stammers",
+        "symptom_urination", "symptom_diarrhea", "symptom_vomiting",
+        "symptom_blood_stools"
+    ]
+
     for idx, row in enumerate(students_data):
         row_num = idx + 1
         row_errors = []
@@ -1243,60 +1324,87 @@ def api_bulk_create_students():
             row_errors.append({"column": "gender", "reason": "Must be M or F"})
 
         dob = str(row.get("dob", "")).strip()
+        age = None
         if dob:
             try:
-                date.fromisoformat(dob)
+                dt = date.fromisoformat(dob)
+                today = date.today()
+                age = today.year - dt.year - ((today.month, today.day) < (dt.month, dt.day))
             except (ValueError, TypeError):
-                row_errors.append({"column": "dob",
-                                   "reason": "Invalid date format (use YYYY-MM-DD)"})
+                row_errors.append({"column": "dob", "reason": "Invalid date format (use YYYY-MM-DD)"})
 
         phone = str(row.get("phone", "")).strip()
         if phone and not re.match(r'^[+]?[\d\s\-()]{7,15}$', phone):
-            row_errors.append({"column": "phone",
-                               "reason": "Invalid phone number"})
+            row_errors.append({"column": "phone", "reason": "Invalid phone number"})
+
+        # Calculate BMI if height/weight exist
+        height = str(row.get("height", "")).strip()
+        weight = str(row.get("weight", "")).strip()
+        bmi = ""
+        if height and weight:
+            try:
+                h = float(height)
+                w = float(weight)
+                if h > 0:
+                    bmi_val = w / ((h / 100) ** 2)
+                    bmi = f"{bmi_val:.1f}"
+            except ValueError:
+                row_errors.append({"column": "vitals", "reason": "Height/Weight must be numbers"})
 
         if row_errors:
-            error_list.append({
-                "row": row_num, "data": row, "errors": row_errors
-            })
+            error_list.append({"row": row_num, "data": row, "errors": row_errors})
             continue
 
-        age = row.get("age")
-        if age is not None:
-            try:
-                age = int(age)
-            except (ValueError, TypeError):
-                age = None
+        qr_hash = "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
+        
+        # Symptoms list parsing
+        symptoms_checked = []
+        for sym_key in SYMPTOM_KEYS:
+            val = str(row.get(sym_key, "")).strip().lower()
+            if val in ("yes", "y", "true", "1"):
+                # converting to human readable feature: e.g. symptom_rubs_eyes -> Rubs Eyes
+                readable = sym_key.replace("symptom_", "").replace("_", " ").title()
+                symptoms_checked.append({'name': readable, 'checked': True})
 
-        qr_hash = "".join(
-            random.choices(string.ascii_lowercase + string.digits, k=13)
-        )
         try:
             cur.execute(
                 """INSERT INTO Students
                    (event_id, name, age, dob, gender, student_class, section,
-                    blood_group, father_name, phone, qr_code_hash,
+                    blood_group, father_name, mother_name, father_occupation,
+                    mother_occupation, address, pincode, phone, qr_code_hash,
                     added_by, status)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
                 (
                     event_id, name, age, dob, gender,
                     str(row.get("student_class", "")).strip(),
                     str(row.get("section", "")).strip(),
                     str(row.get("blood_group", "")).strip(),
                     str(row.get("father_name", "")).strip(),
+                    str(row.get("mother_name", "")).strip(),
+                    str(row.get("father_occupation", "")).strip(),
+                    str(row.get("mother_occupation", "")).strip(),
+                    str(row.get("address", "")).strip(),
+                    str(row.get("pincode", "")).strip(),
                     phone, qr_hash, added_by, "Pending Examination",
                 ),
             )
-            success_list.append({
-                "row": row_num, "student_id": cur.fetchone()["student_id"], "name": name
-            })
+            student_id = cur.fetchone()["student_id"]
+            
+            ts = datetime.utcnow().isoformat()
+            symptoms_json = json.dumps(symptoms_checked)
+            cur.execute(
+                """INSERT INTO Student_General_Info
+                   (student_id, event_id, height, weight, bmi, symptoms_json, filled_by, updated_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (student_id, event_id, height, weight, bmi, symptoms_json, added_by, ts)
+            )
+
+            success_list.append({"row": row_num, "student_id": student_id, "name": name})
             conn.commit()
         except Exception as exc:
             conn.rollback()
-            error_list.append({
-                "row": row_num, "data": row,
-                "errors": [{"column": "db", "reason": str(exc)}],
-            })
+            error_list.append({"row": row_num, "data": row, "errors": [{"column": "db", "reason": str(exc)}]})
 
     conn.commit()
     conn.close()
@@ -1313,10 +1421,25 @@ def api_csv_template():
     """Return a CSV template for bulk student upload."""
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["name", "gender", "dob", "age", "student_class",
-                     "section", "blood_group", "father_name", "phone"])
-    writer.writerow(["John Doe", "M", "2012-05-15", "13", "8", "A",
-                     "B+", "James Doe", "9876543210"])
+    writer.writerow([
+        "name", "dob", "gender", "student_class", "section", "blood_group",
+        "father_name", "father_occupation", "mother_name", "mother_occupation",
+        "address", "pincode", "phone", "height", "weight",
+        "symptom_rubs_eyes", "symptom_cannot_see_board", "symptom_pokes_ear",
+        "symptom_breathes_mouth", "symptom_black_teeth", "symptom_bad_breath",
+        "symptom_cracks_mouth", "symptom_scratches_head", "symptom_white_patches",
+        "symptom_bites_nails", "symptom_headaches", "symptom_fainting",
+        "symptom_breathlessness", "symptom_limping", "symptom_stammers",
+        "symptom_urination", "symptom_diarrhea", "symptom_vomiting",
+        "symptom_blood_stools"
+    ])
+    writer.writerow([
+        "John Doe", "2012-05-15", "M", "8", "A", "O+",
+        "James Doe", "Engineer", "Jane Doe", "Teacher",
+        "123 Street", "110001", "9876543210", "150", "45",
+        "No", "No", "No", "No", "No", "No", "No", "No", "No",
+        "No", "No", "No", "No", "No", "No", "No", "No", "No", "No"
+    ])
     csv_content = output.getvalue()
     return Response(
         csv_content,
@@ -1335,6 +1458,7 @@ def api_students_search():
     gender = request.args.get("gender", "").strip()
     examined = request.args.get("examined", "")   # '1' or '0'
     referred = request.args.get("referred", "")   # '1'
+    assessment = request.args.get("assessment", "") # 'N', 'O', 'R'
     event_id = request.args.get("event_id", "").strip()
 
     conn = get_db()
@@ -1378,54 +1502,71 @@ def api_students_search():
 
     where = (" AND " + " AND ".join(conditions)) if conditions else ""
 
-    # Per-category exam status: which specialist categories have records
     sql = f"""
         SELECT s.*,
                CASE WHEN hr.hr_count > 0 THEN 1 ELSE 0 END AS is_examined,
-               hr.examined_categories
+               hr.examined_categories,
+               hr.latest_assessment
         FROM Students s
         LEFT JOIN (
             SELECT student_id,
                    COUNT(*) AS hr_count,
-                   STRING_AGG(DISTINCT category, ',') AS examined_categories
+                   STRING_AGG(DISTINCT category, ',') AS examined_categories,
+                   (
+                       SELECT json_data
+                       FROM Health_Records hr2
+                       WHERE hr2.student_id = Health_Records.student_id
+                       ORDER BY timestamp DESC LIMIT 1
+                   ) AS latest_record_json
             FROM Health_Records
             GROUP BY student_id
         ) hr ON s.student_id = hr.student_id
         WHERE 1=1 {where}
         ORDER BY s.name
-        LIMIT 100
     """
 
     rows = conn.execute(sql, params).fetchall()
     results = rows_to_list(rows)
 
-    # Post-filter for examined / referred
+    # Post-process for assessment parsing
+    for r in results:
+        r['assessment'] = ''
+        if r.get('latest_record_json'):
+            try:
+                d = json.loads(r['latest_record_json'])
+                r['assessment'] = d.get('assessment', '')
+            except Exception:
+                pass
+
+    # Post-filter
     if examined == '1':
         results = [r for r in results if r.get('is_examined')]
     elif examined == '0':
         results = [r for r in results if not r.get('is_examined')]
 
     if referred == '1':
-        # Need to check json_data for any record with assessment='R'
-        filtered = []
-        for r in results:
-            sid = r.get('student_id')
-            recs = conn.execute(
-                "SELECT json_data FROM Health_Records WHERE student_id = ?",
-                (sid,),
-            ).fetchall()
-            for rec in recs:
-                try:
-                    d = json.loads(rec['json_data'] or '{}')
-                    if d.get('assessment') == 'R':
-                        filtered.append(r)
-                        break
-                except Exception:
-                    pass
-        results = filtered
+        results = [r for r in results if r.get('assessment') == 'R']
+
+    if assessment:
+        results = [r for r in results if r.get('assessment') == assessment]
 
     conn.close()
     return jsonify(results)
+
+
+@app.route("/api/students/<int:student_id>/status", methods=["PUT"])
+def api_update_student_status(student_id):
+    """Update student basic status (like marking them absent)."""
+    data = request.get_json(force=True)
+    new_status = data.get("status", "Pending Examination")
+    conn = get_db()
+    conn.execute(
+        "UPDATE Students SET status = ? WHERE student_id = ?",
+        (new_status, student_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 
 @app.route("/api/students/<int:student_id>")
@@ -1792,13 +1933,13 @@ def serve_spa(path):
 # Bootstrap
 # ---------------------------------------------------------------------------
 
-try:
-    init_db()
-    print("Database initialized successfully.")
-except Exception as e:
-    print(f"Error initializing database: {e}")
-
 if __name__ == "__main__":
+    try:
+        init_db()
+        print("Database initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+
     print(f"")
     print(f"  AIIMS Bathinda - Flask Server")
     print(f"  =============================")
