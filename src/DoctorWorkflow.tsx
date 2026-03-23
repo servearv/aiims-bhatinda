@@ -7,6 +7,10 @@ import {
 } from 'lucide-react';
 import { GeneralInfoSummary } from './GeneralInfoForm';
 
+// Socket.IO client (optional)
+let io: any = null;
+try { io = require('socket.io-client'); } catch {}
+
 // ── Types ──
 type User = { username: string; role: string; name: string; specialization?: string };
 
@@ -872,7 +876,25 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
     } catch { /* ignore network errors */ }
   }, [searchQuery, filterClass, filterSection, filterGender, filterExamined, campId]);
 
+  // Load all students on mount
+  useEffect(() => { doSearch(); }, [campId]);
+  // Re-fetch when filters change
   useEffect(() => { doSearch(); }, [filterClass, filterSection, filterGender, filterExamined]);
+
+  // Real-time Socket.IO listener for live updates
+  useEffect(() => {
+    if (!io) return;
+    try {
+      const socket = io.connect(window.location.origin, { transports: ['websocket', 'polling'] });
+      const refresh = (data: any) => {
+        if (!data.event_id || data.event_id === campId) doSearch();
+      };
+      socket.on('student_created', refresh);
+      socket.on('students_bulk_created', refresh);
+      socket.on('exam_saved', refresh);
+      return () => { socket.disconnect(); };
+    } catch {}
+  }, [campId, doSearch]);
 
   // Load existing exam data when student selected
   const selectStudent = async (s: Student) => {
@@ -998,13 +1020,13 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
             <option value="">All Status</option><option value="0">Not Examined</option><option value="1">Examined</option>
           </select>
           <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
-            <option value="">All Sex</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
+            <option value="">All Sex</option><option value="M">Male</option><option value="F">Female</option>
           </select>
           {(filterClass || filterSection || filterExamined || filterGender) && (
             <button onClick={() => { setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender(''); }} className="text-xs text-red-400 underline">Clear</button>
           )}
         </div>
-        {/* Results */}
+        {/* Results — show when there are results and no student selected */}
         {searchResults.length > 0 && !selectedStudent && (
           <div className="mt-3 max-h-64 overflow-y-auto space-y-1.5 border-t border-slate-800 pt-3">
             {searchResults.map(s => (

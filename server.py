@@ -450,6 +450,29 @@ def _user_public(u: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Date helper: accept dd-mm-yyyy, dd/mm/yyyy, and yyyy-mm-dd
+# ---------------------------------------------------------------------------
+def _normalize_date(raw: str) -> str:
+    """Convert dd-mm-yyyy or dd/mm/yyyy to yyyy-mm-dd; pass through if already iso."""
+    raw = raw.strip()
+    if not raw:
+        return raw
+    # Try dd-mm-yyyy or dd/mm/yyyy
+    for sep in ('-', '/'):
+        parts = raw.split(sep)
+        if len(parts) == 3:
+            a, b, c = parts
+            # If first part looks like a day (1–2 digits) and last is 4-digit year
+            if len(a) <= 2 and len(c) == 4:
+                try:
+                    return f"{c}-{b.zfill(2)}-{a.zfill(2)}"
+                except Exception:
+                    pass
+    # Already yyyy-mm-dd or unrecognized — return as-is
+    return raw
+
+
+# ---------------------------------------------------------------------------
 # API Routes
 # ---------------------------------------------------------------------------
 
@@ -1283,6 +1306,13 @@ def api_create_student():
     conn.close()
     log_audit(user_id or "doctor", "CREATE_STUDENT",
               f"Created student {name} (ID {new_id})")
+
+    # Real-time: notify all clients about the new student
+    if socketio:
+        socketio.emit("student_created", {
+            "student_id": new_id, "event_id": event_id, "name": name,
+        })
+
     return jsonify({"success": True, "student": row_to_dict(student)})
 
 
@@ -1326,12 +1356,13 @@ def api_bulk_create_students():
         dob = str(row.get("dob", "")).strip()
         age = None
         if dob:
+            dob = _normalize_date(dob)
             try:
                 dt = date.fromisoformat(dob)
                 today = date.today()
                 age = today.year - dt.year - ((today.month, today.day) < (dt.month, dt.day))
             except (ValueError, TypeError):
-                row_errors.append({"column": "dob", "reason": "Invalid date format (use YYYY-MM-DD)"})
+                row_errors.append({"column": "dob", "reason": "Invalid date format (use DD-MM-YYYY or YYYY-MM-DD)"})
 
         phone = str(row.get("phone", "")).strip()
         if phone and not re.match(r'^[+]?[\d\s\-()]{7,15}$', phone):
@@ -1410,6 +1441,13 @@ def api_bulk_create_students():
     conn.close()
     log_audit(added_by or "school", "BULK_CREATE_STUDENTS",
               f"Bulk uploaded {len(success_list)} students for event {event_id}")
+
+    # Real-time: notify all clients about the bulk upload
+    if socketio and success_list:
+        socketio.emit("students_bulk_created", {
+            "event_id": event_id, "count": len(success_list),
+        })
+
     return jsonify({
         "success": True, "inserted": success_list, "errors": error_list
     })
@@ -1506,7 +1544,7 @@ def api_students_search():
         SELECT s.*,
                CASE WHEN hr.hr_count > 0 THEN 1 ELSE 0 END AS is_examined,
                hr.examined_categories,
-               hr.latest_assessment
+               hr.latest_record_json
         FROM Students s
         LEFT JOIN (
             SELECT student_id,
@@ -1531,9 +1569,10 @@ def api_students_search():
     # Post-process for assessment parsing
     for r in results:
         r['assessment'] = ''
-        if r.get('latest_record_json'):
+        json_str = r.get('latest_record_json') or r.get('latest_assessment')
+        if json_str:
             try:
-                d = json.loads(r['latest_record_json'])
+                d = json.loads(json_str)
                 r['assessment'] = d.get('assessment', '')
             except Exception:
                 pass

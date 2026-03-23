@@ -7,6 +7,10 @@ import {
 } from 'lucide-react';
 import GeneralInfoForm from './GeneralInfoForm';
 
+// Socket.IO client (optional)
+let io: any = null;
+try { io = require('socket.io-client'); } catch {}
+
 // ── Types ──
 type User = { username: string; role: string; name: string };
 
@@ -72,6 +76,22 @@ function calcAge(dob: string): number | null {
 const CLASSES = ['', 'Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 const SECTIONS = ['', 'A', 'B', 'C', 'D', 'E'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+/** Normalize dd-mm-yyyy or dd/mm/yyyy → yyyy-mm-dd; pass-through if already iso */
+function normalizeDateStr(raw: string): string {
+  if (!raw) return raw;
+  raw = raw.trim();
+  for (const sep of ['-', '/']) {
+    const parts = raw.split(sep);
+    if (parts.length === 3) {
+      const [a, b, c] = parts;
+      if (a.length <= 2 && c.length === 4) {
+        return `${c}-${b.padStart(2, '0')}-${a.padStart(2, '0')}`;
+      }
+    }
+  }
+  return raw;
+}
 
 // ════════════════════════════════════════
 // ██ SCHOOL DASHBOARD (Main Export)
@@ -234,6 +254,21 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   };
 
   useEffect(() => { fetchStudents(); }, [eventId, searchQuery, statusFilter]);
+
+  // Real-time Socket.IO listener for live roster updates
+  useEffect(() => {
+    if (!io) return;
+    try {
+      const socket = io.connect(window.location.origin, { transports: ['websocket', 'polling'] });
+      const refresh = (data: any) => {
+        if (!data.event_id || data.event_id === eventId) fetchStudents();
+      };
+      socket.on('student_created', refresh);
+      socket.on('students_bulk_created', refresh);
+      socket.on('exam_saved', refresh);
+      return () => { socket.disconnect(); };
+    } catch {}
+  }, [eventId]);
 
   const toggleAbsent = async (studentId: number, currentStatus: string) => {
     const newStatus = currentStatus === 'Absent' ? 'Pending Examination' : 'Absent';
@@ -573,8 +608,10 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
           if (!row.name?.trim()) errors.push('Name is required');
           if (row.gender && !['M', 'F', 'm', 'f'].includes(row.gender.trim())) errors.push('Gender must be M or F');
           if (row.dob) {
-            const d = new Date(row.dob);
-            if (isNaN(d.getTime())) errors.push('Invalid DOB format (use YYYY-MM-DD)');
+            const normalized = normalizeDateStr(row.dob);
+            row.dob = normalized;  // update the row so the backend gets yyyy-mm-dd
+            const d = new Date(normalized);
+            if (isNaN(d.getTime())) errors.push('Invalid DOB format (use DD-MM-YYYY or YYYY-MM-DD)');
           }
           if (row.phone?.trim()) {
             if (!/^\d{10}$/.test(row.phone.replace(/\D/g, ''))) errors.push('Invalid 10-digit phone number');
