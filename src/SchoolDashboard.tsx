@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import {
   Calendar, Users, Plus, X, Check, ChevronRight, ArrowRight,
   Upload, Download, FileText, Activity, UserPlus, Search,
-  ChevronDown, AlertTriangle, BarChart3, ClipboardList
+  ChevronDown, AlertTriangle, BarChart3, ClipboardList, Printer
 } from 'lucide-react';
 import GeneralInfoForm from './GeneralInfoForm';
 
@@ -50,6 +50,7 @@ interface EventStats {
   observation: number;
   referred: number;
   absent: number;
+  dept_breakdown?: Record<string, { N: number; O: number; R: number }>;
   records: any[];
   staff: any[];
 }
@@ -127,11 +128,29 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
       .catch(() => setLoading(false));
   }, [user.username]);
 
+  const computeTag = (event: EventData): string => {
+    if (event.tag === 'Cancelled') return 'Cancelled';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (event.start_date) {
+      const start = new Date(event.start_date);
+      start.setHours(0, 0, 0, 0);
+      if (today < start) return 'Upcoming';
+    }
+    if (event.end_date) {
+      const end = new Date(event.end_date);
+      end.setHours(0, 0, 0, 0);
+      if (today > end) return 'Completed';
+    }
+    return 'Ongoing';
+  };
+
   const tagStyle = (tag: string) => {
     switch (tag) {
       case 'Ongoing': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
       case 'Upcoming': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       case 'Completed': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+      case 'Cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
       default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
     }
   };
@@ -176,7 +195,7 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
                   <span className="text-xs text-slate-500">
                     <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0} screened
                   </span>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${tagStyle(event.tag)}`}>{event.tag}</span>
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${tagStyle(computeTag(event))}`}>{computeTag(event)}</span>
                   <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-violet-400 transition-colors" />
                 </div>
               </div>
@@ -238,6 +257,72 @@ function EventWorkspace({ user, event, onBack }: { user: User; event: EventData;
 }
 
 // ════════════════════════════════════════
+// ██ PRINTABLE DOCUMENT HELPERS
+// ════════════════════════════════════════
+function buildDocumentBody(d: any, doctorInfo: any, studentInfo: any, campName: string, isReferral: boolean, specialty: string, today: string): string {
+  const studentName = studentInfo?.name || '—';
+  const studentAge = studentInfo?.age || '—';
+  const studentGender = studentInfo?.gender === 'M' ? 'Male' : studentInfo?.gender === 'F' ? 'Female' : '—';
+  const studentClass = studentInfo?.student_class || '—';
+  const studentSection = studentInfo?.section ? `-${studentInfo.section}` : '';
+  const fatherName = studentInfo?.father_name || '—';
+  const phone = studentInfo?.phone || '';
+  const doctorName = doctorInfo?.name || doctorInfo?.username || '—';
+  const docSpecialty = specialty || (doctorInfo?.role || '').replace(/_/g, ' ');
+
+  let html = `<div style="font-family:serif;color:#000;background:#fff;padding:40px;max-width:210mm;margin:0 auto;">`;
+  html += `<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:20px;">`;
+  html += `<h1 style="font-size:20px;font-weight:bold;margin:0;">AIIMS BATHINDA — SCHOOL HEALTH CAMP</h1>`;
+  if (campName) html += `<p style="font-size:12px;margin:4px 0 0;color:#555;">${campName}</p>`;
+  html += `</div>`;
+  html += `<div style="display:flex;justify-content:space-between;margin-bottom:16px;">`;
+  html += `<div><span style="display:inline-block;padding:4px 14px;border:2px solid #000;font-weight:bold;font-size:14px;text-transform:uppercase;border-radius:4px;">${isReferral ? 'REFERRAL SHEET' : 'PRESCRIPTION'}</span>`;
+  html += `<span style="margin-left:12px;font-size:13px;color:#555;">Department: ${docSpecialty}</span></div>`;
+  html += `<div style="font-size:13px;">Date: ${today}</div></div>`;
+  html += `<table style="width:100%;font-size:13px;margin-bottom:16px;border-collapse:collapse;"><tbody>`;
+  html += `<tr><td style="padding:3px 0;font-weight:bold;width:120px;">Student Name:</td><td>${studentName}</td><td style="font-weight:bold;width:60px;">Age:</td><td style="width:50px;">${studentAge}</td><td style="font-weight:bold;width:60px;">Sex:</td><td style="width:50px;">${studentGender}</td></tr>`;
+  html += `<tr><td style="padding:3px 0;font-weight:bold;">Class:</td><td>${studentClass}${studentSection}</td><td style="font-weight:bold;">Father:</td><td colspan="3">${fatherName}</td></tr>`;
+  if (phone) html += `<tr><td style="padding:3px 0;font-weight:bold;">Contact:</td><td colspan="5">${phone}</td></tr>`;
+  html += `</tbody></table>`;
+  html += `<div style="border-top:1px solid #ccc;padding-top:12px;margin-bottom:12px;"><h3 style="font-size:14px;font-weight:bold;margin:0 0 6px;">Clinical Findings</h3>`;
+  html += `<p style="font-size:13px;white-space:pre-wrap;">${d.clinicalFindings || '—'}</p></div>`;
+
+  if (!isReferral) {
+    html += `<div style="border-top:1px solid #ccc;padding-top:12px;margin-bottom:12px;">`;
+    html += `<h3 style="font-size:14px;font-weight:bold;margin:0 0 6px;">Diagnosis</h3><p style="font-size:13px;">${d.diagnosis || '—'}</p>`;
+    html += `<h3 style="font-size:14px;font-weight:bold;margin:12px 0 6px;">Prescription (Rx)</h3>`;
+    if ((d.medicines || []).length > 0) {
+      html += `<table style="width:100%;font-size:13px;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid #999;">`;
+      html += `<th style="text-align:left;padding:4px;font-weight:bold;">#</th><th style="text-align:left;padding:4px;font-weight:bold;">Medicine</th><th style="text-align:left;padding:4px;font-weight:bold;">Dosage</th><th style="text-align:left;padding:4px;font-weight:bold;">Freq</th><th style="text-align:left;padding:4px;font-weight:bold;">Duration</th></tr></thead><tbody>`;
+      (d.medicines || []).forEach((m: any, i: number) => {
+        html += `<tr style="border-bottom:1px solid #eee;"><td style="padding:4px;">${i + 1}.</td><td style="padding:4px;">${m.name || '—'}</td><td style="padding:4px;">${m.dosage || '—'}</td><td style="padding:4px;">${m.frequency || '—'}</td><td style="padding:4px;">${m.duration || '—'}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    } else {
+      html += `<p style="font-size:13px;color:#999;">No medicines prescribed.</p>`;
+    }
+    if (d.advice) html += `<div style="margin-top:12px;"><h3 style="font-size:14px;font-weight:bold;margin:0 0 6px;">Advice</h3><p style="font-size:13px;white-space:pre-wrap;">${d.advice}</p></div>`;
+    html += `</div>`;
+  } else {
+    html += `<div style="border-top:1px solid #ccc;padding-top:12px;margin-bottom:12px;">`;
+    html += `<h3 style="font-size:14px;font-weight:bold;margin:0 0 6px;">Reason for Referral</h3>`;
+    html += `<p style="font-size:13px;white-space:pre-wrap;">${d.referralReason || '—'}</p>`;
+    html += `<div style="display:flex;gap:40px;margin-top:10px;">`;
+    html += `<div><span style="font-weight:bold;font-size:13px;">Recommended Dept/Hospital: </span><span style="font-size:13px;">${d.referralDept || '—'}</span></div>`;
+    html += `<div><span style="font-weight:bold;font-size:13px;">Urgency: </span><span style="font-size:13px;">${d.urgency || 'Routine'}</span></div></div></div>`;
+  }
+
+  html += `<div style="border-top:2px solid #000;padding-top:16px;margin-top:30px;display:flex;justify-content:space-between;">`;
+  html += `<div style="font-size:13px;"><p style="font-weight:bold;">${doctorName}</p><p style="color:#555;">${docSpecialty}</p></div>`;
+  html += `<div style="text-align:right;font-size:13px;"><p style="margin-top:30px;border-top:1px solid #000;padding-top:4px;">Signature</p></div></div></div>`;
+  return html;
+}
+
+function buildPrintableHTML(d: any, doctorInfo: any, studentInfo: any, campName: string, isReferral: boolean, specialty: string, today: string): string {
+  return `<html><head><title>Print Document</title><style>body{margin:0;padding:0;font-family:serif;}@page{size:A4;margin:15mm;}</style></head><body>${buildDocumentBody(d, doctorInfo, studentInfo, campName, isReferral, specialty, today)}</body></html>`;
+}
+
+// ════════════════════════════════════════
 // ██ OPTION A: ROSTER MANAGEMENT
 // ════════════════════════════════════════
 function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
@@ -247,20 +332,34 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const [showCSVUpload, setShowCSVUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState('');
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [viewingDocsStudent, setViewingDocsStudent] = useState<Student | null>(null);
+  const [studentDocs, setStudentDocs] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [bulkPrinting, setBulkPrinting] = useState(false);
+  const bulkPrintRef = useRef<HTMLDivElement>(null);
+
+  const CLASSES = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  const SECTIONS = ['A', 'B', 'C', 'D', 'E'];
 
   const fetchStudents = () => {
     setLoading(true);
     const params = new URLSearchParams({ event_id: String(eventId) });
     if (searchQuery) params.set('query', searchQuery);
     if (statusFilter) params.set('assessment', statusFilter);
+    if (classFilter) params.set('class', classFilter);
+    if (sectionFilter) params.set('section', sectionFilter);
+    if (genderFilter) params.set('gender', genderFilter);
     fetch(`/api/students/search?${params}`)
       .then(r => r.json())
       .then(data => { setStudents(data); setLoading(false); })
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetchStudents(); }, [eventId, searchQuery, statusFilter]);
+  useEffect(() => { fetchStudents(); }, [eventId, searchQuery, statusFilter, classFilter, sectionFilter, genderFilter]);
 
   // Real-time Socket.IO listener for live roster updates
   useEffect(() => {
@@ -289,6 +388,78 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const totalStudents = students.length;
   const examinedStudents = students.filter(s => s.is_examined).length;
   const progressPct = totalStudents > 0 ? Math.round((examinedStudents / totalStudents) * 100) : 0;
+
+  // Count students with O or R assessment for bulk print badge
+  const docStudents = students.filter(s => s.assessment === 'O' || s.assessment === 'R');
+  const docCount = docStudents.length;
+
+  // View docs for a single student
+  const handleViewDocs = async (student: Student) => {
+    setViewingDocsStudent(student);
+    setLoadingDocs(true);
+    try {
+      const res = await fetch(`/api/students/${student.student_id}/all-records?event_id=${eventId}`);
+      const data = await res.json();
+      const docs = (data.records || []).filter((r: any) => {
+        const parsed = r.parsed_data || {};
+        return parsed.status === 'O' || parsed.status === 'R';
+      });
+      setStudentDocs(docs);
+    } catch { setStudentDocs([]); }
+    finally { setLoadingDocs(false); }
+  };
+
+  // Print a single document
+  const handlePrintDoc = (record: any) => {
+    const d = record.parsed_data || {};
+    const isReferral = d.status === 'R';
+    const specialty = (record.category || '').replace(/_/g, ' ');
+    const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const s = viewingDocsStudent;
+    const html = buildPrintableHTML(d, { name: record.doctor_id, role: record.category }, s, '', isReferral, specialty, today);
+    const pw = window.open('', '_blank');
+    if (!pw) return;
+    pw.document.write(html);
+    pw.document.close();
+    pw.focus();
+    setTimeout(() => { pw.print(); pw.close(); }, 300);
+  };
+
+  // Bulk print all docs
+  const handleBulkPrint = async () => {
+    setBulkPrinting(true);
+    try {
+      const allDocs: { student: Student; record: any }[] = [];
+      for (const s of docStudents) {
+        const res = await fetch(`/api/students/${s.student_id}/all-records?event_id=${eventId}`);
+        const data = await res.json();
+        const docs = (data.records || []).filter((r: any) => {
+          const parsed = r.parsed_data || {};
+          return parsed.status === 'O' || parsed.status === 'R';
+        });
+        for (const doc of docs) {
+          allDocs.push({ student: data.student || s, record: doc });
+        }
+      }
+      if (allDocs.length === 0) { setBulkPrinting(false); return; }
+      const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      let fullHTML = '<html><head><title>Print All Documents</title><style>body{margin:0;padding:0;font-family:serif;}@page{size:A4;margin:15mm;}.page-break{page-break-after:always;}</style></head><body>';
+      allDocs.forEach((item, idx) => {
+        const d = item.record.parsed_data || {};
+        const isReferral = d.status === 'R';
+        const specialty = (item.record.category || '').replace(/_/g, ' ');
+        fullHTML += buildDocumentBody(d, { name: item.record.doctor_id, role: item.record.category }, item.student, '', isReferral, specialty, today);
+        if (idx < allDocs.length - 1) fullHTML += '<div class="page-break"></div>';
+      });
+      fullHTML += '</body></html>';
+      const pw = window.open('', '_blank');
+      if (!pw) { setBulkPrinting(false); return; }
+      pw.document.write(fullHTML);
+      pw.document.close();
+      pw.focus();
+      setTimeout(() => { pw.print(); pw.close(); setBulkPrinting(false); }, 300);
+    } catch { setBulkPrinting(false); }
+  };
 
   // If editing a student's general info, show the form
   if (editingStudent) {
@@ -348,8 +519,8 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
         </div>
       </div>
 
-      {/* Search + Actions */}
-      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800">
+      {/* Search + Filters + Actions */}
+      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800 space-y-3">
         <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-500 w-4 h-4" />
@@ -357,13 +528,6 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all text-sm" />
           </div>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-            className="w-full md:w-auto bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all">
-            <option value="">All Statuses</option>
-            <option value="N">Normal</option>
-            <option value="O">Observation</option>
-            <option value="R">Referral</option>
-          </select>
           <div className="flex space-x-3">
             <button onClick={() => setShowAddModal(true)}
               className="flex-1 md:flex-none bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 shadow-lg whitespace-nowrap text-sm">
@@ -373,7 +537,44 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
               className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 text-violet-400 border border-slate-700 hover:border-violet-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 whitespace-nowrap text-sm">
               <Upload className="w-4 h-4" /><span>CSV Upload</span>
             </button>
+            {docCount > 0 && (
+              <button onClick={handleBulkPrint} disabled={bulkPrinting}
+                className="flex-1 md:flex-none bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 whitespace-nowrap text-sm disabled:opacity-50">
+                <Printer className="w-4 h-4" /><span>{bulkPrinting ? 'Loading...' : `Print All Docs (${docCount})`}</span>
+              </button>
+            )}
           </div>
+        </div>
+        {/* Filter Row */}
+        <div className="flex items-center flex-wrap gap-2">
+          <span className="text-xs text-slate-500 font-medium">Filters:</span>
+          <select value={classFilter} onChange={e => setClassFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Classes</option>
+            {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
+          </select>
+          <select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Sections</option>
+            {SECTIONS.map(s => <option key={s} value={s}>Section {s}</option>)}
+          </select>
+          <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Sex</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Statuses</option>
+            <option value="N">Normal</option>
+            <option value="O">Observation</option>
+            <option value="R">Referral</option>
+          </select>
+          {(classFilter || sectionFilter || genderFilter || statusFilter) && (
+            <button onClick={() => { setClassFilter(''); setSectionFilter(''); setGenderFilter(''); setStatusFilter(''); }}
+              className="text-xs text-red-400 underline">Clear</button>
+          )}
         </div>
       </div>
 
@@ -424,6 +625,12 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                           className="bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 border border-violet-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5">
                           <ClipboardList className="w-3 h-3" /><span className="hidden sm:inline">Fill Info</span>
                         </button>
+                        {(s.assessment === 'O' || s.assessment === 'R') && (
+                          <button onClick={() => handleViewDocs(s)}
+                            className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5">
+                            <FileText className="w-3 h-3" /><span className="hidden sm:inline">View Docs</span>
+                          </button>
+                        )}
                         {!s.is_examined && (
                           <button onClick={() => toggleAbsent(s.student_id, s.status)}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">
@@ -442,6 +649,67 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 
       {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onCreated={() => { setShowAddModal(false); fetchStudents(); }} userId={user.username} eventId={eventId} />}
       {showCSVUpload && <CSVUploadPanel eventId={eventId} userId={user.username} onClose={() => setShowCSVUpload(false)} onDone={() => { setShowCSVUpload(false); fetchStudents(); }} />}
+
+      {/* Document Viewer Modal */}
+      {viewingDocsStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setViewingDocsStudent(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setViewingDocsStudent(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-amber-400" />
+              {viewingDocsStudent.name} — Documents
+            </h3>
+            {loadingDocs ? (
+              <div className="text-center py-8 text-slate-400">Loading documents...</div>
+            ) : studentDocs.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">No prescriptions or referrals found.</div>
+            ) : (
+              <div className="space-y-3">
+                {studentDocs.map((rec: any, i: number) => {
+                  const d = rec.parsed_data || {};
+                  const isReferral = d.status === 'R';
+                  const specialty = (rec.category || '').replace(/_/g, ' ');
+                  return (
+                    <div key={i} className={`rounded-2xl p-4 border ${isReferral ? 'bg-red-500/5 border-red-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-xs font-bold uppercase ${isReferral ? 'text-red-400' : 'text-amber-400'}`}>
+                            {isReferral ? '🏥 Referral' : '📝 Prescription'}
+                          </span>
+                          <span className="text-xs text-slate-500">— {specialty}</span>
+                        </div>
+                        <button onClick={() => handlePrintDoc(rec)}
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                            isReferral ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border-amber-500/30'
+                          }`}>
+                          <Printer className="w-3 h-3" /><span>Print</span>
+                        </button>
+                      </div>
+                      <div className="space-y-1 text-xs text-slate-300">
+                        <p><span className="text-slate-500">Doctor:</span> {rec.doctor_id}</p>
+                        {d.clinicalFindings && <p><span className="text-slate-500">Findings:</span> {d.clinicalFindings}</p>}
+                        {d.diagnosis && <p><span className="text-slate-500">Dx:</span> {d.diagnosis}</p>}
+                        {(d.medicines || []).length > 0 && (
+                          <div>
+                            <span className="text-slate-500">Rx:</span>
+                            {d.medicines.map((m: any, j: number) => (
+                              <span key={j} className="ml-1">{m.name} {m.dosage} {m.frequency} {m.duration}{j < d.medicines.length - 1 ? ',' : ''}</span>
+                            ))}
+                          </div>
+                        )}
+                        {d.advice && <p><span className="text-slate-500">Advice:</span> {d.advice}</p>}
+                        {d.referralReason && <p><span className="text-slate-500">Reason:</span> {d.referralReason}</p>}
+                        {d.referralDept && <p><span className="text-slate-500">Refer to:</span> {d.referralDept}</p>}
+                        {d.urgency && <p><span className="text-slate-500">Urgency:</span> {d.urgency}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -781,17 +1049,59 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
 function ProgressTracking({ eventId }: { eventId: number }) {
   const [stats, setStats] = useState<EventStats | null>(null);
   const [expandedReferral, setExpandedReferral] = useState<number | null>(null);
+  const [classFilter, setClassFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState('');
+
+  const CLASSES_PT = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  const SECTIONS_PT = ['A', 'B', 'C', 'D', 'E'];
 
   useEffect(() => {
-    fetch(`/api/events/${eventId}/stats`)
+    const params = new URLSearchParams();
+    if (classFilter) params.set('student_class', classFilter);
+    if (sectionFilter) params.set('section', sectionFilter);
+    if (genderFilter) params.set('gender', genderFilter);
+    const qs = params.toString();
+    fetch(`/api/events/${eventId}/stats${qs ? '?' + qs : ''}`)
       .then(r => r.json())
       .then(setStats);
-  }, [eventId]);
+  }, [eventId, classFilter, sectionFilter, genderFilter]);
 
   if (!stats) return <div className="text-center py-8 text-slate-400">Loading statistics...</div>;
 
+  type DeptCounts = { N: number; O: number; R: number };
+  const deptEntries = Object.entries(stats.dept_breakdown || {}).sort((a, b) => a[0].localeCompare(b[0])) as [string, DeptCounts][];
+  const formatDept = (d: string) => d.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
   return (
     <div className="space-y-4">
+      {/* Filters */}
+      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800">
+        <div className="flex items-center flex-wrap gap-2">
+          <span className="text-xs text-slate-500 font-medium">Filters:</span>
+          <select value={classFilter} onChange={e => setClassFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Classes</option>
+            {CLASSES_PT.map(c => <option key={c} value={c}>Class {c}</option>)}
+          </select>
+          <select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Sections</option>
+            {SECTIONS_PT.map(s => <option key={s} value={s}>Section {s}</option>)}
+          </select>
+          <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
+            <option value="">All Sex</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select>
+          {(classFilter || sectionFilter || genderFilter) && (
+            <button onClick={() => { setClassFilter(''); setSectionFilter(''); setGenderFilter(''); }}
+              className="text-xs text-red-400 underline">Clear</button>
+          )}
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <StatCard label="Total Students" value={stats.total_students} color="text-violet-400" />
@@ -814,6 +1124,47 @@ function ProgressTracking({ eventId }: { eventId: number }) {
           <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
             <div className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-700 ease-out"
               style={{ width: `${Math.round((stats.screened / stats.total_students) * 100)}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Department Breakdown Table */}
+      {deptEntries.length > 0 && (
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-800">
+            <h3 className="text-sm font-bold text-white">Department Breakdown</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-slate-500 border-b border-slate-800 bg-slate-950/50">
+                <tr>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Department</th>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider text-center">Normal</th>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider text-center">Observation</th>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider text-center">Referred</th>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider text-center">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {deptEntries.map(([dept, counts]) => (
+                  <tr key={dept} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-5 py-3 text-white font-medium">{formatDept(dept)}</td>
+                    <td className="px-5 py-3 text-center">
+                      <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-xs font-bold">{counts.N}</span>
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 rounded-full text-xs font-bold">{counts.O}</span>
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-2.5 py-0.5 rounded-full text-xs font-bold">{counts.R}</span>
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <span className="text-slate-300 text-xs font-bold">{counts.N + counts.O + counts.R}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

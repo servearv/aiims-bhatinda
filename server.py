@@ -905,7 +905,7 @@ def api_active_events():
                (SELECT COUNT(DISTINCT hr.student_id) FROM Health_Records hr
                 WHERE hr.event_id = e.event_id) AS screened_count
         FROM Events e
-        WHERE e.tag IN ('Upcoming', 'Ongoing')
+        WHERE (e.tag IS NULL OR e.tag != 'Cancelled') AND e.end_date >= CURRENT_DATE
         ORDER BY e.start_date DESC
     """).fetchall()
     conn.close()
@@ -1150,53 +1150,85 @@ def api_search_schools():
 @app.route("/api/events/<int:event_id>/stats")
 def api_event_stats(event_id):
     conn = get_db()
+
+    # Optional filters
+    student_class = request.args.get("student_class", "").strip()
+    section = request.args.get("section", "").strip()
+    gender = request.args.get("gender", "").strip()
+
+    student_conditions = ["s.event_id = ?"]
+    student_params = [event_id]
+    if student_class:
+        student_conditions.append("s.student_class = ?")
+        student_params.append(student_class)
+    if section:
+        student_conditions.append("s.section = ?")
+        student_params.append(section)
+    if gender:
+        student_conditions.append("s.gender = ?")
+        student_params.append(gender)
+
+    student_where = " AND ".join(student_conditions)
+
     total_students = conn.execute(
-        "SELECT COUNT(*) AS c FROM Students WHERE event_id = ?",
-        (event_id,),
+        f"SELECT COUNT(*) AS c FROM Students s WHERE {student_where}",
+        student_params,
     ).fetchone()["c"]
 
     absent = conn.execute(
-        "SELECT COUNT(*) AS c FROM Students WHERE event_id = ? AND status = 'Absent'",
-        (event_id,),
+        f"SELECT COUNT(*) AS c FROM Students s WHERE {student_where} AND s.status = 'Absent'",
+        student_params,
     ).fetchone()["c"]
 
-    # Count distinct students with ANY health record
+    # Count distinct students with ANY health record (filtered)
+    hr_join_where = student_where.replace("s.", "st.")
     screened = conn.execute(
-        "SELECT COUNT(DISTINCT student_id) AS c FROM Health_Records "
-        "WHERE event_id = ?",
-        (event_id,),
+        f"SELECT COUNT(DISTINCT hr.student_id) AS c FROM Health_Records hr "
+        f"JOIN Students st ON hr.student_id = st.student_id "
+        f"WHERE hr.event_id = ? AND {hr_join_where}",
+        [event_id] + student_params[1:],
     ).fetchone()["c"]
 
-    # Count assessments (check both FullExam and specialist-category records)
+    # Count assessments + per-department breakdown
     normal = 0
     observation = 0
     referred = 0
+    dept_breakdown = {}  # { category: { N: count, O: count, R: count } }
+
     records = conn.execute(
-        "SELECT json_data FROM Health_Records WHERE event_id = ?",
-        (event_id,),
+        f"SELECT hr.json_data, hr.category FROM Health_Records hr "
+        f"JOIN Students st ON hr.student_id = st.student_id "
+        f"WHERE hr.event_id = ? AND {hr_join_where}",
+        [event_id] + student_params[1:],
     ).fetchall()
     for r in records:
         try:
             d = json.loads(r["json_data"])
             a = d.get("assessment", "")
+            cat = r["category"] or "Other"
+            if cat not in dept_breakdown:
+                dept_breakdown[cat] = {"N": 0, "O": 0, "R": 0}
             if a == "N":
                 normal += 1
+                dept_breakdown[cat]["N"] += 1
             elif a == "O":
                 observation += 1
+                dept_breakdown[cat]["O"] += 1
             elif a == "R":
                 referred += 1
+                dept_breakdown[cat]["R"] += 1
         except Exception:
             pass
 
-    # Get individual health records
-    hr_rows = conn.execute("""
-        SELECT hr.record_id, hr.student_id, s.name AS student_name,
+    # Get individual health records (filtered)
+    hr_rows = conn.execute(f"""
+        SELECT hr.record_id, hr.student_id, st.name AS student_name,
                hr.doctor_id, hr.category, hr.json_data, hr.timestamp
         FROM Health_Records hr
-        JOIN Students s ON hr.student_id = s.student_id
-        WHERE hr.event_id = ?
+        JOIN Students st ON hr.student_id = st.student_id
+        WHERE hr.event_id = ? AND {hr_join_where}
         ORDER BY hr.timestamp DESC
-    """, (event_id,)).fetchall()
+    """, [event_id] + student_params[1:]).fetchall()
 
     # Get active volunteers (replaces old staff query)
     volunteers = conn.execute("""
@@ -1214,6 +1246,7 @@ def api_event_stats(event_id):
         "observation": observation,
         "referred": referred,
         "absent": absent,
+        "dept_breakdown": dept_breakdown,
         "records": rows_to_list(hr_rows),
         "staff": rows_to_list(volunteers),   # keep key for frontend compat
     })

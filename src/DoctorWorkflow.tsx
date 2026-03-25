@@ -3,7 +3,7 @@ import {
   Search, Plus, ChevronDown, ChevronRight, X, Save,
   ArrowRight, AlertTriangle, Eye, Ear, Stethoscope,
   Activity, Check, UserPlus, Calendar, HeartPulse, Scan,
-  Users, CheckCircle, Loader2, ClipboardList
+  Users, CheckCircle, Loader2, ClipboardList, Printer, Trash2, PlusCircle, FileText
 } from 'lucide-react';
 import { GeneralInfoSummary } from './GeneralInfoForm';
 
@@ -385,7 +385,7 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
 // ════════════════════════════════════════════════
 
 // --- Ophthalmology Form ---
-function EyeExamForm({ data, onChange, disabled }: { data: any; onChange: (d: any) => void; disabled?: boolean }) {
+function EyeExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   const statusIsNormal = data.status === 'N';
   return (
@@ -407,13 +407,13 @@ function EyeExamForm({ data, onChange, disabled }: { data: any; onChange: (d: an
           </div>
         </div>
       </div>
-      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} />
+      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
     </SectionCard>
   );
 }
 
 // --- Dental Form ---
-function DentalExamForm({ data, onChange, disabled }: { data: any; onChange: (d: any) => void; disabled?: boolean }) {
+function DentalExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
     <SectionCard title="Dental Examination" icon={<span className="text-base">🦷</span>}>
@@ -441,13 +441,13 @@ function DentalExamForm({ data, onChange, disabled }: { data: any; onChange: (d:
           </div>
         </div>
       </div>
-      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} />
+      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
     </SectionCard>
   );
 }
 
 // --- ENT Form ---
-function ENTExamForm({ data, onChange, disabled }: { data: any; onChange: (d: any) => void; disabled?: boolean }) {
+function ENTExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
     <SectionCard title="ENT Examination" icon={<Ear className="w-4 h-4 text-amber-400" />}>
@@ -456,13 +456,13 @@ function ENTExamForm({ data, onChange, disabled }: { data: any; onChange: (d: an
         <FormInput label="Nose Examination" value={data.nose || ''} onChange={v => u('nose', v)} id="ent-nose" placeholder="NAD or specify" disabled={disabled} />
         <FormInput label="Throat Examination" value={data.throat || ''} onChange={v => u('throat', v)} id="ent-throat" placeholder="NAD or specify" disabled={disabled} />
       </div>
-      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} />
+      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
     </SectionCard>
   );
 }
 
 // --- Skin Form ---
-function SkinExamForm({ data, onChange, disabled }: { data: any; onChange: (d: any) => void; disabled?: boolean }) {
+function SkinExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
     <SectionCard title="Dermatology Examination" icon={<Scan className="w-4 h-4 text-violet-400" />}>
@@ -470,13 +470,13 @@ function SkinExamForm({ data, onChange, disabled }: { data: any; onChange: (d: a
         <FormInput label="Skin, Nails & Hair Examination" value={data.skinExam || ''} onChange={v => u('skinExam', v)}
           id="skin-exam" placeholder='e.g. "Seborrheic dermatitis / crusting on scalp"' disabled={disabled} />
       </div>
-      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} />
+      <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
     </SectionCard>
   );
 }
 
 // --- Community Medicine Form ---
-function CommunityMedForm({ data, onChange, disabled }: { data: any; onChange: (d: any) => void; disabled?: boolean }) {
+function CommunityMedForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   const PAST_HISTORY = ['Jaundice', 'Allergies', 'Blood Transfusion', 'Major Illness/Surgery'];
   const VACCINATIONS = ['Hep-B', 'Typhoid', 'D.T. & Polio', 'Tetanus'];
@@ -583,16 +583,141 @@ function CommunityMedForm({ data, onChange, disabled }: { data: any; onChange: (
       </SectionCard>
 
       <SectionCard title="Final Assessment" icon={<Stethoscope className="w-4 h-4 text-indigo-400" />}>
-        <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} />
+        <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
       </SectionCard>
     </>
   );
 }
 
-// --- Shared Status + Remarks component ---
-function StatusAndRemarks({ data, onChange, disabled }: { data: any; onChange: (d: any) => void; disabled?: boolean }) {
+// --- Shared Status + Prescription/Referral component ---
+const FREQUENCIES = ['OD', 'BD', 'TDS', 'QID', 'SOS', 'HS'];
+
+function PrintableDocument({ data, doctorInfo, studentInfo, campName }: { data: any; doctorInfo?: any; studentInfo?: any; campName?: string }) {
+  const isReferral = data.status === 'R';
+  const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const specialty = (doctorInfo?.role || '').replace(/_/g, ' ');
+  return (
+    <div className="printable-document" style={{ fontFamily: 'serif', color: '#000', background: '#fff', padding: '40px', maxWidth: '210mm', margin: '0 auto' }}>
+      <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '12px', marginBottom: '20px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>AIIMS BATHINDA — SCHOOL HEALTH CAMP</h1>
+        <p style={{ fontSize: '12px', margin: '4px 0 0', color: '#555' }}>{campName || ''}</p>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div>
+          <span style={{ display: 'inline-block', padding: '4px 14px', border: '2px solid #000', fontWeight: 'bold', fontSize: '14px', textTransform: 'uppercase', borderRadius: '4px' }}>
+            {isReferral ? 'REFERRAL SHEET' : 'PRESCRIPTION'}
+          </span>
+          <span style={{ marginLeft: '12px', fontSize: '13px', color: '#555' }}>Department: {specialty}</span>
+        </div>
+        <div style={{ fontSize: '13px' }}>Date: {today}</div>
+      </div>
+      <table style={{ width: '100%', fontSize: '13px', marginBottom: '16px', borderCollapse: 'collapse' }}>
+        <tbody>
+          <tr><td style={{ padding: '3px 0', fontWeight: 'bold', width: '120px' }}>Student Name:</td><td>{studentInfo?.name || '—'}</td><td style={{ fontWeight: 'bold', width: '60px' }}>Age:</td><td style={{ width: '50px' }}>{studentInfo?.age || '—'}</td><td style={{ fontWeight: 'bold', width: '60px' }}>Sex:</td><td style={{ width: '50px' }}>{studentInfo?.gender === 'M' ? 'Male' : studentInfo?.gender === 'F' ? 'Female' : '—'}</td></tr>
+          <tr><td style={{ padding: '3px 0', fontWeight: 'bold' }}>Class:</td><td>{studentInfo?.student_class || '—'}{studentInfo?.section ? `-${studentInfo.section}` : ''}</td><td style={{ fontWeight: 'bold' }}>Father:</td><td colSpan={3}>{studentInfo?.father_name || '—'}</td></tr>
+          {studentInfo?.phone && <tr><td style={{ padding: '3px 0', fontWeight: 'bold' }}>Contact:</td><td colSpan={5}>{studentInfo.phone}</td></tr>}
+        </tbody>
+      </table>
+      <div style={{ borderTop: '1px solid #ccc', paddingTop: '12px', marginBottom: '12px' }}>
+        <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 6px' }}>Clinical Findings</h3>
+        <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap' }}>{data.clinicalFindings || '—'}</p>
+      </div>
+      {!isReferral && (
+        <div style={{ borderTop: '1px solid #ccc', paddingTop: '12px', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 6px' }}>Diagnosis</h3>
+          <p style={{ fontSize: '13px' }}>{data.diagnosis || '—'}</p>
+          <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: '12px 0 6px' }}>Prescription (Rx)</h3>
+          {(data.medicines || []).length > 0 ? (
+            <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+              <thead><tr style={{ borderBottom: '1px solid #999' }}>
+                <th style={{ textAlign: 'left', padding: '4px', fontWeight: 'bold' }}>#</th>
+                <th style={{ textAlign: 'left', padding: '4px', fontWeight: 'bold' }}>Medicine</th>
+                <th style={{ textAlign: 'left', padding: '4px', fontWeight: 'bold' }}>Dosage</th>
+                <th style={{ textAlign: 'left', padding: '4px', fontWeight: 'bold' }}>Freq</th>
+                <th style={{ textAlign: 'left', padding: '4px', fontWeight: 'bold' }}>Duration</th>
+              </tr></thead>
+              <tbody>
+                {(data.medicines || []).map((m: any, i: number) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '4px' }}>{i + 1}.</td>
+                    <td style={{ padding: '4px' }}>{m.name || '—'}</td>
+                    <td style={{ padding: '4px' }}>{m.dosage || '—'}</td>
+                    <td style={{ padding: '4px' }}>{m.frequency || '—'}</td>
+                    <td style={{ padding: '4px' }}>{m.duration || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p style={{ fontSize: '13px', color: '#999' }}>No medicines prescribed.</p>}
+          {data.advice && (
+            <div style={{ marginTop: '12px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 6px' }}>Advice</h3>
+              <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap' }}>{data.advice}</p>
+            </div>
+          )}
+        </div>
+      )}
+      {isReferral && (
+        <div style={{ borderTop: '1px solid #ccc', paddingTop: '12px', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 'bold', margin: '0 0 6px' }}>Reason for Referral</h3>
+          <p style={{ fontSize: '13px', whiteSpace: 'pre-wrap' }}>{data.referralReason || '—'}</p>
+          <div style={{ display: 'flex', gap: '40px', marginTop: '10px' }}>
+            <div><span style={{ fontWeight: 'bold', fontSize: '13px' }}>Recommended Dept/Hospital: </span><span style={{ fontSize: '13px' }}>{data.referralDept || '—'}</span></div>
+            <div><span style={{ fontWeight: 'bold', fontSize: '13px' }}>Urgency: </span><span style={{ fontSize: '13px' }}>{data.urgency || 'Routine'}</span></div>
+          </div>
+        </div>
+      )}
+      <div style={{ borderTop: '2px solid #000', paddingTop: '16px', marginTop: '30px', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: '13px' }}>
+          <p style={{ fontWeight: 'bold' }}>{doctorInfo?.name || doctorInfo?.username || '—'}</p>
+          <p style={{ color: '#555' }}>{specialty}</p>
+        </div>
+        <div style={{ textAlign: 'right', fontSize: '13px' }}>
+          <p style={{ marginTop: '30px', borderTop: '1px solid #000', paddingTop: '4px' }}>Signature</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, campName }: {
+  data: any; onChange: (d: any) => void; disabled?: boolean;
+  doctorInfo?: any; studentInfo?: any; campName?: string;
+}) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   const statusIsNormal = data.status === 'N';
+  const isObservation = data.status === 'O';
+  const isReferred = data.status === 'R';
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const addMedicine = () => {
+    const meds = data.medicines || [];
+    onChange({ ...data, medicines: [...meds, { name: '', dosage: '', frequency: 'OD', duration: '' }] });
+  };
+  const updateMedicine = (idx: number, field: string, value: string) => {
+    const meds = [...(data.medicines || [])];
+    meds[idx] = { ...meds[idx], [field]: value };
+    onChange({ ...data, medicines: meds });
+  };
+  const removeMedicine = (idx: number) => {
+    const meds = [...(data.medicines || [])];
+    meds.splice(idx, 1);
+    onChange({ ...data, medicines: meds });
+  };
+
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`<html><head><title>Print Document</title><style>body{margin:0;padding:0;font-family:serif;}@page{size:A4;margin:15mm;}</style></head><body>`);
+    printWindow.document.write(printContent.innerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);
+  };
+
   return (
     <div className="mt-4 space-y-3">
       <div>
@@ -612,16 +737,160 @@ function StatusAndRemarks({ data, onChange, disabled }: { data: any; onChange: (
           ))}
         </div>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
-          Diagnosis / Remarks {statusIsNormal && <span className="text-slate-600 normal-case">(select Observation or Referred to enable)</span>}
-        </label>
-        <textarea value={data.remarks || ''} onChange={e => u('remarks', e.target.value)}
-          rows={2} placeholder={statusIsNormal ? 'No remarks needed for Normal status' : 'Enter diagnosis/remarks...'}
-          disabled={disabled || statusIsNormal}
-          className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm resize-none transition-all ${
-            statusIsNormal ? 'border-slate-800 opacity-40 cursor-not-allowed' : 'border-slate-800 focus:ring-2 focus:ring-cyan-500/50'
-          }`} />
+
+      {/* Normal — show nothing extra */}
+      {statusIsNormal && (
+        <p className="text-xs text-slate-600 italic">No prescription or referral needed for Normal status.</p>
+      )}
+
+      {/* Observation — Prescription form */}
+      {isObservation && !disabled && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in duration-300">
+          <div className="flex items-center space-x-2 mb-1">
+            <FileText className="w-4 h-4 text-amber-400" />
+            <span className="text-sm font-bold text-amber-400 uppercase tracking-wider">Prescription</span>
+          </div>
+          {/* Auto-filled info */}
+          <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+            <div><span className="text-slate-600">Doctor:</span> {doctorInfo?.name || doctorInfo?.username || '—'} ({(doctorInfo?.role || '').replace(/_/g, ' ')})</div>
+            <div><span className="text-slate-600">Date:</span> {new Date().toLocaleDateString('en-IN')}</div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Clinical Findings</label>
+            <textarea value={data.clinicalFindings || ''} onChange={e => u('clinicalFindings', e.target.value)}
+              rows={2} placeholder="Summarize clinical findings..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-amber-500/50" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Diagnosis</label>
+            <input value={data.diagnosis || ''} onChange={e => u('diagnosis', e.target.value)}
+              placeholder="e.g. Myopia, Dental Caries"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-amber-500/50" />
+          </div>
+          {/* Medicines Repeater */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Medicines (Rx)</label>
+            <div className="space-y-2">
+              {(data.medicines || []).map((med: any, idx: number) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                  <input value={med.name} onChange={e => updateMedicine(idx, 'name', e.target.value)}
+                    placeholder="Medicine name" className="col-span-4 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-white text-xs" />
+                  <input value={med.dosage} onChange={e => updateMedicine(idx, 'dosage', e.target.value)}
+                    placeholder="Dosage" className="col-span-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-white text-xs" />
+                  <select value={med.frequency} onChange={e => updateMedicine(idx, 'frequency', e.target.value)}
+                    className="col-span-2 bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white text-xs">
+                    {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  <input value={med.duration} onChange={e => updateMedicine(idx, 'duration', e.target.value)}
+                    placeholder="Duration" className="col-span-3 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-white text-xs" />
+                  <button type="button" onClick={() => removeMedicine(idx)} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={addMedicine}
+              className="mt-2 flex items-center space-x-1.5 text-xs text-amber-400 hover:text-amber-300 font-medium">
+              <PlusCircle className="w-3.5 h-3.5" /><span>Add Medicine</span>
+            </button>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">General Advice</label>
+            <textarea value={data.advice || ''} onChange={e => u('advice', e.target.value)}
+              rows={2} placeholder="Follow-up advice, precautions..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-amber-500/50" />
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={handlePrint}
+              className="flex items-center space-x-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-4 py-2 rounded-xl text-sm font-bold transition-all">
+              <Printer className="w-4 h-4" /><span>Print Prescription</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Referred — Referral form */}
+      {isReferred && !disabled && (
+        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in duration-300">
+          <div className="flex items-center space-x-2 mb-1">
+            <FileText className="w-4 h-4 text-red-400" />
+            <span className="text-sm font-bold text-red-400 uppercase tracking-wider">Referral Sheet</span>
+          </div>
+          {/* Auto-filled info */}
+          <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+            <div><span className="text-slate-600">Referring Doctor:</span> {doctorInfo?.name || doctorInfo?.username || '—'} ({(doctorInfo?.role || '').replace(/_/g, ' ')})</div>
+            <div><span className="text-slate-600">Date:</span> {new Date().toLocaleDateString('en-IN')}</div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Clinical Findings</label>
+            <textarea value={data.clinicalFindings || ''} onChange={e => u('clinicalFindings', e.target.value)}
+              rows={2} placeholder="Summarize clinical findings..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-red-500/50" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Reason for Referral</label>
+            <textarea value={data.referralReason || ''} onChange={e => u('referralReason', e.target.value)}
+              rows={2} placeholder="Why is this student being referred?"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-red-500/50" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Recommended Dept / Hospital</label>
+            <input value={data.referralDept || ''} onChange={e => u('referralDept', e.target.value)}
+              placeholder="e.g. Ophthalmology, Civil Hospital Bathinda"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-red-500/50" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Urgency</label>
+            <div className="flex space-x-3">
+              {['Routine', 'Priority', 'Urgent'].map(urg => (
+                <button key={urg} type="button" onClick={() => u('urgency', urg)}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs border transition-all ${
+                    data.urgency === urg
+                      ? urg === 'Routine' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                      : urg === 'Priority' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                      : 'bg-red-500/20 text-red-400 border-red-500/40'
+                      : 'bg-slate-950 text-slate-400 border-slate-800'
+                  }`}>
+                  {urg}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={handlePrint}
+              className="flex items-center space-x-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold transition-all">
+              <Printer className="w-4 h-4" /><span>Print Referral Sheet</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Read-only view when disabled and not Normal */}
+      {(isObservation || isReferred) && disabled && (
+        <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4 space-y-2">
+          <span className={`text-xs font-bold uppercase ${isObservation ? 'text-amber-400' : 'text-red-400'}`}>
+            {isObservation ? '📝 Prescription' : '🏥 Referral Sheet'}
+          </span>
+          {data.clinicalFindings && <p className="text-xs text-slate-300"><span className="text-slate-500">Findings:</span> {data.clinicalFindings}</p>}
+          {data.diagnosis && <p className="text-xs text-slate-300"><span className="text-slate-500">Dx:</span> {data.diagnosis}</p>}
+          {(data.medicines || []).length > 0 && (
+            <div className="text-xs text-slate-300">
+              <span className="text-slate-500">Rx:</span>
+              {data.medicines.map((m: any, i: number) => (
+                <span key={i} className="ml-1">{m.name} {m.dosage} {m.frequency} {m.duration}{i < data.medicines.length - 1 ? ',' : ''}</span>
+              ))}
+            </div>
+          )}
+          {data.referralReason && <p className="text-xs text-slate-300"><span className="text-slate-500">Reason:</span> {data.referralReason}</p>}
+          {data.referralDept && <p className="text-xs text-slate-300"><span className="text-slate-500">Refer to:</span> {data.referralDept}</p>}
+          {data.urgency && <p className="text-xs text-slate-300"><span className="text-slate-500">Urgency:</span> {data.urgency}</p>}
+          {data.advice && <p className="text-xs text-slate-300"><span className="text-slate-500">Advice:</span> {data.advice}</p>}
+        </div>
+      )}
+
+      {/* Hidden printable document */}
+      <div ref={printRef} style={{ display: 'none' }}>
+        <PrintableDocument data={data} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
       </div>
     </div>
   );
@@ -1078,12 +1347,12 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
           <GeneralInfoSummary studentId={selectedStudent.student_id} eventId={campId} />
 
           {/* Specialist-specific form */}
-          {specialistCategory === 'Eye_Specialist' && <EyeExamForm data={examData} onChange={handleExamChange} />}
-          {specialistCategory === 'Dental' && <DentalExamForm data={examData} onChange={handleExamChange} />}
-          {specialistCategory === 'ENT' && <ENTExamForm data={examData} onChange={handleExamChange} />}
-          {specialistCategory === 'Skin_Specialist' && <SkinExamForm data={examData} onChange={handleExamChange} />}
-          {specialistCategory === 'Community_Medicine' && <CommunityMedForm data={examData} onChange={handleExamChange} />}
-          {specialistCategory === 'Other' && <CommunityMedForm data={examData} onChange={handleExamChange} />}
+          {specialistCategory === 'Eye_Specialist' && <EyeExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+          {specialistCategory === 'Dental' && <DentalExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+          {specialistCategory === 'ENT' && <ENTExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+          {specialistCategory === 'Skin_Specialist' && <SkinExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+          {specialistCategory === 'Community_Medicine' && <CommunityMedForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+          {specialistCategory === 'Other' && <CommunityMedForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
 
           {/* Other specialists' records (read-only) */}
           <OtherRecordsPanel studentId={selectedStudent.student_id} eventId={campId} currentCategory={specialistCategory} />

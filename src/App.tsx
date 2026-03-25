@@ -6,7 +6,7 @@ import {
   Activity, Stethoscope, ActivitySquare,
   LogOut, ShieldCheck, Sun, Moon, School,
   HeartPulse, Eye, Ear, Scan, Menu, X, User as UserIcon,
-  Mail, KeyRound, ArrowRight, Loader2, Check, AlertCircle, RefreshCw
+  Mail, KeyRound, ArrowRight, Loader2, Check, AlertCircle, RefreshCw, Settings
 } from 'lucide-react';
 
 // --- Types ---
@@ -109,14 +109,20 @@ export default function App() {
         </div>
         
         <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">{user.name}</p>
+                <p className="text-xs text-slate-400">{formatRoleDisplay(user.role)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-white">{user.name}</p>
-              <p className="text-xs text-slate-400">{formatRoleDisplay(user.role)}</p>
-            </div>
+            <button onClick={() => setShowProfile(!showProfile)} title="Profile Settings"
+              className={`p-2 rounded-lg transition-all ${showProfile ? 'bg-violet-500/20 text-violet-400' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -126,11 +132,6 @@ export default function App() {
             {getRoleIcon(user.role)}
             <span className="font-medium">{formatRoleDisplay(user.role)} Dashboard</span>
           </div>
-          <button onClick={() => setShowProfile(!showProfile)}
-            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all ${showProfile ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
-            <UserIcon className="w-5 h-5" />
-            <span className="font-medium">Profile</span>
-          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-800/50 space-y-2">
@@ -164,7 +165,7 @@ export default function App() {
 
         <div className="px-8 pb-8 flex-1 relative z-10">
           {showProfile ? (
-            <ProfileSettings user={user} />
+            <ProfileSettings user={user} onBack={() => setShowProfile(false)} />
           ) : (
             <>
               {user.role === 'Admin' && <AdminDashboard user={user} />}
@@ -551,7 +552,7 @@ function PasswordSetupWizard({ userName, onComplete }: { userName: string; onCom
 // ═══════════════════════════════════════════
 // ██ PROFILE SETTINGS
 // ═══════════════════════════════════════════
-function ProfileSettings({ user }: { user: User }) {
+function ProfileSettings({ user, onBack }: { user: User; onBack: () => void }) {
   // --- Change Display Name ---
   const [newUsername, setNewUsername] = useState(user.username);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
@@ -641,6 +642,10 @@ function ProfileSettings({ user }: { user: User }) {
 
   return (
     <div className="max-w-xl mx-auto space-y-6 animate-in fade-in duration-500">
+      <button onClick={onBack}
+        className="text-slate-400 hover:text-cyan-400 transition-colors text-sm flex items-center space-x-1 mb-4">
+        <ArrowRight className="w-3 h-3 rotate-180" /><span>Back to Dashboard</span>
+      </button>
       <h2 className="text-2xl font-bold text-white tracking-tight flex items-center space-x-2">
         <UserIcon className="w-6 h-6 text-violet-400" /><span>Profile Settings</span>
       </h2>
