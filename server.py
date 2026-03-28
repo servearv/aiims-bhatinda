@@ -2,16 +2,28 @@ import os
 import io
 import csv
 import json
+import logging
 import random
 import string
 import subprocess
 import sys
 import re
 import smtplib
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date, timedelta
 from urllib.parse import urlparse
+
+# ---------------------------------------------------------------------------
+# Logging Configuration
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger('aiims')
 
 try:
     import psycopg2
@@ -420,7 +432,7 @@ def send_email(to_email: str, subject: str, body_html: str):
     smtp_pass = os.environ.get('SMTP_PASSWORD', '')
     sender = os.environ.get('SMTP_EMAIL', '')
     if not smtp_pass or not sender:
-        print(f"[EMAIL SKIPPED] No SMTP_PASSWORD set. Would send to {to_email}: {subject}")
+        logger.warning(f"Email skipped (no SMTP credentials). To: {to_email}, Subject: {subject}")
         return False
     try:
         msg = MIMEMultipart('alternative')
@@ -431,9 +443,10 @@ def send_email(to_email: str, subject: str, body_html: str):
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.login(sender, smtp_pass)
             server.send_message(msg)
+        logger.info(f"Email sent to {to_email}: {subject}")
         return True
     except Exception as e:
-        print(f"[EMAIL ERROR] {e}")
+        logger.error(f"Email sending failed to {to_email}: {e}")
         return False
 
 
@@ -475,6 +488,74 @@ def _normalize_date(raw: str) -> str:
                     pass
     # Already yyyy-mm-dd or unrecognized — return as-is
     return raw
+
+
+# ---------------------------------------------------------------------------
+# Dynamic camp status computation
+# ---------------------------------------------------------------------------
+def _compute_event_status(start_date_str: str, end_date_str: str) -> str:
+    """Compute camp status dynamically from start/end dates vs today.
+
+    Returns 'Upcoming', 'Ongoing', or 'Completed'.
+    """
+    today = date.today()
+
+    # Parse start_date
+    start = None
+    if start_date_str:
+        try:
+            start = date.fromisoformat(_normalize_date(start_date_str))
+        except (ValueError, TypeError):
+            logger.warning(f"Could not parse start_date: {start_date_str!r}")
+
+    # Parse end_date
+    end = None
+    if end_date_str:
+        try:
+            end = date.fromisoformat(_normalize_date(end_date_str))
+        except (ValueError, TypeError):
+            logger.warning(f"Could not parse end_date: {end_date_str!r}")
+
+    if start and start > today:
+        return 'Upcoming'
+    if end and end < today:
+        return 'Completed'
+    # start_date is today or in the past, and end_date is today/future or not set
+    return 'Ongoing'
+
+
+def _enrich_events_with_status(events: list) -> list:
+    """Add 'computed_status' to each event dict based on date logic."""
+    for ev in events:
+        raw_tag = ev.get('tag', '')
+        # If event was manually cancelled, keep that
+        if raw_tag == 'Cancelled':
+            ev['computed_status'] = 'Cancelled'
+        else:
+            ev['computed_status'] = _compute_event_status(
+                ev.get('start_date', ''),
+                ev.get('end_date', ''),
+            )
+    return events
+
+
+# ---------------------------------------------------------------------------
+# Request logging middleware
+# ---------------------------------------------------------------------------
+@app.before_request
+def _log_request_start():
+    request._start_time = time.time()
+
+
+@app.after_request
+def _log_request_end(response):
+    duration = time.time() - getattr(request, '_start_time', time.time())
+    if request.path.startswith('/api/'):
+        logger.info(
+            f"{request.method} {request.path} → {response.status_code} "
+            f"({duration * 1000:.0f}ms)"
+        )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -791,7 +872,9 @@ def api_list_events():
         ORDER BY e.start_date DESC
     """).fetchall()
     conn.close()
-    return jsonify(rows_to_list(events))
+    result = rows_to_list(events)
+    _enrich_events_with_status(result)
+    return jsonify(result)
 
 
 @app.route("/api/events/<int:event_id>", methods=["GET"])
@@ -895,6 +978,10 @@ def api_update_event(event_id):
 # ---- Active Events (for specialist volunteer discovery) ----
 @app.route("/api/events/active")
 def api_active_events():
+    """Return events that are Upcoming or Ongoing (not Completed or Cancelled).
+
+    Status is computed dynamically from start_date/end_date vs today.
+    """
     conn = get_db()
     events = conn.execute("""
         SELECT e.*,
@@ -905,11 +992,18 @@ def api_active_events():
                (SELECT COUNT(DISTINCT hr.student_id) FROM Health_Records hr
                 WHERE hr.event_id = e.event_id) AS screened_count
         FROM Events e
-        WHERE (e.tag IS NULL OR e.tag != 'Cancelled') AND e.end_date >= CURRENT_DATE
+        WHERE (e.tag IS NULL OR e.tag != 'Cancelled')
         ORDER BY e.start_date DESC
     """).fetchall()
     conn.close()
-    return jsonify(rows_to_list(events))
+
+    result = rows_to_list(events)
+    _enrich_events_with_status(result)
+
+    # Only return active camps (Upcoming or Ongoing)
+    active = [e for e in result if e.get('computed_status') in ('Upcoming', 'Ongoing')]
+    logger.info(f"Active events query: {len(result)} total, {len(active)} active")
+    return jsonify(active)
 
 
 # ---- Volunteer Management (replaces old staff assignment) ----
@@ -1186,7 +1280,7 @@ def api_event_stats(event_id):
         f"SELECT COUNT(DISTINCT hr.student_id) AS c FROM Health_Records hr "
         f"JOIN Students st ON hr.student_id = st.student_id "
         f"WHERE hr.event_id = ? AND {hr_join_where}",
-        [event_id] + student_params[1:],
+        [event_id] + student_params,
     ).fetchone()["c"]
 
     # Count assessments + per-department breakdown
@@ -1199,12 +1293,12 @@ def api_event_stats(event_id):
         f"SELECT hr.json_data, hr.category FROM Health_Records hr "
         f"JOIN Students st ON hr.student_id = st.student_id "
         f"WHERE hr.event_id = ? AND {hr_join_where}",
-        [event_id] + student_params[1:],
+        [event_id] + student_params,
     ).fetchall()
     for r in records:
         try:
             d = json.loads(r["json_data"])
-            a = d.get("assessment", "")
+            a = d.get("status", d.get("assessment", ""))
             cat = r["category"] or "Other"
             if cat not in dept_breakdown:
                 dept_breakdown[cat] = {"N": 0, "O": 0, "R": 0}
@@ -1228,7 +1322,7 @@ def api_event_stats(event_id):
         JOIN Students st ON hr.student_id = st.student_id
         WHERE hr.event_id = ? AND {hr_join_where}
         ORDER BY hr.timestamp DESC
-    """, [event_id] + student_params[1:]).fetchall()
+    """, [event_id] + student_params).fetchall()
 
     # Get active volunteers (replaces old staff query)
     volunteers = conn.execute("""
@@ -1292,7 +1386,9 @@ def api_school_events():
         ORDER BY e.start_date DESC
     """, (school_id,)).fetchall()
     conn.close()
-    return jsonify(rows_to_list(events))
+    result = rows_to_list(events)
+    _enrich_events_with_status(result)
+    return jsonify(result)
 
 
 # ---- Students ----
@@ -1798,9 +1894,17 @@ def api_student_all_records(student_id):
     for r in records:
         rd = row_to_dict(r)
         try:
-            rd["parsed_data"] = json.loads(rd.get("json_data", "{}"))
+            parsed = json.loads(rd.get("json_data", "{}"))
+            rd["parsed_data"] = parsed
+            
+            # User requirement: Do not generate redundant prescriptions for Normal students.
+            status = parsed.get("status", parsed.get("assessment", ""))
+            if status == "N":
+                continue
+                
         except Exception:
             rd["parsed_data"] = {}
+            
         records_list.append(rd)
 
     return jsonify({
@@ -1864,30 +1968,63 @@ def api_save_full_exam():
             }), 403
 
     # Upsert by student + event + specialist category
-    existing = conn.execute(
-        "SELECT record_id FROM Health_Records "
-        "WHERE student_id = ? AND event_id = ? AND category = ?",
-        (student_id, event_id, specialist_category),
-    ).fetchone()
+    # Use try/except for concurrency safety — two doctors of the same
+    # specialty could race on the same student record.
+    try:
+        existing = conn.execute(
+            "SELECT record_id FROM Health_Records "
+            "WHERE student_id = ? AND event_id = ? AND category = ?",
+            (student_id, event_id, specialist_category),
+        ).fetchone()
 
-    if existing:
-        conn.execute(
-            "UPDATE Health_Records SET json_data = ?, timestamp = ?, doctor_id = ? "
-            "WHERE record_id = ?",
-            (json_str, ts, doctor_id, existing["record_id"]),
-        )
-        record_id = existing["record_id"]
-    else:
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO Health_Records "
-            "(student_id, event_id, doctor_id, category, json_data, timestamp) "
-            "VALUES (%s,%s,%s,%s,%s,%s) RETURNING record_id",
-            (student_id, event_id, doctor_id, specialist_category, json_str, ts),
-        )
-        record_id = cur.fetchone()["record_id"]
+        if existing:
+            conn.execute(
+                "UPDATE Health_Records SET json_data = ?, timestamp = ?, doctor_id = ? "
+                "WHERE record_id = ?",
+                (json_str, ts, doctor_id, existing["record_id"]),
+            )
+            record_id = existing["record_id"]
+        else:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO Health_Records "
+                "(student_id, event_id, doctor_id, category, json_data, timestamp) "
+                "VALUES (%s,%s,%s,%s,%s,%s) RETURNING record_id",
+                (student_id, event_id, doctor_id, specialist_category, json_str, ts),
+            )
+            record_id = cur.fetchone()["record_id"]
 
-    conn.commit()
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        # On concurrent insert conflict, retry as update
+        logger.warning(
+            f"Exam save conflict for student={student_id}, "
+            f"event={event_id}, category={specialist_category}: {exc}"
+        )
+        try:
+            existing = conn.execute(
+                "SELECT record_id FROM Health_Records "
+                "WHERE student_id = ? AND event_id = ? AND category = ?",
+                (student_id, event_id, specialist_category),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE Health_Records SET json_data = ?, timestamp = ?, doctor_id = ? "
+                    "WHERE record_id = ?",
+                    (json_str, ts, doctor_id, existing["record_id"]),
+                )
+                record_id = existing["record_id"]
+                conn.commit()
+            else:
+                conn.close()
+                logger.error(f"Exam save failed after retry for student {student_id}")
+                return jsonify({"success": False, "message": "Save failed, please retry"}), 500
+        except Exception as retry_exc:
+            conn.close()
+            logger.error(f"Exam save retry failed: {retry_exc}")
+            return jsonify({"success": False, "message": "Save failed, please retry"}), 500
+
     conn.close()
     log_audit(doctor_id, "SAVE_EXAM",
               f"Saved {specialist_category} exam for student {student_id}")
@@ -1976,11 +2113,11 @@ def api_digitise_launch():
 if HAS_SOCKETIO and socketio:
     @socketio.on("connect")
     def handle_connect():
-        print(f"[socket.io] Client connected")
+        logger.info("[socket.io] Client connected")
 
     @socketio.on("disconnect")
     def handle_disconnect():
-        print(f"[socket.io] Client disconnected")
+        logger.info("[socket.io] Client disconnected")
 
 
 # ---------------------------------------------------------------------------
@@ -2021,18 +2158,18 @@ def serve_spa(path):
 if __name__ == "__main__":
     try:
         init_db()
-        print("Database initialized successfully.")
+        logger.info("Database initialized successfully.")
     except Exception as e:
-        print(f"Error initializing database: {e}")
+        logger.error(f"Error initializing database: {e}")
 
-    print(f"")
-    print(f"  AIIMS Bathinda - Flask Server")
-    print(f"  =============================")
-    print(f"  Server running on: http://localhost:{PORT}")
-    print(f"  Database:          {DB_PATH}")
-    print(f"  Frontend (dist/):  {'FOUND' if os.path.isdir(DIST_DIR) else 'NOT BUILT - run: npm run build'}")
-    print(f"  Socket.IO:         {'ENABLED' if HAS_SOCKETIO else 'DISABLED (pip install flask-socketio)'}")
-    print(f"")
+    logger.info(f"")
+    logger.info(f"  AIIMS Bathinda - Flask Server")
+    logger.info(f"  =============================")
+    logger.info(f"  Server running on: http://localhost:{PORT}")
+    logger.info(f"  Database:          {DB_PATH}")
+    logger.info(f"  Frontend (dist/):  {'FOUND' if os.path.isdir(DIST_DIR) else 'NOT BUILT - run: npm run build'}")
+    logger.info(f"  Socket.IO:         {'ENABLED' if HAS_SOCKETIO else 'DISABLED (pip install flask-socketio)'}")
+    logger.info(f"")
 
     if HAS_SOCKETIO and socketio:
         socketio.run(app, host="0.0.0.0", port=PORT, debug=False,

@@ -365,7 +365,7 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
                     <span className="text-xs text-slate-500 block"><Users className="w-3.5 h-3.5 inline mr-1" />{camp.volunteer_count ?? 0} medical staff</span>
                     <span className="text-xs text-slate-500 block mt-0.5"><Activity className="w-3.5 h-3.5 inline mr-1" />{camp.screened_count ?? 0}/{camp.student_count ?? 0} screened</span>
                   </div>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${camp.tag === 'Ongoing' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>{camp.tag === 'Ongoing' ? 'Live' : camp.tag}</span>
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>{(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}</span>
                   <button onClick={() => handleVolunteer(camp)} disabled={joining === camp.event_id}
                     className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 shadow-lg disabled:opacity-50">
                     <ArrowRight className="w-4 h-4" /><span>{joining === camp.event_id ? 'Joining...' : 'Join Camp'}</span>

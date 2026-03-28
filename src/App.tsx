@@ -35,7 +35,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [checkingSession, setCheckingSession] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile'>('dashboard');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
     return 'light';
@@ -59,7 +59,7 @@ export default function App() {
     try { await fetch('/api/logout', { method: 'POST' }); } catch {}
     setUser(null);
     setNeedsPasswordSetup(false);
-    setShowProfile(false);
+    setActiveTab('dashboard');
   };
 
   const handleLogin = (u: User, needsPw: boolean) => {
@@ -109,29 +109,37 @@ export default function App() {
         </div>
         
         <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">{user.name}</p>
-                <p className="text-xs text-slate-400">{formatRoleDisplay(user.role)}</p>
-              </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
             </div>
-            <button onClick={() => setShowProfile(!showProfile)} title="Profile Settings"
-              className={`p-2 rounded-lg transition-all ${showProfile ? 'bg-violet-500/20 text-violet-400' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>
-              <Settings className="w-4 h-4" />
-            </button>
+            <div>
+              <p className="text-sm font-medium text-white">{user.name}</p>
+              <p className="text-xs text-slate-400">{formatRoleDisplay(user.role)}</p>
+            </div>
           </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Navigation</div>
-          <div className="px-3 py-3 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center space-x-3">
+          <button onClick={() => setActiveTab('dashboard')}
+            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all ${
+              activeTab === 'dashboard'
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+            }`}>
             {getRoleIcon(user.role)}
             <span className="font-medium">{formatRoleDisplay(user.role)} Dashboard</span>
-          </div>
+          </button>
+          <button onClick={() => setActiveTab('profile')}
+            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all ${
+              activeTab === 'profile'
+                ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+            }`}>
+            <Settings className="w-5 h-5" />
+            <span className="font-medium">Profile Settings</span>
+          </button>
         </nav>
 
         <div className="p-4 border-t border-slate-800/50 space-y-2">
@@ -164,8 +172,8 @@ export default function App() {
         </div>
 
         <div className="px-8 pb-8 flex-1 relative z-10">
-          {showProfile ? (
-            <ProfileSettings user={user} onBack={() => setShowProfile(false)} />
+          {activeTab === 'profile' ? (
+            <ProfileSettings user={user} onBack={() => setActiveTab('dashboard')} />
           ) : (
             <>
               {user.role === 'Admin' && <AdminDashboard user={user} />}

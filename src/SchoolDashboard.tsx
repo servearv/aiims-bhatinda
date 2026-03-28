@@ -389,9 +389,9 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const examinedStudents = students.filter(s => s.is_examined).length;
   const progressPct = totalStudents > 0 ? Math.round((examinedStudents / totalStudents) * 100) : 0;
 
-  // Count students with O or R assessment for bulk print badge
-  const docStudents = students.filter(s => s.assessment === 'O' || s.assessment === 'R');
-  const docCount = docStudents.length;
+  // Count examined students for bulk print badge
+  const examinedStudentsList = students.filter(s => s.is_examined);
+  const docCount = examinedStudentsList.length;
 
   // View docs for a single student
   const handleViewDocs = async (student: Student) => {
@@ -430,13 +430,10 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
     setBulkPrinting(true);
     try {
       const allDocs: { student: Student; record: any }[] = [];
-      for (const s of docStudents) {
+      for (const s of examinedStudentsList) {
         const res = await fetch(`/api/students/${s.student_id}/all-records?event_id=${eventId}`);
         const data = await res.json();
-        const docs = (data.records || []).filter((r: any) => {
-          const parsed = r.parsed_data || {};
-          return parsed.status === 'O' || parsed.status === 'R';
-        });
+        const docs = data.records || [];
         for (const doc of docs) {
           allDocs.push({ student: data.student || s, record: doc });
         }
@@ -540,7 +537,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
             {docCount > 0 && (
               <button onClick={handleBulkPrint} disabled={bulkPrinting}
                 className="flex-1 md:flex-none bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 whitespace-nowrap text-sm disabled:opacity-50">
-                <Printer className="w-4 h-4" /><span>{bulkPrinting ? 'Loading...' : `Print All Docs (${docCount})`}</span>
+                <Printer className="w-4 h-4" /><span>{bulkPrinting ? 'Loading...' : `Print Prescriptions (${docCount})`}</span>
               </button>
             )}
           </div>
@@ -1064,7 +1061,11 @@ function ProgressTracking({ eventId }: { eventId: number }) {
     const qs = params.toString();
     fetch(`/api/events/${eventId}/stats${qs ? '?' + qs : ''}`)
       .then(r => r.json())
-      .then(setStats);
+      .then(setStats)
+      .catch(e => {
+        console.error("Error fetching stats:", e);
+        setStats({ total_students: 0, screened: 0, normal: 0, observation: 0, referred: 0, absent: 0, records: [], staff: [] });
+      });
   }, [eventId, classFilter, sectionFilter, genderFilter]);
 
   if (!stats) return <div className="text-center py-8 text-slate-400">Loading statistics...</div>;
