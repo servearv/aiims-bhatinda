@@ -2146,6 +2146,13 @@ def serve_spa(path):
 
     full_path = os.path.join(DIST_DIR, path)
     if path and os.path.isfile(full_path):
+        if path == "sw.js" or path.endswith("sw.js"):
+            response = send_from_directory(DIST_DIR, path)
+            response.headers["Service-Worker-Allowed"] = "/"
+            response.headers["Content-Type"] = "application/javascript"
+            return response
+        if path == "manifest.json" or path.endswith(".webmanifest"):
+            return send_from_directory(DIST_DIR, path, mimetype="application/manifest+json")
         return send_from_directory(DIST_DIR, path)
 
     return send_from_directory(DIST_DIR, "index.html")

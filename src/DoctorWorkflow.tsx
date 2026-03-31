@@ -86,6 +86,17 @@ async function syncOfflineQueue() {
     } catch { /* still offline */ }
   }
 }
+async function getOfflineQueueCount(): Promise<number> {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(STORE, 'readonly');
+    return new Promise(r => { 
+      const req = tx.objectStore(STORE).count(); 
+      req.onsuccess = () => r(req.result); 
+      req.onerror = () => r(0); 
+    });
+  } catch { return 0; }
+}
 
 // ── Reusable UI ──
 function FormSelect({ label, value, onChange, options, id, disabled }: {
@@ -1117,17 +1128,29 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   const [examData, setExamData] = useState<any>({ status: 'N' });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [online, setOnline] = useState(navigator.onLine);
+  const [offlineCount, setOfflineCount] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Online/offline
+  // Online/offline logic
   useEffect(() => {
-    const on = () => { setOnline(true); syncOfflineQueue(); };
+    const checkQueue = async () => setOfflineCount(await getOfflineQueueCount());
+    checkQueue();
+    const on = () => { setOnline(true); syncOfflineQueue().then(checkQueue); };
     const off = () => setOnline(false);
     window.addEventListener('online', on); window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    const intv = setInterval(checkQueue, 5000);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); clearInterval(intv); };
   }, []);
+
+  const handleManualSync = async () => {
+    if (!online) return;
+    setSaveStatus('saving');
+    await syncOfflineQueue();
+    setOfflineCount(await getOfflineQueueCount());
+    setSaveStatus('idle');
+  };
 
   // Search
   const doSearch = useCallback(async (q?: string) => {
@@ -1254,8 +1277,19 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
           {saveStatus === 'saving' && <span className="text-xs text-amber-400 flex items-center space-x-1"><Loader2 className="w-3 h-3 animate-spin" /><span>Saving...</span></span>}
           {saveStatus === 'saved' && <span className="text-xs text-emerald-400 flex items-center space-x-1"><Check className="w-3 h-3" /><span>Saved</span></span>}
           {saveStatus === 'error' && <span className="text-xs text-red-400 flex items-center space-x-1"><AlertTriangle className="w-3 h-3" /><span>Error</span></span>}
-          {!online && <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold">Offline</span>}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm">
+          
+          {offlineCount > 0 && (
+            <button onClick={handleManualSync} disabled={!online || saveStatus === 'saving'}
+              className="flex items-center space-x-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+              title={online ? "Click to sync now" : "Waiting for connection..."}>
+              {online ? <RefreshCw className="w-3.5 h-3.5" /> : <Activity className="w-3.5 h-3.5" />}
+              <span>{offlineCount} Pending</span>
+            </button>
+          )}
+
+          {!online && <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1"><Activity className="w-3.5 h-3.5" /><span>Offline</span></span>}
+
+          <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm hidden sm:block">
             <span className="text-slate-400">Today: </span><span className="text-cyan-400 font-bold">{todayCount}</span><span className="text-slate-500"> examined</span>
           </div>
         </div>

@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import DoctorWorkflow from './DoctorWorkflow';
 import AdminDashboard from './AdminDashboard';
 import SchoolDashboard from './SchoolDashboard';
+import OfflineBanner from './components/OfflineBanner';
+import UpdatePrompt from './components/UpdatePrompt';
+import { usePWAInstall } from './hooks/usePWAInstall';
 import {
   Activity, Stethoscope, ActivitySquare,
   LogOut, ShieldCheck, Sun, Moon, School,
@@ -36,6 +39,7 @@ export default function App() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile'>('dashboard');
+  const { canInstall, promptInstall } = usePWAInstall();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') return (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
     return 'light';
@@ -73,12 +77,25 @@ export default function App() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.5)] animate-pulse">
-            <ActivitySquare className="w-6 h-6 text-white" />
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+        
+        <div className="relative z-10 flex flex-col items-center space-y-6 animate-in pwa-fade-in duration-700">
+          <div className="relative">
+            <div className="absolute inset-0 bg-cyan-500 blur-xl opacity-20 animate-pulse rounded-full"></div>
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_40px_rgba(34,211,238,0.4)] relative">
+              <ActivitySquare className="w-10 h-10 text-white" />
+            </div>
           </div>
-          <p className="text-slate-400 text-sm">Loading...</p>
+          
+          <div className="flex flex-col items-center space-y-3">
+            <h1 className="text-2xl font-bold tracking-tight text-white">AIIMS Bathinda</h1>
+            <div className="flex items-center space-x-2 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-full px-4 py-1.5">
+              <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+              <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">Starting Portal</span>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -93,10 +110,28 @@ export default function App() {
     return <PasswordSetupWizard userName={user.name} onComplete={handlePasswordSet} />;
   }
 
+  const handleTabSwitch = (tab: 'dashboard' | 'profile') => {
+    setActiveTab(tab);
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  };
+
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
+    <div className="flex h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30 overflow-hidden">
+      <OfflineBanner />
+      <UpdatePrompt />
+      
+      {/* Sidebar Overlay for Mobile */}
+      {sidebarOpen && (
+        <div 
+          className="md:hidden sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
-      <aside className={`bg-slate-900/80 border-r border-slate-800 backdrop-blur-xl flex flex-col relative z-20 transition-all duration-300 overflow-hidden ${sidebarOpen ? 'w-72' : 'w-0 border-r-0'}`}>
+      <aside className={`bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl flex flex-col absolute md:relative z-40 h-full transition-all duration-300 ease-out shadow-2xl md:shadow-none ${
+        sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0 md:w-0 md:border-r-0'
+      }`}>
         <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
           <div className="flex items-center space-x-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)] flex-shrink-0">
@@ -122,19 +157,19 @@ export default function App() {
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Navigation</div>
-          <button onClick={() => setActiveTab('dashboard')}
-            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all ${
+          <button onClick={() => handleTabSwitch('dashboard')}
+            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all pwa-no-print ${
               activeTab === 'dashboard'
-                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
             }`}>
             {getRoleIcon(user.role)}
             <span className="font-medium">{formatRoleDisplay(user.role)} Dashboard</span>
           </button>
-          <button onClick={() => setActiveTab('profile')}
-            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all ${
+          <button onClick={() => handleTabSwitch('profile')}
+            className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all pwa-no-print ${
               activeTab === 'profile'
-                ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20'
+                ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
             }`}>
             <Settings className="w-5 h-5" />
@@ -142,7 +177,14 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="p-4 border-t border-slate-800/50 space-y-2">
+        <div className="p-4 border-t border-slate-800/50 space-y-2 pwa-no-print">
+          {canInstall && (
+            <button onClick={promptInstall}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium transition-all shadow-lg text-sm mb-4">
+              <ArrowRight className="w-4 h-4 rotate-90" />
+              <span>Install App</span>
+            </button>
+          )}
           <button onClick={toggleTheme}
             className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-500/20">
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -162,12 +204,12 @@ export default function App() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
         
         {/* Topbar with Sidebar Toggle */}
-        <div className="p-4 flex items-center relative z-20">
+        <div className="p-4 flex items-center relative z-20 pwa-no-print">
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all backdrop-blur-xl border border-slate-700 hover:border-cyan-500/50"
-            title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all backdrop-blur-xl border border-slate-700 hover:border-cyan-500/50 shadow-sm"
+            title="Toggle Menu">
+            <Menu className="w-5 h-5" />
           </button>
         </div>
 
@@ -304,7 +346,15 @@ function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void
     e.preventDefault();
     setLoading(true);
     setError('');
+    const isOnline = navigator.onLine;
+
     try {
+      if (!isOnline && step === 'otp_send') {
+        setError('Login with OTP requires an internet connection.');
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

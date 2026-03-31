@@ -1,5 +1,78 @@
 @import "tailwindcss";
 
+/* ── PWA: Safe Area Insets ── */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* ── PWA: Standalone Mode ── */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: text;
+  }
+
+  /* Add safe area padding to the root layout */
+  #root {
+    padding-top: var(--safe-area-top);
+    padding-bottom: var(--safe-area-bottom);
+    padding-left: var(--safe-area-left);
+    padding-right: var(--safe-area-right);
+  }
+}
+
+/* ── PWA: Touch Feedback & Mobile UX ── */
+button,
+[role="button"],
+a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── PWA: Smooth Transitions ── */
+.pwa-fade-in {
+  animation: pwaFadeIn 0.3s ease-out;
+}
+
+@keyframes pwaFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pwa-slide-up {
+  animation: pwaSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pwaSlideUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── PWA: Mobile Sidebar Overlay ── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.3s ease;
+}
+
+/* ── PWA: Print Styles ── */
+@media print {
+  .pwa-no-print,
+  .offline-banner,
+  .update-prompt,
+  nav,
+  aside {
+    display: none !important;
+  }
+}
+
 /* ── Light Theme Overrides ── */
 html[data-theme="light"] {
   color-scheme: light;
