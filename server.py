@@ -1896,12 +1896,6 @@ def api_student_all_records(student_id):
         try:
             parsed = json.loads(rd.get("json_data", "{}"))
             rd["parsed_data"] = parsed
-            
-            # User requirement: Do not generate redundant prescriptions for Normal students.
-            status = parsed.get("status", parsed.get("assessment", ""))
-            if status == "N":
-                continue
-                
         except Exception:
             rd["parsed_data"] = {}
             

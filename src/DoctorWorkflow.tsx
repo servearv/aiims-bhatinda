@@ -914,50 +914,155 @@ function RecordField({ label, value, className = '' }: { label: string; value?: 
   if (!value) return null;
   return (
     <div className={className}>
-      <span className="text-[10px] text-slate-600 uppercase tracking-wider">{label}</span>
-      <p className="text-xs text-slate-300 mt-0.5">{value}</p>
+      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</span>
+      <p className="text-sm text-slate-200 mt-0.5 leading-snug">{value}</p>
     </div>
   );
 }
 
 function RecordPill({ label, color }: { label: string; color: string }) {
-  return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${color}`}>{label}</span>;
+  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${color}`}>{label}</span>;
 }
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = status === 'N'
+    ? { label: '✓ Normal', bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' }
+    : status === 'O'
+    ? { label: '⦿ Observation', bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' }
+    : status === 'R'
+    ? { label: '⚑ Referred', bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30' }
+    : { label: status || '—', bg: 'bg-slate-800', text: 'text-slate-400', border: 'border-slate-700' };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function RemarksBlock({ data }: { data: any }) {
+  const hasRemarks = data.remarks || data.clinicalFindings || data.diagnosis || data.referralReason;
+  if (!hasRemarks) return null;
+  return (
+    <div className="mt-2.5 pt-2 border-t border-slate-700/50 space-y-1">
+      {data.clinicalFindings && (
+        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Findings:</span> {data.clinicalFindings}</p>
+      )}
+      {data.diagnosis && (
+        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Diagnosis:</span> {data.diagnosis}</p>
+      )}
+      {data.remarks && (
+        <p className="text-xs text-slate-400 italic">"{data.remarks}"</p>
+      )}
+      {data.referralReason && (
+        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Referral:</span> {data.referralReason}</p>
+      )}
+      {data.referralDept && (
+        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Refer to:</span> {data.referralDept}</p>
+      )}
+      {data.urgency && (
+        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Urgency:</span> {data.urgency}</p>
+      )}
+      {(data.medicines || []).length > 0 && (
+        <div className="text-xs text-slate-400">
+          <span className="text-slate-500 font-medium">Rx:</span>
+          {data.medicines.map((m: any, i: number) => (
+            <span key={i} className="ml-1">{m.name} {m.dosage} {m.frequency}{m.duration ? ` ×${m.duration}` : ''}{i < data.medicines.length - 1 ? ',' : ''}</span>
+          ))}
+        </div>
+      )}
+      {data.advice && (
+        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Advice:</span> {data.advice}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Specialist-Specific Read-Only Cards ──
 
 function EyeRecordCard({ d }: { d: any }) {
   return (
-    <div className="grid grid-cols-3 gap-2 mt-1.5">
-      <RecordField label="Vision RE" value={d.rightEye} />
-      <RecordField label="Vision LE" value={d.leftEye} />
-      <RecordField label="Spectacles" value={d.accessories} />
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-3 py-2.5 text-center">
+          <span className="text-[10px] text-emerald-500/70 uppercase tracking-wider block">Right Eye</span>
+          <span className="text-lg font-bold text-emerald-300 mt-0.5 block">{d.rightEye || '—'}</span>
+        </div>
+        <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-3 py-2.5 text-center">
+          <span className="text-[10px] text-emerald-500/70 uppercase tracking-wider block">Left Eye</span>
+          <span className="text-lg font-bold text-emerald-300 mt-0.5 block">{d.leftEye || '—'}</span>
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2.5 text-center">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Spectacles</span>
+          <span className={`text-sm font-bold mt-0.5 block ${d.accessories === 'Yes' ? 'text-cyan-400' : 'text-slate-400'}`}>
+            {d.accessories === 'Yes' ? '🤓 Yes' : d.accessories === 'No' ? 'No' : '—'}
+          </span>
+        </div>
+      </div>
+      <RemarksBlock data={d} />
     </div>
   );
 }
 
 function DentalRecordCard({ d }: { d: any }) {
   return (
-    <div className="mt-1.5 space-y-1">
-      <RecordField label="Teeth & Gums" value={d.teethGums} />
-      <div className="grid grid-cols-2 gap-2">
-        <RecordField label="Implants" value={d.implants} />
-        <RecordField label="Braces" value={d.braces} />
+    <div className="space-y-3">
+      {d.teethGums && (
+        <div className="bg-sky-500/5 border border-sky-500/15 rounded-xl px-3 py-2.5">
+          <span className="text-[10px] text-sky-500/70 uppercase tracking-wider">Teeth & Gums Examination</span>
+          <p className="text-sm text-sky-200 mt-1 font-medium">{d.teethGums}</p>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2.5 flex items-center justify-between">
+          <span className="text-xs text-slate-500">Dental Implants</span>
+          <span className={`text-xs font-bold ${d.implants === 'Yes' ? 'text-sky-400' : 'text-slate-400'}`}>
+            {d.implants || '—'}
+          </span>
+        </div>
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2.5 flex items-center justify-between">
+          <span className="text-xs text-slate-500">Braces</span>
+          <span className={`text-xs font-bold ${d.braces === 'Yes' ? 'text-sky-400' : 'text-slate-400'}`}>
+            {d.braces || '—'}
+          </span>
+        </div>
       </div>
+      <RemarksBlock data={d} />
     </div>
   );
 }
 
 function ENTRecordCard({ d }: { d: any }) {
   return (
-    <div className="grid grid-cols-3 gap-2 mt-1.5">
-      <RecordField label="Ear" value={d.ear} />
-      <RecordField label="Nose" value={d.nose} />
-      <RecordField label="Throat" value={d.throat} />
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: '👂 Ear', value: d.ear, key: 'ear' },
+          { label: '👃 Nose', value: d.nose, key: 'nose' },
+          { label: '🗣 Throat', value: d.throat, key: 'throat' },
+        ].map(item => (
+          <div key={item.key} className="bg-amber-500/5 border border-amber-500/15 rounded-xl px-3 py-2.5">
+            <span className="text-[10px] text-amber-500/70 uppercase tracking-wider block">{item.label}</span>
+            <p className="text-sm text-amber-200 mt-1 font-medium leading-snug">{item.value || 'NAD'}</p>
+          </div>
+        ))}
+      </div>
+      <RemarksBlock data={d} />
     </div>
   );
 }
 
 function SkinRecordCard({ d }: { d: any }) {
-  return <div className="mt-1.5"><RecordField label="Skin / Nails / Hair" value={d.skinExam} /></div>;
+  return (
+    <div className="space-y-3">
+      {d.skinExam && (
+        <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl px-3 py-2.5">
+          <span className="text-[10px] text-violet-500/70 uppercase tracking-wider">Skin, Nails & Hair</span>
+          <p className="text-sm text-violet-200 mt-1 font-medium">{d.skinExam}</p>
+        </div>
+      )}
+      <RemarksBlock data={d} />
+    </div>
+  );
 }
 
 function CommunityMedRecordCard({ d }: { d: any }) {
@@ -967,73 +1072,122 @@ function CommunityMedRecordCard({ d }: { d: any }) {
     s === 'given' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
     s === 'not_given' ? 'text-red-400 bg-red-500/10 border-red-500/30' :
     'text-slate-400 bg-slate-800 border-slate-700';
-  const vaccLabel = (s: string) => s === 'given' ? '✓' : s === 'not_given' ? '✗' : '?';
+  const vaccIcon = (s: string) => s === 'given' ? '✓' : s === 'not_given' ? '✗' : '?';
   const pastHistory = Array.isArray(d.pastHistory) ? d.pastHistory : [];
   const SYSTEMS = ['locomotor', 'abdomen', 'respiratory', 'cardiovascular', 'cns'];
+  const SYSTEM_LABELS: Record<string, string> = {
+    locomotor: 'Locomotor', abdomen: 'Abdomen', respiratory: 'Respiratory',
+    cardiovascular: 'Cardiovascular', cns: 'CNS'
+  };
   const sysEntries = SYSTEMS.filter(s => d[s]).map(s => ({ key: s, val: d[s], detail: d[`${s}Detail`] }));
+
   return (
-    <div className="mt-1.5 space-y-2">
+    <div className="space-y-3">
+      {/* Past History */}
+      {(pastHistory.length > 0 || d.pastHistoryOther) && (
+        <div className="bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2.5">
+          <span className="text-[10px] text-rose-500/70 uppercase tracking-wider block mb-1.5">Past History</span>
+          {pastHistory.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {pastHistory.map((h: string) => (
+                <span key={h} className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md font-medium">{h}</span>
+              ))}
+            </div>
+          )}
+          {d.pastHistoryOther && <p className="text-xs text-rose-300/80 mt-1">Other: {d.pastHistoryOther}</p>}
+        </div>
+      )}
+
       {/* Vaccinations */}
       {vaccEntries.length > 0 && (
-        <div>
-          <span className="text-[10px] text-slate-600 uppercase tracking-wider">Immunisation</span>
-          <div className="flex flex-wrap gap-1 mt-0.5">
+        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl px-3 py-2.5">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1.5">Immunisation Status</span>
+          <div className="grid grid-cols-2 gap-1.5">
             {vaccEntries.map(([name, status]) => (
-              <span key={name} className={`text-[10px] font-medium px-1.5 py-0.5 rounded border inline-flex items-center space-x-1 ${vaccColor(status)}`}>
-                <span>{vaccLabel(status)}</span><span>{name}</span>
-              </span>
+              <div key={name} className={`flex items-center justify-between px-2 py-1 rounded-lg border text-[11px] ${vaccColor(status)}`}>
+                <span className="font-medium">{name}</span>
+                <span className="font-bold">{vaccIcon(status)} {status === 'given' ? 'Given' : status === 'not_given' ? 'Not Given' : 'Unknown'}</span>
+              </div>
             ))}
           </div>
         </div>
       )}
-      {/* Past History */}
-      {pastHistory.length > 0 && (
-        <div>
-          <span className="text-[10px] text-slate-600 uppercase tracking-wider">Past History</span>
-          <div className="flex flex-wrap gap-1 mt-0.5">
-            {pastHistory.map((h: string) => <span key={h} className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 py-0.5 rounded">{h}</span>)}
-          </div>
+
+      {/* Present Complaint & Medication */}
+      {(d.presentComplaint || d.currentMedication) && (
+        <div className="grid grid-cols-2 gap-3">
+          {d.presentComplaint && (
+            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl px-3 py-2.5">
+              <span className="text-[10px] text-blue-500/70 uppercase tracking-wider">Present Complaint</span>
+              <p className="text-sm text-blue-200 mt-1 font-medium">{d.presentComplaint}</p>
+            </div>
+          )}
+          {d.currentMedication && (
+            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl px-3 py-2.5">
+              <span className="text-[10px] text-blue-500/70 uppercase tracking-wider">Current Medication</span>
+              <p className="text-sm text-blue-200 mt-1 font-medium">{d.currentMedication}</p>
+            </div>
+          )}
         </div>
       )}
-      {d.pastHistoryOther && <RecordField label="Other History" value={d.pastHistoryOther} />}
-      {/* Complaints & Meds */}
-      <div className="grid grid-cols-2 gap-2">
-        <RecordField label="Complaint" value={d.presentComplaint} />
-        <RecordField label="Medication" value={d.currentMedication} />
-      </div>
-      <RecordField label="Anaemia" value={d.anaemia} />
+
+      {/* Anaemia */}
+      {d.anaemia && (
+        <div className="flex items-center space-x-2">
+          <span className="text-xs text-slate-500">Anaemia:</span>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${
+            d.anaemia === 'No' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+            : d.anaemia === 'Yes' ? 'text-red-400 bg-red-500/10 border-red-500/30'
+            : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+          }`}>{d.anaemia}</span>
+        </div>
+      )}
+
       {/* Systemic Examination */}
       {sysEntries.length > 0 && (
-        <div>
-          <span className="text-[10px] text-slate-600 uppercase tracking-wider">Systems</span>
-          <div className="flex flex-wrap gap-1 mt-0.5">
+        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl px-3 py-2.5">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1.5">Systemic Examination</span>
+          <div className="grid grid-cols-1 gap-1">
             {sysEntries.map(s => (
-              <span key={s.key} className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${s.val === 'NAD' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-red-400 bg-red-500/10 border-red-500/30'}`}>
-                {s.key}{s.val === 'Abnormal' && s.detail ? `: ${s.detail}` : ` ${s.val}`}
-              </span>
+              <div key={s.key} className="flex items-center justify-between py-1 text-xs">
+                <span className="text-slate-400 font-medium">{SYSTEM_LABELS[s.key] || s.key}</span>
+                <span className={`font-bold px-2 py-0.5 rounded border ${
+                  s.val === 'NAD' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-red-400 bg-red-500/10 border-red-500/30'
+                }`}>
+                  {s.val === 'Abnormal' && s.detail ? `Abnormal: ${s.detail}` : s.val}
+                </span>
+              </div>
             ))}
           </div>
         </div>
       )}
-      {d.otherFindings && <RecordField label="Other Findings" value={d.otherFindings} />}
+
+      {d.otherFindings && (
+        <RecordField label="Other Findings" value={d.otherFindings} />
+      )}
+
+      <RemarksBlock data={d} />
     </div>
   );
 }
 
 /** Fallback for unrecognized specialty — show key-value pairs cleanly. */
 function GenericRecordCard({ d }: { d: any }) {
-  const entries = Object.entries(d).filter(([k]) => k !== 'status' && k !== 'assessment');
+  const entries = Object.entries(d).filter(([k]) => !['status', 'assessment', 'clinicalFindings', 'diagnosis', 'remarks', 'medicines', 'advice', 'referralReason', 'referralDept', 'urgency'].includes(k));
   if (entries.length === 0) return null;
   return (
-    <div className="grid grid-cols-2 gap-2 mt-1.5">
-      {entries.map(([k, v]) => {
-        if (v === null || v === undefined || v === '') return null;
-        let display: string;
-        if (Array.isArray(v)) display = v.map(i => typeof i === 'object' ? Object.entries(i).map(([a,b])=>`${a}: ${b}`).join(', ') : String(i)).join(' | ');
-        else if (typeof v === 'object') display = Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(', ');
-        else display = String(v);
-        return <div key={k}><RecordField label={k.replace(/_/g, ' ')} value={display} /></div>;
-      })}
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        {entries.map(([k, v]) => {
+          if (v === null || v === undefined || v === '') return null;
+          let display: string;
+          if (Array.isArray(v)) display = v.map(i => typeof i === 'object' ? Object.entries(i).map(([a,b])=>`${a}: ${b}`).join(', ') : String(i)).join(' | ');
+          else if (typeof v === 'object') display = Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(', ');
+          else display = String(v);
+          return <div key={k}><RecordField label={k.replace(/_/g, ' ')} value={display} /></div>;
+        })}
+      </div>
+      <RemarksBlock data={d} />
     </div>
   );
 }
@@ -1049,49 +1203,160 @@ function SpecialistRecordBody({ category, d }: { category: string; d: any }) {
   }
 }
 
+// Category metadata: icon, label, color theme
+const SPECIALIST_META: Record<string, { icon: React.ReactNode; label: string; gradient: string; accent: string; border: string; bg: string }> = {
+  Eye_Specialist: {
+    icon: <Eye className="w-4 h-4" />,
+    label: 'Ophthalmology',
+    gradient: 'from-emerald-500/20 to-teal-500/10',
+    accent: 'text-emerald-400',
+    border: 'border-emerald-500/30',
+    bg: 'bg-emerald-500/5',
+  },
+  Dental: {
+    icon: <span className="text-sm">🦷</span>,
+    label: 'Dental',
+    gradient: 'from-sky-500/20 to-cyan-500/10',
+    accent: 'text-sky-400',
+    border: 'border-sky-500/30',
+    bg: 'bg-sky-500/5',
+  },
+  ENT: {
+    icon: <Ear className="w-4 h-4" />,
+    label: 'ENT',
+    gradient: 'from-amber-500/20 to-orange-500/10',
+    accent: 'text-amber-400',
+    border: 'border-amber-500/30',
+    bg: 'bg-amber-500/5',
+  },
+  Skin_Specialist: {
+    icon: <Scan className="w-4 h-4" />,
+    label: 'Dermatology',
+    gradient: 'from-violet-500/20 to-purple-500/10',
+    accent: 'text-violet-400',
+    border: 'border-violet-500/30',
+    bg: 'bg-violet-500/5',
+  },
+  Community_Medicine: {
+    icon: <Stethoscope className="w-4 h-4" />,
+    label: 'Community Medicine',
+    gradient: 'from-rose-500/20 to-pink-500/10',
+    accent: 'text-rose-400',
+    border: 'border-rose-500/30',
+    bg: 'bg-rose-500/5',
+  },
+};
+
 function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
   studentId: number; eventId: number; currentCategory: string;
 }) {
   const [records, setRecords] = useState<any[]>([]);
-  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(true);
+
   useEffect(() => {
-    if (open && records.length === 0) {
-      fetch(`/api/students/${studentId}/all-records?event_id=${eventId}`)
-        .then(r => r.json())
-        .then(d => setRecords(d.records || []))
-        .catch(() => {});
-    }
-  }, [open, studentId, eventId]);
+    setLoading(true);
+    fetch(`/api/students/${studentId}/all-records?event_id=${eventId}`)
+      .then(r => r.json())
+      .then(d => { setRecords(d.records || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [studentId, eventId]);
+
+  // Also listen for real-time updates
+  useEffect(() => {
+    if (!io) return;
+    try {
+      const socket = io.connect(window.location.origin, { transports: ['websocket', 'polling'] });
+      socket.on('exam_saved', (data: any) => {
+        if (data.student_id === studentId || !data.student_id) {
+          fetch(`/api/students/${studentId}/all-records?event_id=${eventId}`)
+            .then(r => r.json())
+            .then(d => setRecords(d.records || []))
+            .catch(() => {});
+        }
+      });
+      return () => { socket.disconnect(); };
+    } catch {}
+  }, [studentId, eventId]);
+
   const otherRecords = records.filter(r => r.category !== currentCategory);
-  const catLabel = (c: string) => c.replace(/_/g, ' ');
-  const statusLabel = (s: string) => s === 'N' ? 'Normal' : s === 'O' ? 'Observation' : s === 'R' ? 'Referred' : s;
-  const statusColor = (s: string) => s === 'N' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : s === 'R' ? 'text-red-400 bg-red-500/10 border-red-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+  const evaluatedCount = otherRecords.length;
+  const totalOtherSpecs = Object.keys(SPECIALIST_META).filter(k => k !== currentCategory).length;
+
   return (
-    <div className="bg-slate-900/60 rounded-2xl border border-slate-800">
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-800/50 transition-colors">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Other Specialists' Records ({otherRecords.length})</span>
-        {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+    <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/50 transition-colors">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center">
+            <ClipboardList className="w-4 h-4 text-indigo-400" />
+          </div>
+          <div className="text-left">
+            <span className="text-sm font-bold text-white block">Other Specialists' Evaluations</span>
+            <span className="text-[11px] text-slate-500">
+              {loading ? 'Loading...' : `${evaluatedCount} of ${totalOtherSpecs} specialists have evaluated`}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          {!loading && evaluatedCount > 0 && (
+            <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-md text-xs font-bold">
+              {evaluatedCount}
+            </span>
+          )}
+          {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+        </div>
       </button>
+
       {open && (
-        <div className="px-4 pb-3 border-t border-slate-800/50 pt-2 space-y-2">
-          {otherRecords.length === 0 ? (
-            <p className="text-xs text-slate-500 py-1">No other specialist records yet.</p>
-          ) : otherRecords.map((r, i) => {
-            const d = r.parsed_data || {};
-            return (
-              <div key={i} className="bg-slate-950/50 rounded-lg px-3 py-2 border border-slate-800">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-cyan-400">{catLabel(r.category)}</span>
-                  <div className="flex items-center space-x-2">
-                    {d.status && <RecordPill label={statusLabel(d.status)} color={statusColor(d.status)} />}
-                    <span className="text-[10px] text-slate-600">{r.doctor_id}</span>
+        <div className="px-4 pb-4 border-t border-slate-800/50 pt-3 space-y-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-6 space-x-2">
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+              <span className="text-sm text-slate-500">Loading evaluations...</span>
+            </div>
+          ) : otherRecords.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                <ClipboardList className="w-6 h-6 text-slate-600" />
+              </div>
+              <p className="text-sm text-slate-500 font-medium">No evaluations from other specialists yet</p>
+              <p className="text-xs text-slate-600 mt-1">Records will appear here as other doctors examine the student</p>
+            </div>
+          ) : (
+            otherRecords.map((r, i) => {
+              const d = r.parsed_data || {};
+              const meta = SPECIALIST_META[r.category] || {
+                icon: <Activity className="w-4 h-4" />,
+                label: r.category.replace(/_/g, ' '),
+                gradient: 'from-slate-500/20 to-slate-500/10',
+                accent: 'text-slate-400',
+                border: 'border-slate-500/30',
+                bg: 'bg-slate-500/5',
+              };
+
+              return (
+                <div key={i} className={`rounded-2xl border ${meta.border} overflow-hidden bg-gradient-to-br ${meta.gradient} backdrop-blur-sm transition-all hover:shadow-lg`}>
+                  {/* Card Header */}
+                  <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700/30">
+                    <div className="flex items-center space-x-2.5">
+                      <div className={`${meta.accent}`}>{meta.icon}</div>
+                      <div>
+                        <span className={`text-sm font-bold ${meta.accent}`}>{meta.label}</span>
+                        <span className="text-[10px] text-slate-600 block">Dr. {r.doctor_id} {r.timestamp ? `• ${new Date(r.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</span>
+                      </div>
+                    </div>
+                    {d.status && <StatusBadge status={d.status} />}
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="px-4 py-3">
+                    <SpecialistRecordBody category={r.category} d={d} />
                   </div>
                 </div>
-                <SpecialistRecordBody category={r.category} d={d} />
-                {d.remarks && <p className="text-[11px] text-slate-400 mt-1 italic border-t border-slate-800/50 pt-1">"{d.remarks}"</p>}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
     </div>
