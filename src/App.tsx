@@ -129,9 +129,10 @@ export default function App() {
       )}
       
       {/* Sidebar */}
-      <aside className={`bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl flex flex-col absolute md:relative z-40 h-full transition-all duration-300 ease-out shadow-2xl md:shadow-none ${
-        sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0 md:w-0 md:border-r-0'
+      <aside className={`bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl flex flex-col absolute md:relative z-40 h-full transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
+        sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 md:translate-x-0 md:w-0 md:border-r-0'
       }`}>
+        <div className="w-72 flex flex-col h-full flex-shrink-0">
         <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
           <div className="flex items-center space-x-3 mb-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)] flex-shrink-0">
@@ -195,6 +196,7 @@ export default function App() {
             <LogOut className="w-4 h-4" />
             <span className="font-medium text-sm">Logout</span>
           </button>
+        </div>
         </div>
       </aside>
 

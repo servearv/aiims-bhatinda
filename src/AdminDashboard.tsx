@@ -80,6 +80,7 @@ interface EventData {
   end_date: string;
   operational_hours: string;
   tag: string;
+  computed_status?: string;
   created_at: string;
   staff_count?: number;
   student_count?: number;
@@ -145,11 +146,10 @@ export default function AdminDashboard({ user }: { user: User }) {
           <button
             key={tab.key}
             onClick={() => { setActiveTab(tab.key); if (tab.key !== 'register') setDefaultRole(''); }}
-            className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-              activeTab === tab.key
-                ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
+            className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeTab === tab.key
+              ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
           >
             {tab.icon}
             <span>{tab.label}</span>
@@ -171,7 +171,7 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
   const [showCreate, setShowCreate] = useState(false);
   const [filterTag, setFilterTag] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [editingTag, setEditingTag] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchEvents = () => {
     fetch('/api/events').then(r => r.json()).then(setEvents);
@@ -179,7 +179,17 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
 
   useEffect(() => { fetchEvents(); }, []);
 
-  const filtered = filterTag ? events.filter(e => e.tag === filterTag) : events;
+  const filtered = events
+    .filter(e => {
+      const matchTag = filterTag ? e.tag === filterTag : true;
+      const matchSearch = e.school_name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchTag && matchSearch;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.start_date || 0).getTime();
+      const dateB = new Date(b.start_date || 0).getTime();
+      return dateB - dateA; // Most recent first
+    });
 
   const updateTag = async (eventId: number, newTag: string) => {
     await fetch(`/api/events/${eventId}`, {
@@ -187,29 +197,40 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag: newTag, user_id: user.username }),
     });
-    setEditingTag(null);
     fetchEvents();
   };
 
   return (
     <div className="space-y-4">
       {/* Header + Filter + Create */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-slate-500 font-medium">Filter:</span>
-          <button onClick={() => setFilterTag('')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${!filterTag ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
-            All
-          </button>
-          {TAGS.map(t => (
-            <button key={t} onClick={() => setFilterTag(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${filterTag === t ? TAG_STYLES[t] : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
-              {t}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <div className="relative flex-shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4.5 h-4.5" />
+            <input
+              type="text"
+              placeholder="Search by school name..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 w-full md:w-96 shadow-lg shadow-black/20"
+            />
+          </div>
+          <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+            <span className="text-sm text-slate-500 font-medium whitespace-nowrap">Filter:</span>
+            <button onClick={() => setFilterTag('')}
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all border whitespace-nowrap ${!filterTag ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_15px_rgba(34,211,238,0.1)]' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
+              All
             </button>
-          ))}
+            {TAGS.map(t => (
+              <button key={t} onClick={() => setFilterTag(t)}
+                className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all border whitespace-nowrap ${filterTag === t ? TAG_STYLES[t] : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
         <button onClick={() => setShowCreate(true)}
-          className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all flex items-center space-x-2 shadow-lg text-sm">
+          className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white px-5 py-2.5 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 shadow-lg text-sm flex-shrink-0 whitespace-nowrap">
           <Plus className="w-4 h-4" /><span>Create Event</span>
         </button>
       </div>
@@ -244,19 +265,42 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
                   <span className="text-xs text-slate-500">
                     <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0}/{event.student_count ?? 0} screened
                   </span>
-                  {editingTag === event.event_id ? (
-                    <div className="flex space-x-1" onClick={e => e.stopPropagation()}>
-                      {TAGS.map(t => (
-                        <button key={t} onClick={() => updateTag(event.event_id, t)}
-                          className={`px-2 py-1 rounded text-xs font-medium border ${TAG_STYLES[t]}`}>{t}</button>
-                      ))}
-                    </div>
-                  ) : (
-                    <button onClick={e => { e.stopPropagation(); setEditingTag(event.event_id); }}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold border ${TAG_STYLES[event.tag] || TAG_STYLES.Upcoming}`}>
-                      {event.tag}
-                    </button>
-                  )}
+                  <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
+                    <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${TAG_STYLES[event.computed_status || event.tag] || TAG_STYLES.Upcoming}`}>
+                      {event.computed_status || event.tag}
+                    </span>
+                    {(event.computed_status || event.tag) !== 'Cancelled' && (event.computed_status || event.tag) !== 'Completed' && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Are you sure you want to cancel the camp at ${event.school_name}?`)) {
+                            updateTag(event.event_id, 'Cancelled');
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold border bg-red-500/10 text-red-500 border-red-500/30 hover:bg-red-500/20 transition-colors shadow-sm cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    {(event.computed_status || event.tag) === 'Ongoing' && (
+                      <button
+                        onClick={async () => {
+                          if (window.confirm(`Are you sure you want to completely END the camp at ${event.school_name}? This will mark it as Completed immediately.`)) {
+                            const yesterday = new Date();
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            await fetch(`/api/events/${event.event_id}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ end_date: yesterday.toISOString().split('T')[0], user_id: user.username })
+                            });
+                            fetchEvents();
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 transition-colors shadow-sm cursor-pointer"
+                      >
+                        End Camp
+                      </button>
+                    )}
+                  </div>
                   {expandedId === event.event_id ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                 </div>
               </button>
@@ -300,11 +344,10 @@ function EventExpandedPanel({ eventId, event, user, onRefresh }: {
       <div className="flex space-x-1 px-6 pt-3">
         {sectionBtns.map(s => (
           <button key={s.key} onClick={() => setActiveSection(s.key)}
-            className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${
-              activeSection === s.key
-                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/25'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}>
+            className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeSection === s.key
+              ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/25'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}>
             {s.icon}<span>{s.label}</span>
           </button>
         ))}
@@ -375,7 +418,7 @@ function EventExpandedPanel({ eventId, event, user, onRefresh }: {
                         try {
                           const d = JSON.parse(rec.json_data);
                           assessment = d.assessment === 'N' ? 'Normal' : d.assessment === 'O' ? 'Observation' : d.assessment === 'R' ? 'Referred' : '—';
-                        } catch {}
+                        } catch { }
                         const assessColor = assessment === 'Normal' ? 'text-emerald-400' : assessment === 'Referred' ? 'text-red-400' : assessment === 'Observation' ? 'text-amber-400' : 'text-slate-400';
                         return (
                           <tr key={rec.record_id} className="hover:bg-slate-800/30">
@@ -482,6 +525,24 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
     return Object.keys(e).length === 0;
   };
 
+  const computedTag = (() => {
+    if (!f.start_date) return 'Upcoming';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(f.start_date);
+    if (isNaN(startDate.getTime())) return 'Upcoming';
+    startDate.setHours(0, 0, 0, 0);
+
+    if (startDate > today) return 'Upcoming';
+    if (!f.end_date) return 'Ongoing';
+
+    const endDate = new Date(f.end_date);
+    if (isNaN(endDate.getTime())) return 'Ongoing';
+    endDate.setHours(0, 0, 0, 0);
+
+    return endDate >= today ? 'Ongoing' : 'Completed';
+  })();
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
@@ -490,7 +551,7 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...f, created_by: user.username }),
+        body: JSON.stringify({ ...f, tag: computedTag, created_by: user.username }),
       });
       const data = await res.json();
       if (data.success) onCreated();
@@ -567,18 +628,6 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
             </div>
           </div>
 
-          {/* Tag */}
-          <div>
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Status Tag</h4>
-            <div className="flex space-x-2">
-              {TAGS.map(t => (
-                <button key={t} type="button" onClick={() => upd('tag', t)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${f.tag === t ? TAG_STYLES[t] : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
-                  {f.tag === t && <Check className="w-3 h-3 inline mr-1" />}{t}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <button type="submit" disabled={saving}
             className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 mt-2">
@@ -687,11 +736,10 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         </h3>
 
         {message && (
-          <div className={`p-3 rounded-xl text-sm mb-4 border whitespace-pre-line ${
-            message.type === 'success'
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-              : 'bg-red-500/10 border-red-500/30 text-red-400'
-          }`}>
+          <div className={`p-3 rounded-xl text-sm mb-4 border whitespace-pre-line ${message.type === 'success'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}>
             {message.text}
           </div>
         )}
@@ -710,15 +758,14 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
             <div className="flex flex-wrap gap-2">
               {ALL_REGISTER_ROLES.map(role => (
                 <button key={role.key} type="button" onClick={() => upd('role', role.key)}
-                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all border ${
-                    f.role === role.key
-                      ? role.key === 'School POC'
-                        ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
-                        : SPECIALIST_ROLES.some(r => r.key === role.key)
-                          ? getCategoryColor(role.key)
-                          : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-                  }`}>
+                  className={`px-3 py-2 rounded-xl font-bold text-xs transition-all border ${f.role === role.key
+                    ? role.key === 'School POC'
+                      ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
+                      : SPECIALIST_ROLES.some(r => r.key === role.key)
+                        ? getCategoryColor(role.key)
+                        : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                    }`}>
                   {role.key === 'School POC' && <School className="w-3.5 h-3.5 inline mr-1" />}
                   {role.label}
                 </button>
