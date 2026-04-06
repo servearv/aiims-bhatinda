@@ -1707,7 +1707,7 @@ def api_students_search():
         if json_str:
             try:
                 d = json.loads(json_str)
-                r['assessment'] = d.get('assessment', '')
+                r['assessment'] = d.get('status', '') or d.get('assessment', '')
             except Exception:
                 pass
 

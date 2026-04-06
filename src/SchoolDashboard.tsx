@@ -120,6 +120,8 @@ export default function SchoolDashboard({ user }: { user: User }) {
 function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventData) => void }) {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'Ongoing' | 'Upcoming' | 'Completed'>('Ongoing');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetch(`/api/events/school?username=${encodeURIComponent(user.username)}`)
@@ -155,6 +157,12 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
     }
   };
 
+  const filteredEvents = events.filter(e => {
+    const matchesSearch = e.school_name.toLowerCase().includes(searchQuery.toLowerCase());
+    const eventTag = computeTag(e);
+    return matchesSearch && eventTag === activeTab;
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
       <div className="text-center">
@@ -162,22 +170,51 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
         <p className="text-slate-400 text-sm mt-1">Manage student rosters and track camp progress.</p>
       </div>
 
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex space-x-2 bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
+          {['Ongoing', 'Completed', 'Upcoming'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none ${
+                activeTab === tab 
+                  ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]' 
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+          <input 
+            type="text" 
+            placeholder="Search events..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all text-sm backdrop-blur-xl"
+          />
+        </div>
+      </div>
+
       {loading ? (
         <div className="text-center py-12 text-slate-400">Loading events...</div>
-      ) : events.length === 0 ? (
+      ) : filteredEvents.length === 0 ? (
         <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
           <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400">No events assigned to your school.</p>
-          <p className="text-slate-500 text-sm mt-1">Contact an administrator to create events for your school.</p>
+          <p className="text-slate-400">No {activeTab.toLowerCase()} events found.</p>
+          {searchQuery && <p className="text-slate-500 text-sm mt-1">Try adjusting your search query.</p>}
         </div>
       ) : (
         <div className="space-y-3">
-          {events.map(event => (
+          {filteredEvents.map(event => (
             <button key={event.event_id} onClick={() => onSelect(event)}
-              className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all p-5 group shadow-xl">
-              <div className="flex items-center justify-between">
+              className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-violet-500/40 transition-all p-5 group shadow-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-all">
+                  <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-all flex-shrink-0">
                     <Calendar className="w-6 h-6 text-violet-400" />
                   </div>
                   <div>
@@ -188,14 +225,14 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <span className="text-xs text-slate-500">
+                <div className="flex items-center space-x-3 self-end md:self-auto">
+                  <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
                     <Users className="w-3.5 h-3.5 inline mr-1" />{event.student_count ?? 0} students
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
                     <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0} screened
                   </span>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${tagStyle(computeTag(event))}`}>{computeTag(event)}</span>
+                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${tagStyle(computeTag(event))}`}>{computeTag(event)}</span>
                   <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-violet-400 transition-colors" />
                 </div>
               </div>
@@ -477,7 +514,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   }
 
   // Empty state
-  if (!loading && students.length === 0 && !searchQuery) {
+  if (!loading && students.length === 0 && !searchQuery && !statusFilter && !classFilter && !sectionFilter && !genderFilter) {
     return (
       <div className="space-y-4">
         <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
@@ -578,6 +615,12 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
       {/* Student Table */}
       {loading ? (
         <div className="text-center py-8 text-slate-400">Loading students...</div>
+      ) : students.length === 0 ? (
+        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center shadow-xl">
+          <Users className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+          <p className="text-slate-400 font-medium">No student yet.</p>
+          <p className="text-slate-500 text-sm mt-1">Try adjusting your active filters.</p>
+        </div>
       ) : (
         <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
           <div className="overflow-x-auto">
