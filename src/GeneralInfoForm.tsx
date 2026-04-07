@@ -497,28 +497,23 @@ export function GeneralInfoSummary({ studentId, eventId }: {
   return (
     <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-4 space-y-3">
       <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center">
-        <User className="w-3.5 h-3.5 mr-1.5" /> General Information (Read Only)
+        <User className="w-3.5 h-3.5 mr-1.5" /> General Info & Vitals (Read Only)
       </h4>
 
-      {/* Demographics row */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
-        <InfoChip label="Age" value={s.age ? `${s.age}y` : '—'} />
-        <InfoChip label="Gender" value={s.gender === 'M' ? 'Male' : s.gender === 'F' ? 'Female' : s.gender || '—'} />
-        <InfoChip label="Class" value={s.student_class ? `${s.student_class}${s.section ? '-' + s.section : ''}` : '—'} />
+      {/* Combined Demographics & Vitals */}
+      <div className="grid grid-cols-3 gap-2 text-xs">
         <InfoChip label="Blood" value={s.blood_group || '—'} />
         <InfoChip label="Father" value={s.father_name || '—'} />
         <InfoChip label="Phone" value={s.phone || '—'} />
+        
+        {(gi.height || gi.weight) && (
+          <>
+            <InfoChip label="Height" value={gi.height ? `${gi.height} cm` : '—'} />
+            <InfoChip label="Weight" value={gi.weight ? `${gi.weight} kg` : '—'} />
+            <InfoChip label="BMI" value={bmi ? `${bmi} (${bmiCat})` : '—'} highlight={bmiCat && bmiCat !== 'Normal'} />
+          </>
+        )}
       </div>
-
-      {/* Vitals row */}
-      {(gi.height || gi.weight) && (
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <InfoChip label="Height" value={gi.height ? `${gi.height} cm` : '—'} />
-          <InfoChip label="Weight" value={gi.weight ? `${gi.weight} kg` : '—'} />
-          <InfoChip label="BMI" value={bmi ? `${bmi} (${bmiCat})` : '—'}
-            highlight={bmiCat && bmiCat !== 'Normal'} />
-        </div>
-      )}
 
       {/* Symptoms alerts */}
       {symptoms.length > 0 && (

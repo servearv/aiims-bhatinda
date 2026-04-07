@@ -3,9 +3,9 @@ import {
   Search, Plus, ChevronDown, ChevronRight, X, Save,
   ArrowRight, AlertTriangle, Eye, Ear, Stethoscope,
   Activity, Check, UserPlus, Calendar, HeartPulse, Scan,
-  Users, CheckCircle, Loader2, ClipboardList, Printer, Trash2, PlusCircle, FileText
+  Users, CheckCircle, Loader2, ClipboardList, Printer, Trash2, PlusCircle, FileText, RefreshCw
 } from 'lucide-react';
-import { GeneralInfoSummary } from './GeneralInfoForm';
+import GeneralInfoForm, { GeneralInfoSummary } from './GeneralInfoForm';
 
 // Socket.IO client (optional)
 let io: any = null;
@@ -347,21 +347,38 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
       onVolunteer(camp.event_id, camp.school_name);
     } catch { alert('Failed to join camp'); } finally { setJoining(null); }
   };
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredCamps = camps.filter(c => c.school_name.toLowerCase().includes(searchQuery.toLowerCase()));
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl mx-auto">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-white tracking-tight">Screening Camps 🏥</h2>
         <p className="text-slate-400 text-sm mt-1">Select a camp to begin clinical screening.</p>
       </div>
+
+      <div className="relative max-w-md mx-auto">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-500 w-4 h-4" />
+        <input 
+          type="text" 
+          placeholder="Search active camps..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/80 border border-slate-800 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-sm backdrop-blur-xl shadow-lg"
+        />
+      </div>
+
       {loading ? <div className="text-center py-12 text-slate-400">Loading camps...</div>
-      : camps.length === 0 ? (
-        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
+      : filteredCamps.length === 0 ? (
+        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center shadow-xl">
           <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400">No active camps available.</p>
+          {searchQuery && <p className="text-slate-500 text-sm mt-1">Try adjusting your search query.</p>}
         </div>
       ) : (
         <div className="space-y-3">
-          {camps.map((camp: any) => (
+          {filteredCamps.map((camp: any) => (
             <div key={camp.event_id} className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all p-5 shadow-xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
@@ -1391,6 +1408,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   const [filterGender, setFilterGender] = useState('');
   const [filterExamined, setFilterExamined] = useState('');
   const [examData, setExamData] = useState<any>({ status: 'N' });
+  const [showFullRecord, setShowFullRecord] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [online, setOnline] = useState(navigator.onLine);
   const [offlineCount, setOfflineCount] = useState(0);
@@ -1455,7 +1473,16 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
 
   // Load existing exam data when student selected
   const selectStudent = async (s: Student) => {
-    setSelectedStudent(s); setSearchResults([]); setSearchQuery('');
+    // Force save the current student's data before switching
+    if (selectedStudent && examData) {
+      await autoSave(examData);
+    }
+    
+    setSelectedStudent(s); 
+    setSearchResults([]); 
+    setSearchQuery('');
+    setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender('');
+
     // Load existing record for this specialist
     try {
       const res = await fetch(`/api/students/${s.student_id}/all-records?event_id=${campId}`);
@@ -1561,7 +1588,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
       </div>
 
       {/* Search + Add */}
-      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800 shadow-xl">
+      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800 shadow-xl relative z-40">
         <div className="flex space-x-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-500 w-5 h-5" />
@@ -1594,29 +1621,33 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
             <button onClick={() => { setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender(''); }} className="text-xs text-red-400 underline">Clear</button>
           )}
         </div>
-        {/* Results — show when there are results and no student selected */}
-        {searchResults.length > 0 && !selectedStudent && (
-          <div className="mt-3 max-h-64 overflow-y-auto space-y-1.5 border-t border-slate-800 pt-3">
-            {searchResults.map(s => (
-              <button key={s.student_id} onClick={() => selectStudent(s)}
-                className="w-full text-left px-4 py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all flex justify-between items-center group">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full ${s.is_examined ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                  <div>
-                    <span className="font-bold text-white">{s.name}</span>
-                    <span className="text-slate-400 text-xs ml-2">
-                      {s.student_class && `Class ${s.student_class}`}{s.section && `-${s.section}`}
-                      {s.age && ` • ${s.age}y`} • {s.gender}
-                    </span>
+        {/* Results — inline if no student selected, floating if filling form */}
+        {searchResults.length > 0 && (
+          (!selectedStudent || searchQuery || filterClass || filterSection || filterExamined || filterGender) && (
+            <div className={selectedStudent 
+              ? "absolute left-2 right-2 top-full mt-2 z-50 bg-slate-900/95 backdrop-blur-2xl border border-slate-700 shadow-2xl rounded-2xl max-h-[60vh] overflow-y-auto p-2"
+              : "mt-3 max-h-64 overflow-y-auto space-y-1.5 border-t border-slate-800 pt-3"}>
+              {searchResults.map(s => (
+                <button key={s.student_id} onClick={() => selectStudent(s)}
+                  className="w-full text-left px-4 py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all flex justify-between items-center group mb-1.5">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-2 h-2 rounded-full ${s.is_examined ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                    <div>
+                      <span className="font-bold text-white">{s.name}</span>
+                      <span className="text-slate-400 text-xs ml-2">
+                        {s.student_class && `Class ${s.student_class}`}{s.section && `-${s.section}`}
+                        {s.age && ` • ${s.age}y`} • {s.gender}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <DomainProgressBar examinedCategories={s.examined_categories} />
-                  <span className="text-xs text-slate-500 group-hover:text-cyan-400">Select →</span>
-                </div>
-              </button>
-            ))}
-          </div>
+                  <div className="flex items-center space-x-2">
+                    <DomainProgressBar examinedCategories={s.examined_categories} />
+                    <span className="text-xs text-slate-500 group-hover:text-cyan-400">Select →</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
         )}
       </div>
 
@@ -1636,10 +1667,16 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
                 </div>
               </div>
             </div>
-            <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); doSearch(); searchRef.current?.focus(); }}
-              className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-700 text-white flex items-center space-x-2">
-              <X className="w-4 h-4" /><span>Done</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button onClick={() => setShowFullRecord(true)}
+                className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 px-4 py-2.5 rounded-xl text-sm font-medium border border-cyan-500/30 flex items-center space-x-2 transition-all">
+                <FileText className="w-4 h-4" /><span>Full Record</span>
+              </button>
+              <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); doSearch(); searchRef.current?.focus(); }}
+                className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-700 text-white flex items-center space-x-2 transition-all">
+                <X className="w-4 h-4" /><span>Done</span>
+              </button>
+            </div>
           </div>
 
           {/* General Info Summary (read-only for specialists) */}
@@ -1659,6 +1696,22 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
       )}
 
       {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onCreated={(s) => selectStudent(s)} userId={user.username} campId={campId} />}
+      
+      {showFullRecord && selectedStudent && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowFullRecord(false)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-2">
+              <GeneralInfoForm
+                student={selectedStudent as any}
+                eventId={campId}
+                user={{ username: user.username, role: user.role, name: user.name || user.username }}
+                onClose={() => setShowFullRecord(false)}
+                readOnly={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -212,7 +212,7 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
               placeholder="Search by school name..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 w-full md:w-96 shadow-lg shadow-black/20"
+              className="pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 w-full md:w-96 shadow-sm"
             />
           </div>
           <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
@@ -237,16 +237,16 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
 
       {/* Events List */}
       {filtered.length === 0 ? (
-        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
+        <div className="bg-slate-900/40 backdrop-blur-xl p-12 rounded-2xl border border-slate-800/50 text-center">
           <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400">No events found.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl border border-slate-800/50 shadow-sm overflow-hidden divide-y divide-slate-800/50">
           {filtered.map(event => (
-            <div key={event.event_id} className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+            <div key={event.event_id} className="group">
               <button onClick={() => setExpandedId(expandedId === event.event_id ? null : event.event_id)}
-                className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-800/30 transition-colors text-left">
+                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-800/40 transition-colors text-left">
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
                     <Calendar className="w-5 h-5 text-cyan-400" />
