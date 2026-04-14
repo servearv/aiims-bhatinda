@@ -1,0 +1,22 @@
+/** Shared teacher-observed symptom checklist (School POC + on-site registration). */
+export const SYMPTOM_CHECKLIST = [
+  'Child rubs eyes frequently',
+  'Child cannot see what is written on the board',
+  'Child constantly pokes fingers into or pulls ear',
+  'Child tends to breathe through their mouth',
+  'Teeth look black or rotten',
+  'Breath has a bad odour',
+  'Cracks at corners of the mouth',
+  'Child constantly scratches the head',
+  'White patches on the skin',
+  'Child bites nails',
+  'Child complains of frequent headaches',
+  'Episodes of fainting (especially in summers)',
+  'Child gets attacks of breathlessness',
+  'Limping gait',
+  'Child stammers or cannot speak properly',
+  'Frequent urination',
+  'Diarrhea',
+  'Vomiting',
+  'Blood passed with stools',
+] as const;

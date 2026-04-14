@@ -201,21 +201,36 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative flex flex-col">
-        <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
-        
-        {/* Topbar with Sidebar Toggle */}
-        <div className="p-4 flex items-center relative z-20 pwa-no-print">
-          <button 
+      <main
+        className={`relative flex flex-1 flex-col ${
+          isSpecialist(user.role) && activeTab === 'dashboard' ? 'min-h-0 overflow-hidden' : 'overflow-y-auto'
+        }`}
+      >
+        {!(isSpecialist(user.role) && activeTab === 'dashboard') && (
+          <>
+            <div className="pointer-events-none absolute top-1/2 left-1/4 h-96 w-96 rounded-full bg-cyan-500/10 blur-[120px]" />
+            <div className="pointer-events-none absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-blue-600/10 blur-[120px]" />
+          </>
+        )}
+
+        <div className="relative z-20 flex flex-shrink-0 items-center p-3 pwa-no-print md:p-4">
+          <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all backdrop-blur-xl border border-slate-700 hover:border-cyan-500/50 shadow-sm"
-            title="Toggle Menu">
-            <Menu className="w-5 h-5" />
+            className="rounded-xl border border-slate-700 bg-slate-800/80 p-2.5 text-slate-300 backdrop-blur-xl transition-all hover:border-cyan-500/50 hover:bg-slate-700 hover:text-white"
+            title="Toggle Menu"
+            type="button"
+          >
+            <Menu className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="px-8 pb-8 flex-1 relative z-10">
+        <div
+          className={`relative z-10 flex-1 ${
+            isSpecialist(user.role) && activeTab === 'dashboard'
+              ? 'flex min-h-0 flex-col overflow-hidden px-0 pb-0'
+              : 'px-8 pb-8'
+          }`}
+        >
           {activeTab === 'profile' ? (
             <ProfileSettings user={user} onBack={() => setActiveTab('dashboard')} />
           ) : (

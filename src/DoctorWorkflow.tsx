@@ -98,6 +98,27 @@ async function getOfflineQueueCount(): Promise<number> {
   } catch { return 0; }
 }
 
+// ── Clinical design tokens (layout / surface only) ──
+const cls = {
+  input:
+    'min-h-[44px] w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 text-[15px] leading-snug text-[#1F2937] transition-all placeholder-[#9CA3AF] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20',
+  inputLg:
+    'min-h-[44px] w-full rounded-lg border border-[#E5E7EB] bg-white px-4 py-3 text-base leading-snug text-[#1F2937] transition-all placeholder-[#9CA3AF] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20',
+  select:
+    'min-h-[44px] w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 text-[15px] text-[#1F2937] transition-all focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20',
+  selectSm:
+    'min-h-[32px] rounded-md border border-[#E5E7EB] bg-white px-2 py-1.5 text-xs text-[#374151] transition-all focus:border-[#2563EB] focus:outline-none focus:ring-1 focus:ring-[#2563EB]/25',
+  textarea:
+    'min-h-[120px] w-full resize-y rounded-lg border border-[#E5E7EB] bg-white px-3 py-3 text-[15px] leading-relaxed text-[#1F2937] transition-all placeholder-[#9CA3AF] focus:border-[#2563EB] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20',
+  // Labels
+  label: 'mb-1.5 block text-xs font-medium uppercase tracking-wider text-[#6B7280]',
+  sectionTitle: 'text-xs font-semibold uppercase tracking-wider text-[#6B7280]',
+  // Buttons
+  btnPrimary: 'rounded-lg bg-[#2563EB] px-4 py-2.5 font-semibold text-white shadow-sm transition-colors hover:bg-[#1D4ED8]',
+  btnSecondary: 'rounded-lg border border-[#E5E7EB] bg-white px-4 py-2.5 font-medium text-[#374151] transition-colors hover:bg-[#F9FAFB]',
+  btnGhost: 'rounded-lg px-3 py-2 font-medium text-[#6B7280] transition-colors hover:bg-[#F3F4F6]',
+};
+
 // ── Reusable UI ──
 function FormSelect({ label, value, onChange, options, id, disabled }: {
   label: string; value: string; onChange: (v: string) => void; options: string[]; id: string; disabled?: boolean;
@@ -107,16 +128,16 @@ function FormSelect({ label, value, onChange, options, id, disabled }: {
   const showCustom = options.includes('Other') && isOther;
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">{label}</label>
+      <label htmlFor={id} className={cls.label}>{label}</label>
       <select id={id} value={isOther && value !== 'Other' ? 'Other' : value} disabled={disabled} onChange={e => {
         if (e.target.value === 'Other') onChange('Other'); else { onChange(e.target.value); setCustomValue(''); }
-      }} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all disabled:opacity-60">
+      }} className={`${cls.select} w-full disabled:opacity-50`}>
         {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
       </select>
       {showCustom && !disabled && (
         <input type="text" placeholder="Specify..." value={value === 'Other' ? customValue : value}
           onChange={e => { setCustomValue(e.target.value); onChange(e.target.value || 'Other'); }}
-          className="w-full mt-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 placeholder-slate-600" />
+          className={`${cls.input} mt-1.5`} />
       )}
     </div>
   );
@@ -127,9 +148,18 @@ function FormInput({ label, value, onChange, type = 'text', placeholder = '', id
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">{label}</label>
+      <label htmlFor={id} className={cls.label}>{label}</label>
       <input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
-        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 disabled:opacity-60" />
+        className={`${cls.input} disabled:opacity-50`} />
+    </div>
+  );
+}
+
+function SectionHeading({ title, icon }: { title: string; icon: React.ReactNode }) {
+  return (
+    <div className="mb-6 flex items-center gap-2 border-b border-[#E5E7EB] pb-3">
+      <span className="text-[#9CA3AF]">{icon}</span>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">{title}</h3>
     </div>
   );
 }
@@ -139,13 +169,16 @@ function SectionCard({ title, icon, children, defaultOpen = true }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
       <button type="button" onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-800/50 transition-colors">
-        <div className="flex items-center space-x-3">{icon}<span className="font-semibold text-white text-sm">{title}</span></div>
-        {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center space-x-2.5">
+          <span className="text-gray-400">{icon}</span>
+          <span className="font-semibold text-gray-800 text-sm">{title}</span>
+        </div>
+        {open ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
       </button>
-      {open && <div className="px-5 pb-5 border-t border-slate-800/50 pt-4">{children}</div>}
+      {open && <div className="px-5 pb-5 border-t border-gray-50 pt-4">{children}</div>}
     </div>
   );
 }
@@ -153,16 +186,19 @@ function SectionCard({ title, icon, children, defaultOpen = true }: {
 function DomainProgressBar({ examinedCategories }: { examinedCategories?: string }) {
   const done = new Set((examinedCategories || '').split(',').filter(Boolean));
   return (
-    <div className="flex items-center space-x-1">
+    <div className="flex flex-wrap items-center gap-1">
       {DOMAIN_TAGS.map(d => {
         const isDone = done.has(d.key) || done.has('FullExam');
         return (
-          <div key={d.key} className={`flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-            isDone ? `${d.color}/20 border-current text-white` : 'bg-slate-800 border-slate-700 text-slate-500'
-          }`}>
-            {isDone && <CheckCircle className="w-2.5 h-2.5" />}
-            <span>{d.short}</span>
-          </div>
+          <span
+            key={d.key}
+            className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+              isDone ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]' : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#9CA3AF]'
+            }`}
+          >
+            {isDone && <CheckCircle className="h-2.5 w-2.5 text-[#16A34A]" />}
+            {d.short}
+          </span>
         );
       })}
     </div>
@@ -229,37 +265,37 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
     finally { setSaving(false); }
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-        <h3 className="text-xl font-bold text-white mb-5 flex items-center"><UserPlus className="w-5 h-5 mr-2 text-cyan-400" /> Register New Student</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto border border-gray-200" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"><X className="w-5 h-5" /></button>
+        <h3 className="text-lg font-bold text-gray-900 mb-5 flex items-center"><UserPlus className="w-5 h-5 mr-2 text-blue-600" /> Register New Student</h3>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Student Name *</label>
+              <label className={cls.label}>Student Name *</label>
               <input ref={nameRef} value={f.name} onChange={e => upd('name', e.target.value)} required
-                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-white text-lg focus:ring-2 focus:ring-cyan-500/50 ${errors.name ? 'border-red-500/50' : 'border-slate-800'}`} placeholder="Full name" />
-              {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
+                className={`${cls.inputLg} ${errors.name ? 'border-red-300 focus:ring-red-500/30 focus:border-red-500' : ''}`} placeholder="Full name" />
+              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
             <FormInput label="Age" value={f.age} onChange={() => {}} type="number" id="add-age" placeholder="Auto from DOB" disabled />
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Sex *</label>
+              <label className={cls.label}>Sex *</label>
               <div className="flex space-x-3 mt-1">
                 {[{ v: 'M', label: 'Male' }, { v: 'F', label: 'Female' }].map(opt => (
                   <button key={opt.v} type="button" onClick={() => upd('gender', opt.v)}
-                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center space-x-2 ${
-                      f.gender === opt.v ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800'
+                    className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all border flex items-center justify-center space-x-2 ${
+                      f.gender === opt.v ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                     }`}>
                     {f.gender === opt.v && <Check className="w-3.5 h-3.5" />}<span>{opt.label}</span>
                   </button>
                 ))}
               </div>
-              {errors.gender && <p className="text-red-400 text-xs mt-1">{errors.gender}</p>}
+              {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender}</p>}
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Class *</label>
+              <label className={cls.label}>Class *</label>
               <select value={f.student_class} onChange={e => upd('student_class', e.target.value)}
-                className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm ${errors.student_class ? 'border-red-500/50' : 'border-slate-800'}`}>
+                className={`${cls.select} w-full ${errors.student_class ? 'border-red-300' : ''}`}>
                 {CLASSES.map(o => <option key={o} value={o}>{o || '— Select —'}</option>)}
               </select>
             </div>
@@ -268,39 +304,39 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
             <FormInput label="Father's Name" value={f.father_name} onChange={v => upd('father_name', v)} id="add-father" placeholder="Optional" />
             <FormInput label="Contact Number" value={f.phone} onChange={v => upd('phone', v)} id="add-phone" placeholder="Optional" type="tel" />
             <div>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Date of Birth *</label>
+              <label className={cls.label}>Date of Birth *</label>
               <input type="date" value={f.dob} onChange={e => upd('dob', e.target.value)}
-                className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm ${errors.dob ? 'border-red-500/50' : 'border-slate-800'}`} />
-              {errors.dob && <p className="text-red-400 text-xs mt-1">{errors.dob}</p>}
+                className={`${cls.input} ${errors.dob ? 'border-red-300' : ''}`} />
+              {errors.dob && <p className="text-red-500 text-xs mt-1">{errors.dob}</p>}
             </div>
           </div>
 
           {/* Symptoms Checklist */}
-          <div className="border border-slate-800 rounded-2xl overflow-hidden">
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
             <button type="button" onClick={() => setShowSymptoms(!showSymptoms)}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/50 transition-colors">
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
               <div className="flex items-center space-x-2">
-                <ClipboardList className="w-4 h-4 text-amber-400" />
-                <span className="text-sm font-semibold text-white">Observed Symptoms</span>
+                <ClipboardList className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-semibold text-gray-700">Observed Symptoms</span>
                 {symptoms.length > 0 && (
-                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-xs font-bold">{symptoms.length}</span>
+                  <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded text-xs font-bold">{symptoms.length}</span>
                 )}
               </div>
-              {showSymptoms ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+              {showSymptoms ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
             </button>
             {showSymptoms && (
-              <div className="px-4 pb-4 border-t border-slate-800/50 pt-3">
-                <p className="text-xs text-slate-500 mb-2">Check all symptoms observed in the child:</p>
+              <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+                <p className="text-xs text-gray-500 mb-2">Check all symptoms observed in the child:</p>
                 <div className="grid grid-cols-1 gap-1.5 max-h-60 overflow-y-auto">
                   {SYMPTOM_CHECKLIST.map(symptom => {
                     const active = symptoms.includes(symptom);
                     return (
                       <button key={symptom} type="button" onClick={() => toggleSymptom(symptom)}
                         className={`flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-left transition-all border ${
-                          active ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                          active ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300'
                         }`}>
                         <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                          active ? 'bg-amber-500 border-amber-500' : 'border-slate-600'
+                          active ? 'bg-amber-500 border-amber-500' : 'border-gray-300'
                         }`}>
                           {active && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
@@ -314,7 +350,7 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
           </div>
 
           <button type="submit" disabled={saving}
-            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg disabled:opacity-50 mt-2">
+            className={`w-full ${cls.btnPrimary} py-3.5 text-base disabled:opacity-50`}>
             {saving ? 'Saving...' : 'Register & Continue →'}
           </button>
         </form>
@@ -352,50 +388,50 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
   const filteredCamps = camps.filter(c => c.school_name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl mx-auto">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-white tracking-tight">Screening Camps 🏥</h2>
-        <p className="text-slate-400 text-sm mt-1">Select a camp to begin clinical screening.</p>
+    <div className="clinical-camps space-y-6 max-w-4xl mx-auto py-8">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Screening Camps</h2>
+        <p className="text-gray-500 text-sm mt-1">Select an active camp to begin clinical screening</p>
       </div>
 
       <div className="relative max-w-md mx-auto">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-500 w-4 h-4" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
         <input 
           type="text" 
-          placeholder="Search active camps..."
+          placeholder="Search camps..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/80 border border-slate-800 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 outline-none transition-all text-sm backdrop-blur-xl shadow-lg"
+          className={`${cls.input} pl-10`}
         />
       </div>
 
-      {loading ? <div className="text-center py-12 text-slate-400">Loading camps...</div>
+      {loading ? <div className="text-center py-12 text-gray-400">Loading camps...</div>
       : filteredCamps.length === 0 ? (
-        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center shadow-xl">
-          <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400">No active camps available.</p>
-          {searchQuery && <p className="text-slate-500 text-sm mt-1">Try adjusting your search query.</p>}
+        <div className="bg-white p-12 rounded-xl border border-gray-100 text-center">
+          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500">No active camps available.</p>
+          {searchQuery && <p className="text-gray-400 text-sm mt-1">Try adjusting your search query.</p>}
         </div>
       ) : (
         <div className="space-y-3">
           {filteredCamps.map((camp: any) => (
-            <div key={camp.event_id} className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all p-5 shadow-xl">
+            <div key={camp.event_id} className="w-full text-left bg-white rounded-xl border border-gray-100 hover:border-blue-200 transition-all p-5 hover:shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center"><Calendar className="w-6 h-6 text-cyan-400" /></div>
+                  <div className="w-11 h-11 rounded-lg bg-blue-50 flex items-center justify-center"><Calendar className="w-5 h-5 text-blue-600" /></div>
                   <div>
-                    <h3 className="text-white font-semibold text-lg">{camp.school_name}</h3>
-                    <p className="text-sm text-slate-400 mt-0.5">{formatDate(camp.start_date)}{camp.end_date ? ` → ${formatDate(camp.end_date)}` : ''}</p>
+                    <h3 className="text-gray-900 font-semibold text-base">{camp.school_name}</h3>
+                    <p className="text-sm text-gray-400 mt-0.5">{formatDate(camp.start_date)}{camp.end_date ? ` → ${formatDate(camp.end_date)}` : ''}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="text-right mr-2">
-                    <span className="text-xs text-slate-500 block"><Users className="w-3.5 h-3.5 inline mr-1" />{camp.volunteer_count ?? 0} medical staff</span>
-                    <span className="text-xs text-slate-500 block mt-0.5"><Activity className="w-3.5 h-3.5 inline mr-1" />{camp.screened_count ?? 0}/{camp.student_count ?? 0} screened</span>
+                  <div className="text-right mr-2 hidden sm:block">
+                    <span className="text-xs text-gray-400 block"><Users className="w-3.5 h-3.5 inline mr-1" />{camp.volunteer_count ?? 0} staff</span>
+                    <span className="text-xs text-gray-400 block mt-0.5"><Activity className="w-3.5 h-3.5 inline mr-1" />{camp.screened_count ?? 0}/{camp.student_count ?? 0}</span>
                   </div>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>{(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}</span>
+                  <span className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-green-50 text-green-700 border-green-200' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-gray-50 text-gray-500 border-gray-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}</span>
                   <button onClick={() => handleVolunteer(camp)} disabled={joining === camp.event_id}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 shadow-lg disabled:opacity-50">
+                    className={`${cls.btnPrimary} flex items-center space-x-2 text-sm disabled:opacity-50`}>
                     <ArrowRight className="w-4 h-4" /><span>{joining === camp.event_id ? 'Joining...' : 'Join Camp'}</span>
                   </button>
                 </div>
@@ -415,20 +451,20 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
 // --- Ophthalmology Form ---
 function EyeExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
-  const statusIsNormal = data.status === 'N';
   return (
-    <SectionCard title="Ophthalmology Examination" icon={<Eye className="w-4 h-4 text-emerald-400" />}>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div className="space-y-5">
+      <SectionHeading title="Ophthalmology Examination" icon={<Eye className="w-4 h-4" />} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <FormSelect label="Vision - Right Eye" value={data.rightEye || '6/6'} onChange={v => u('rightEye', v)}
           options={['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', 'Other']} id="eye-r" disabled={disabled} />
         <FormSelect label="Vision - Left Eye" value={data.leftEye || '6/6'} onChange={v => u('leftEye', v)}
           options={['6/6', '6/9', '6/12', '6/18', '6/24', '6/36', '6/60', 'Other']} id="eye-l" disabled={disabled} />
         <div>
-          <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Spectacles / Lenses</label>
+          <label className={cls.label}>Spectacles / Lenses</label>
           <div className="flex space-x-2">
             {['Yes', 'No'].map(o => (
               <button key={o} type="button" onClick={() => !disabled && u('accessories', o)} disabled={disabled}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs border ${data.accessories === o ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
+                className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${data.accessories === o ? 'border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]' : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'} disabled:opacity-50`}>
                 {o}
               </button>
             ))}
@@ -436,7 +472,7 @@ function EyeExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campNa
         </div>
       </div>
       <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
-    </SectionCard>
+    </div>
   );
 }
 
@@ -444,33 +480,46 @@ function EyeExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campNa
 function DentalExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
-    <SectionCard title="Dental Examination" icon={<span className="text-base">🦷</span>}>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="col-span-2">
-          <FormInput label="Teeth & Gums Examination" value={data.teethGums || ''} onChange={v => u('teethGums', v)}
-            id="dental-exam" placeholder='e.g. "Caries CBA ABE"' disabled={disabled} />
+    <div className="space-y-6">
+      <SectionHeading title="Dental Examination" icon={<span className="text-base">🦷</span>} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <label htmlFor="dental-exam" className={cls.label}>
+            Teeth &amp; gums examination
+          </label>
+          <textarea
+            id="dental-exam"
+            value={data.teethGums || ''}
+            onChange={e => u('teethGums', e.target.value)}
+            disabled={disabled}
+            rows={6}
+            placeholder='e.g. "Caries CBA ABE"'
+            className={`${cls.textarea} min-h-[160px] disabled:opacity-50`}
+          />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Dental Implants</label>
-          <div className="flex space-x-2">
-            {['Yes', 'No'].map(o => (
-              <button key={o} type="button" onClick={() => !disabled && u('implants', o)} disabled={disabled}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs border ${data.implants === o ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>{o}</button>
-            ))}
+        <div className="flex flex-col gap-6">
+          <div>
+            <label className={cls.label}>Dental implants</label>
+            <div className="flex gap-2">
+              {['Yes', 'No'].map(o => (
+                <button key={o} type="button" onClick={() => !disabled && u('implants', o)} disabled={disabled}
+                  className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${data.implants === o ? 'border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]' : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'} disabled:opacity-50`}>{o}</button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Braces</label>
-          <div className="flex space-x-2">
-            {['Yes', 'No'].map(o => (
-              <button key={o} type="button" onClick={() => !disabled && u('braces', o)} disabled={disabled}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs border ${data.braces === o ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>{o}</button>
-            ))}
+          <div>
+            <label className={cls.label}>Braces</label>
+            <div className="flex gap-2">
+              {['Yes', 'No'].map(o => (
+                <button key={o} type="button" onClick={() => !disabled && u('braces', o)} disabled={disabled}
+                  className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${data.braces === o ? 'border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]' : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'} disabled:opacity-50`}>{o}</button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
       <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
-    </SectionCard>
+    </div>
   );
 }
 
@@ -478,14 +527,15 @@ function DentalExamForm({ data, onChange, disabled, doctorInfo, studentInfo, cam
 function ENTExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
-    <SectionCard title="ENT Examination" icon={<Ear className="w-4 h-4 text-amber-400" />}>
-      <div className="grid grid-cols-3 gap-3">
+    <div className="space-y-5">
+      <SectionHeading title="ENT Examination" icon={<Ear className="w-4 h-4" />} />
+      <div className="grid grid-cols-3 gap-4">
         <FormInput label="Ear Examination" value={data.ear || ''} onChange={v => u('ear', v)} id="ent-ear" placeholder='e.g. "B/L EAC Wax"' disabled={disabled} />
         <FormInput label="Nose Examination" value={data.nose || ''} onChange={v => u('nose', v)} id="ent-nose" placeholder="NAD or specify" disabled={disabled} />
         <FormInput label="Throat Examination" value={data.throat || ''} onChange={v => u('throat', v)} id="ent-throat" placeholder="NAD or specify" disabled={disabled} />
       </div>
       <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
-    </SectionCard>
+    </div>
   );
 }
 
@@ -493,13 +543,14 @@ function ENTExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campNa
 function SkinExamForm({ data, onChange, disabled, doctorInfo, studentInfo, campName }: { data: any; onChange: (d: any) => void; disabled?: boolean; doctorInfo?: any; studentInfo?: any; campName?: string }) {
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
-    <SectionCard title="Dermatology Examination" icon={<Scan className="w-4 h-4 text-violet-400" />}>
-      <div className="grid grid-cols-1 gap-3">
+    <div className="space-y-5">
+      <SectionHeading title="Dermatology Examination" icon={<Scan className="w-4 h-4" />} />
+      <div className="grid grid-cols-1 gap-4">
         <FormInput label="Skin, Nails & Hair Examination" value={data.skinExam || ''} onChange={v => u('skinExam', v)}
           id="skin-exam" placeholder='e.g. "Seborrheic dermatitis / crusting on scalp"' disabled={disabled} />
       </div>
       <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
-    </SectionCard>
+    </div>
   );
 }
 
@@ -521,16 +572,18 @@ function CommunityMedForm({ data, onChange, disabled, doctorInfo, studentInfo, c
   };
   return (
     <>
-      <SectionCard title="Past History & Immunisation" icon={<HeartPulse className="w-4 h-4 text-rose-400" />}>
-        <div className="space-y-3">
+      {/* Past History & Immunisation */}
+      <div className="space-y-5">
+        <SectionHeading title="Past History & Immunisation" icon={<HeartPulse className="w-4 h-4" />} />
+        <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Past History</label>
+            <label className={cls.label}>Past History</label>
             <div className="flex flex-wrap gap-2">
               {PAST_HISTORY.map(h => {
                 const active = (data.pastHistory || []).includes(h);
                 return (
                   <button key={h} type="button" onClick={() => !disabled && toggleList('pastHistory', h)} disabled={disabled}
-                    className={`px-3 py-2 rounded-xl text-sm font-medium border ${active ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
+                    className={`min-h-[40px] rounded-lg border px-3 py-2 text-sm font-medium transition-all ${active ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]' : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'} disabled:opacity-50`}>
                     {active && <Check className="w-3 h-3 inline mr-1" />}{h}
                   </button>
                 );
@@ -539,28 +592,28 @@ function CommunityMedForm({ data, onChange, disabled, doctorInfo, studentInfo, c
             <FormInput label="Other Past History" value={data.pastHistoryOther || ''} onChange={v => u('pastHistoryOther', v)} id="cm-ph-other" placeholder="Specify if any" disabled={disabled} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Immunisation Status</label>
+            <label className={cls.label}>Immunisation Status</label>
             <div className="space-y-2">
               {VACCINATIONS.map(v => {
                 const val = (data.vaccinationStatus || {})[v] || 'unknown';
                 return (
                   <div key={v} className="flex items-center space-x-2">
-                    <span className="text-sm text-slate-300 w-28 flex-shrink-0">{v}</span>
+                    <span className="text-sm text-gray-600 w-28 flex-shrink-0">{v}</span>
                     <div className="flex space-x-1.5">
                       {[
-                        { key: 'given', label: 'Given', color: 'emerald' },
+                        { key: 'given', label: 'Given', color: 'green' },
                         { key: 'not_given', label: 'Not Given', color: 'red' },
-                        { key: 'unknown', label: 'Unknown', color: 'slate' },
+                        { key: 'unknown', label: 'Unknown', color: 'gray' },
                       ].map(opt => (
                         <button key={opt.key} type="button" disabled={disabled}
                           onClick={() => !disabled && u('vaccinationStatus', { ...(data.vaccinationStatus || {}), [v]: opt.key })}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                          className={`min-h-[36px] rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-all ${
                             val === opt.key
-                              ? opt.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                              : opt.color === 'red' ? 'bg-red-500/20 text-red-400 border-red-500/40'
-                              : 'bg-slate-700/40 text-slate-300 border-slate-600'
-                              : 'bg-slate-950 text-slate-500 border-slate-800 hover:border-slate-600'
-                          }`}>
+                              ? opt.color === 'green' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]'
+                              : opt.color === 'red' ? 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]'
+                              : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#4B5563]'
+                              : 'border-[#E5E7EB] bg-white text-[#9CA3AF] hover:border-[#D1D5DB]'
+                          } disabled:opacity-50`}>
                           {opt.label}
                         </button>
                       ))}
@@ -571,48 +624,54 @@ function CommunityMedForm({ data, onChange, disabled, doctorInfo, studentInfo, c
             </div>
           </div>
         </div>
-      </SectionCard>
+      </div>
 
-      <SectionCard title="Present Complaint & Medication" icon={<Stethoscope className="w-4 h-4 text-blue-400" />}>
-        <div className="grid grid-cols-2 gap-3">
+      {/* Present Complaint & Medication */}
+      <div className="space-y-5 mt-6">
+        <SectionHeading title="Present Complaint & Medication" icon={<Stethoscope className="w-4 h-4" />} />
+        <div className="grid grid-cols-2 gap-4">
           <FormInput label="Present Complaint" value={data.presentComplaint || ''} onChange={v => u('presentComplaint', v)} id="cm-complaint" placeholder='e.g. "White crusting on scalp"' disabled={disabled} />
           <FormInput label="Current Medication" value={data.currentMedication || ''} onChange={v => u('currentMedication', v)} id="cm-med" placeholder='e.g. "Medicated shampoo"' disabled={disabled} />
         </div>
-        <div className="mt-3">
-          <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">General Appearance: Anaemia</label>
+        <div>
+          <label className={cls.label}>General Appearance: Anaemia</label>
           <div className="flex space-x-2">
             {['No', 'Yes', 'Clinical Pallor'].map(o => (
               <button key={o} type="button" onClick={() => !disabled && u('anaemia', o)} disabled={disabled}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs border ${data.anaemia === o ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>{o}</button>
+                className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${data.anaemia === o ? 'border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]' : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'} disabled:opacity-50`}>{o}</button>
             ))}
           </div>
         </div>
-      </SectionCard>
+      </div>
 
-      <SectionCard title="Systemic Examination" icon={<HeartPulse className="w-4 h-4 text-rose-400" />}>
+      {/* Systemic Examination */}
+      <div className="space-y-5 mt-6">
+        <SectionHeading title="Systemic Examination" icon={<HeartPulse className="w-4 h-4" />} />
         <div className="space-y-3">
           {SYSTEMS.map(sys => (
             <div key={sys.key}>
-              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">{sys.label}</label>
+              <label className={cls.label}>{sys.label}</label>
               <div className="flex space-x-2">
                 {['NAD', 'Abnormal'].map(o => (
                   <button key={o} type="button" onClick={() => !disabled && u(sys.key, o)} disabled={disabled}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs border ${data[sys.key] === o ? (o === 'NAD' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30') : 'bg-slate-950 text-slate-400 border-slate-800'}`}>{o}</button>
+                    className={`min-h-[40px] rounded-lg border px-4 py-2 text-sm font-semibold transition-all ${data[sys.key] === o ? (o === 'NAD' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]' : 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]') : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'} disabled:opacity-50`}>{o}</button>
                 ))}
                 {data[sys.key] === 'Abnormal' && (
                   <input value={data[`${sys.key}Detail`] || ''} onChange={e => u(`${sys.key}Detail`, e.target.value)} disabled={disabled}
-                    placeholder="Specify..." className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white text-sm" />
+                    placeholder="Specify..." className={`flex-1 ${cls.input}`} />
                 )}
               </div>
             </div>
           ))}
           <FormInput label="Other Findings" value={data.otherFindings || ''} onChange={v => u('otherFindings', v)} id="cm-other" placeholder="Additional findings" disabled={disabled} />
         </div>
-      </SectionCard>
+      </div>
 
-      <SectionCard title="Final Assessment" icon={<Stethoscope className="w-4 h-4 text-indigo-400" />}>
+      {/* Final Assessment */}
+      <div className="space-y-5 mt-6">
+        <SectionHeading title="Final Assessment" icon={<Stethoscope className="w-4 h-4" />} />
         <StatusAndRemarks data={data} onChange={onChange} disabled={disabled} doctorInfo={doctorInfo} studentInfo={studentInfo} campName={campName} />
-      </SectionCard>
+      </div>
     </>
   );
 }
@@ -747,20 +806,20 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
   };
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className="mt-8 space-y-6 border-t border-[#E5E7EB] pt-8">
       <div>
-        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Status</label>
-        <div className="flex space-x-3">
-          {[{ v: 'N', label: 'Normal', color: 'emerald' }, { v: 'O', label: 'Observation', color: 'amber' }, { v: 'R', label: 'Referred for Treatment', color: 'red' }].map(opt => (
+        <label className={cls.label}>Assessment</label>
+        <div className="flex overflow-hidden rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] p-1">
+          {[
+            { v: 'N', label: 'Normal', active: 'bg-white text-[#166534] shadow-sm ring-1 ring-[#BBF7D0]' },
+            { v: 'O', label: 'Observation', active: 'bg-white text-[#B45309] shadow-sm ring-1 ring-[#FDE68A]' },
+            { v: 'R', label: 'Referral', active: 'bg-white text-[#B91C1C] shadow-sm ring-1 ring-[#FECACA]' },
+          ].map(opt => (
             <button key={opt.v} type="button" onClick={() => !disabled && u('status', opt.v)} disabled={disabled}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border ${
-                data.status === opt.v
-                  ? opt.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                  : opt.color === 'amber' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                  : 'bg-red-500/20 text-red-400 border-red-500/40'
-                  : 'bg-slate-950 text-slate-400 border-slate-800'
+              className={`min-h-[48px] flex-1 rounded-md px-2 text-center text-sm font-semibold transition-all disabled:opacity-50 ${
+                data.status === opt.v ? opt.active : 'text-[#6B7280] hover:bg-white/80'
               }`}>
-              {opt.v} — {opt.label}
+              {opt.label}
             </button>
           ))}
         </div>
@@ -768,70 +827,93 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
 
       {/* Normal — show nothing extra */}
       {statusIsNormal && (
-        <p className="text-xs text-slate-600 italic">No prescription or referral needed for Normal status.</p>
+        <p className="py-2 text-sm text-[#6B7280]">No prescription or referral for a normal assessment.</p>
       )}
 
       {/* Observation — Prescription form */}
       {isObservation && !disabled && (
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in duration-300">
-          <div className="flex items-center space-x-2 mb-1">
-            <FileText className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-bold text-amber-400 uppercase tracking-wider">Prescription</span>
+        <div className="space-y-5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-6">
+          <div className="flex items-center gap-2 border-b border-[#FDE68A] pb-3">
+            <FileText className="h-4 w-4 text-[#B45309]" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#92400E]">Prescription</span>
           </div>
-          {/* Auto-filled info */}
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
-            <div><span className="text-slate-600">Doctor:</span> {doctorInfo?.name || doctorInfo?.username || '—'} ({(doctorInfo?.role || '').replace(/_/g, ' ')})</div>
-            <div><span className="text-slate-600">Date:</span> {new Date().toLocaleDateString('en-IN')}</div>
+          <div className="grid grid-cols-2 gap-4 text-xs text-[#6B7280]">
+            <div>
+              <span className="text-[#9CA3AF]">Clinician </span>
+              {doctorInfo?.name || doctorInfo?.username || '—'} · {(doctorInfo?.role || '').replace(/_/g, ' ')}
+            </div>
+            <div>
+              <span className="text-[#9CA3AF]">Date </span>
+              {new Date().toLocaleDateString('en-IN')}
+            </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Clinical Findings</label>
+            <label className={cls.label}>Clinical findings</label>
             <textarea value={data.clinicalFindings || ''} onChange={e => u('clinicalFindings', e.target.value)}
-              rows={2} placeholder="Summarize clinical findings..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-amber-500/50" />
+              rows={3} placeholder="Summarize clinical findings..."
+              className={cls.textarea} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Diagnosis</label>
+            <label className={cls.label}>Diagnosis</label>
             <input value={data.diagnosis || ''} onChange={e => u('diagnosis', e.target.value)}
-              placeholder="e.g. Myopia, Dental Caries"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-amber-500/50" />
+              placeholder="e.g. Myopia, dental caries"
+              className={cls.input} />
           </div>
-          {/* Medicines Repeater */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Medicines (Rx)</label>
-            <div className="space-y-2">
-              {(data.medicines || []).map((med: any, idx: number) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                  <input value={med.name} onChange={e => updateMedicine(idx, 'name', e.target.value)}
-                    placeholder="Medicine name" className="col-span-4 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-white text-xs" />
-                  <input value={med.dosage} onChange={e => updateMedicine(idx, 'dosage', e.target.value)}
-                    placeholder="Dosage" className="col-span-2 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-white text-xs" />
-                  <select value={med.frequency} onChange={e => updateMedicine(idx, 'frequency', e.target.value)}
-                    className="col-span-2 bg-slate-950 border border-slate-800 rounded-lg px-2 py-2 text-white text-xs">
-                    {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                  <input value={med.duration} onChange={e => updateMedicine(idx, 'duration', e.target.value)}
-                    placeholder="Duration" className="col-span-3 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-white text-xs" />
-                  <button type="button" onClick={() => removeMedicine(idx)} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+            <label className={cls.label}>Medicines (Rx)</label>
+            <div className="overflow-x-auto rounded-lg border border-[#E5E7EB] bg-white">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="border-b border-[#E5E7EB] bg-[#F9FAFB] text-xs font-semibold uppercase tracking-wide text-[#6B7280]">
+                  <tr>
+                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2 w-28">Dosage</th>
+                    <th className="px-3 py-2 w-24">Freq</th>
+                    <th className="px-3 py-2 w-28">Duration</th>
+                    <th className="w-10 px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F3F4F6]">
+                  {(data.medicines || []).map((med: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="p-2">
+                        <input value={med.name} onChange={e => updateMedicine(idx, 'name', e.target.value)} placeholder="Medicine" className={`${cls.input} min-h-[40px]`} />
+                      </td>
+                      <td className="p-2">
+                        <input value={med.dosage} onChange={e => updateMedicine(idx, 'dosage', e.target.value)} placeholder="Dose" className={`${cls.input} min-h-[40px]`} />
+                      </td>
+                      <td className="p-2">
+                        <select value={med.frequency} onChange={e => updateMedicine(idx, 'frequency', e.target.value)} className={`${cls.select} min-h-[40px]`}>
+                          {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </td>
+                      <td className="p-2">
+                        <input value={med.duration} onChange={e => updateMedicine(idx, 'duration', e.target.value)} placeholder="Duration" className={`${cls.input} min-h-[40px]`} />
+                      </td>
+                      <td className="p-2 text-center">
+                        <button type="button" onClick={() => removeMedicine(idx)} className="rounded p-1.5 text-[#DC2626] hover:bg-[#FEF2F2]" aria-label="Remove row">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             <button type="button" onClick={addMedicine}
-              className="mt-2 flex items-center space-x-1.5 text-xs text-amber-400 hover:text-amber-300 font-medium">
-              <PlusCircle className="w-3.5 h-3.5" /><span>Add Medicine</span>
+              className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-[#B45309] hover:text-[#92400E]">
+              <PlusCircle className="h-4 w-4" /><span>Add medicine</span>
             </button>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">General Advice</label>
+            <label className={cls.label}>General advice</label>
             <textarea value={data.advice || ''} onChange={e => u('advice', e.target.value)}
-              rows={2} placeholder="Follow-up advice, precautions..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-amber-500/50" />
+              rows={3} placeholder="Follow-up, precautions…"
+              className={cls.textarea} />
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end border-t border-[#FDE68A] pt-4">
             <button type="button" onClick={handlePrint}
-              className="flex items-center space-x-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-4 py-2 rounded-xl text-sm font-bold transition-all">
-              <Printer className="w-4 h-4" /><span>Print Prescription</span>
+              className="inline-flex items-center gap-2 rounded-lg border border-[#F59E0B] bg-white px-4 py-2.5 text-sm font-semibold text-[#B45309] transition-colors hover:bg-[#FFFBEB]">
+              <Printer className="h-4 w-4" /><span>Print prescription</span>
             </button>
           </div>
         </div>
@@ -839,55 +921,55 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
 
       {/* Referred — Referral form */}
       {isReferred && !disabled && (
-        <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in duration-300">
-          <div className="flex items-center space-x-2 mb-1">
-            <FileText className="w-4 h-4 text-red-400" />
-            <span className="text-sm font-bold text-red-400 uppercase tracking-wider">Referral Sheet</span>
+        <div className="space-y-5 rounded-lg border border-[#FECACA] bg-[#FEF2F2] p-6">
+          <div className="flex items-center gap-2 border-b border-[#FECACA] pb-3">
+            <FileText className="h-4 w-4 text-[#B91C1C]" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#991B1B]">Referral</span>
           </div>
           {/* Auto-filled info */}
-          <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
-            <div><span className="text-slate-600">Referring Doctor:</span> {doctorInfo?.name || doctorInfo?.username || '—'} ({(doctorInfo?.role || '').replace(/_/g, ' ')})</div>
-            <div><span className="text-slate-600">Date:</span> {new Date().toLocaleDateString('en-IN')}</div>
+          <div className="grid grid-cols-2 gap-4 text-xs text-[#6B7280]">
+            <div><span className="text-[#9CA3AF]">Referring </span>{doctorInfo?.name || doctorInfo?.username || '—'} · {(doctorInfo?.role || '').replace(/_/g, ' ')}</div>
+            <div><span className="text-[#9CA3AF]">Date </span>{new Date().toLocaleDateString('en-IN')}</div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Clinical Findings</label>
+            <label className={cls.label}>Clinical Findings</label>
             <textarea value={data.clinicalFindings || ''} onChange={e => u('clinicalFindings', e.target.value)}
               rows={2} placeholder="Summarize clinical findings..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-red-500/50" />
+              className={cls.textarea} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Reason for Referral</label>
+            <label className={cls.label}>Reason for Referral</label>
             <textarea value={data.referralReason || ''} onChange={e => u('referralReason', e.target.value)}
               rows={2} placeholder="Why is this student being referred?"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm resize-none focus:ring-2 focus:ring-red-500/50" />
+              className={cls.textarea} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Recommended Dept / Hospital</label>
+            <label className={cls.label}>Recommended Dept / Hospital</label>
             <input value={data.referralDept || ''} onChange={e => u('referralDept', e.target.value)}
               placeholder="e.g. Ophthalmology, Civil Hospital Bathinda"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-red-500/50" />
+              className={cls.input} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Urgency</label>
-            <div className="flex space-x-3">
+            <label className={cls.label}>Urgency</label>
+            <div className="flex space-x-2">
               {['Routine', 'Priority', 'Urgent'].map(urg => (
                 <button key={urg} type="button" onClick={() => u('urgency', urg)}
-                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs border transition-all ${
+                  className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${
                     data.urgency === urg
-                      ? urg === 'Routine' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
-                      : urg === 'Priority' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                      : 'bg-red-500/20 text-red-400 border-red-500/40'
-                      : 'bg-slate-950 text-slate-400 border-slate-800'
+                      ? urg === 'Routine' ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]'
+                      : urg === 'Priority' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]'
+                      : 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]'
+                      : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'
                   }`}>
                   {urg}
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end border-t border-[#FECACA] pt-4">
             <button type="button" onClick={handlePrint}
-              className="flex items-center space-x-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-4 py-2 rounded-xl text-sm font-bold transition-all">
-              <Printer className="w-4 h-4" /><span>Print Referral Sheet</span>
+              className="inline-flex items-center gap-2 rounded-lg border border-[#DC2626] bg-white px-4 py-2.5 text-sm font-semibold text-[#B91C1C] transition-colors hover:bg-[#FEF2F2]">
+              <Printer className="h-4 w-4" /><span>Print referral</span>
             </button>
           </div>
         </div>
@@ -895,24 +977,24 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
 
       {/* Read-only view when disabled and not Normal */}
       {(isObservation || isReferred) && disabled && (
-        <div className="bg-slate-800/30 border border-slate-700 rounded-2xl p-4 space-y-2">
-          <span className={`text-xs font-bold uppercase ${isObservation ? 'text-amber-400' : 'text-red-400'}`}>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+          <span className={`text-xs font-bold uppercase ${isObservation ? 'text-amber-600' : 'text-red-600'}`}>
             {isObservation ? '📝 Prescription' : '🏥 Referral Sheet'}
           </span>
-          {data.clinicalFindings && <p className="text-xs text-slate-300"><span className="text-slate-500">Findings:</span> {data.clinicalFindings}</p>}
-          {data.diagnosis && <p className="text-xs text-slate-300"><span className="text-slate-500">Dx:</span> {data.diagnosis}</p>}
+          {data.clinicalFindings && <p className="text-xs text-gray-600"><span className="text-gray-400">Findings:</span> {data.clinicalFindings}</p>}
+          {data.diagnosis && <p className="text-xs text-gray-600"><span className="text-gray-400">Dx:</span> {data.diagnosis}</p>}
           {(data.medicines || []).length > 0 && (
-            <div className="text-xs text-slate-300">
-              <span className="text-slate-500">Rx:</span>
+            <div className="text-xs text-gray-600">
+              <span className="text-gray-400">Rx:</span>
               {data.medicines.map((m: any, i: number) => (
                 <span key={i} className="ml-1">{m.name} {m.dosage} {m.frequency} {m.duration}{i < data.medicines.length - 1 ? ',' : ''}</span>
               ))}
             </div>
           )}
-          {data.referralReason && <p className="text-xs text-slate-300"><span className="text-slate-500">Reason:</span> {data.referralReason}</p>}
-          {data.referralDept && <p className="text-xs text-slate-300"><span className="text-slate-500">Refer to:</span> {data.referralDept}</p>}
-          {data.urgency && <p className="text-xs text-slate-300"><span className="text-slate-500">Urgency:</span> {data.urgency}</p>}
-          {data.advice && <p className="text-xs text-slate-300"><span className="text-slate-500">Advice:</span> {data.advice}</p>}
+          {data.referralReason && <p className="text-xs text-gray-600"><span className="text-gray-400">Reason:</span> {data.referralReason}</p>}
+          {data.referralDept && <p className="text-xs text-gray-600"><span className="text-gray-400">Refer to:</span> {data.referralDept}</p>}
+          {data.urgency && <p className="text-xs text-gray-600"><span className="text-gray-400">Urgency:</span> {data.urgency}</p>}
+          {data.advice && <p className="text-xs text-gray-600"><span className="text-gray-400">Advice:</span> {data.advice}</p>}
         </div>
       )}
 
@@ -925,14 +1007,12 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
 }
 
 // ── Other Specialists' Records (Read-Only) ──
-// Per-specialist renderers so each card shows data in a structured, readable layout.
-
 function RecordField({ label, value, className = '' }: { label: string; value?: string; className?: string }) {
   if (!value) return null;
   return (
     <div className={className}>
-      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</span>
-      <p className="text-sm text-slate-200 mt-0.5 leading-snug">{value}</p>
+      <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">{label}</span>
+      <p className="text-sm text-gray-700 mt-0.5 leading-snug">{value}</p>
     </div>
   );
 }
@@ -943,14 +1023,14 @@ function RecordPill({ label, color }: { label: string; color: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const cfg = status === 'N'
-    ? { label: '✓ Normal', bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' }
+    ? { label: '✓ Normal', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' }
     : status === 'O'
-    ? { label: '⦿ Observation', bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' }
+    ? { label: '⦿ Observation', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }
     : status === 'R'
-    ? { label: '⚑ Referred', bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30' }
-    : { label: status || '—', bg: 'bg-slate-800', text: 'text-slate-400', border: 'border-slate-700' };
+    ? { label: '⚑ Referred', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' }
+    : { label: status || '—', bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' };
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
       {cfg.label}
     </span>
   );
@@ -960,35 +1040,35 @@ function RemarksBlock({ data }: { data: any }) {
   const hasRemarks = data.remarks || data.clinicalFindings || data.diagnosis || data.referralReason;
   if (!hasRemarks) return null;
   return (
-    <div className="mt-2.5 pt-2 border-t border-slate-700/50 space-y-1">
+    <div className="mt-2.5 pt-2 border-t border-gray-100 space-y-1">
       {data.clinicalFindings && (
-        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Findings:</span> {data.clinicalFindings}</p>
+        <p className="text-xs text-gray-500"><span className="text-gray-400 font-medium">Findings:</span> {data.clinicalFindings}</p>
       )}
       {data.diagnosis && (
-        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Diagnosis:</span> {data.diagnosis}</p>
+        <p className="text-xs text-gray-500"><span className="text-gray-400 font-medium">Diagnosis:</span> {data.diagnosis}</p>
       )}
       {data.remarks && (
-        <p className="text-xs text-slate-400 italic">"{data.remarks}"</p>
+        <p className="text-xs text-gray-500 italic">"{data.remarks}"</p>
       )}
       {data.referralReason && (
-        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Referral:</span> {data.referralReason}</p>
+        <p className="text-xs text-gray-500"><span className="text-gray-400 font-medium">Referral:</span> {data.referralReason}</p>
       )}
       {data.referralDept && (
-        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Refer to:</span> {data.referralDept}</p>
+        <p className="text-xs text-gray-500"><span className="text-gray-400 font-medium">Refer to:</span> {data.referralDept}</p>
       )}
       {data.urgency && (
-        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Urgency:</span> {data.urgency}</p>
+        <p className="text-xs text-gray-500"><span className="text-gray-400 font-medium">Urgency:</span> {data.urgency}</p>
       )}
       {(data.medicines || []).length > 0 && (
-        <div className="text-xs text-slate-400">
-          <span className="text-slate-500 font-medium">Rx:</span>
+        <div className="text-xs text-gray-500">
+          <span className="text-gray-400 font-medium">Rx:</span>
           {data.medicines.map((m: any, i: number) => (
             <span key={i} className="ml-1">{m.name} {m.dosage} {m.frequency}{m.duration ? ` ×${m.duration}` : ''}{i < data.medicines.length - 1 ? ',' : ''}</span>
           ))}
         </div>
       )}
       {data.advice && (
-        <p className="text-xs text-slate-400"><span className="text-slate-500 font-medium">Advice:</span> {data.advice}</p>
+        <p className="text-xs text-gray-500"><span className="text-gray-400 font-medium">Advice:</span> {data.advice}</p>
       )}
     </div>
   );
@@ -998,19 +1078,19 @@ function RemarksBlock({ data }: { data: any }) {
 
 function EyeRecordCard({ d }: { d: any }) {
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-3 py-2.5 text-center">
-          <span className="text-[10px] text-emerald-500/70 uppercase tracking-wider block">Right Eye</span>
-          <span className="text-lg font-bold text-emerald-300 mt-0.5 block">{d.rightEye || '—'}</span>
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-center">
+          <span className="text-[10px] text-green-600 uppercase tracking-wider block">Right Eye</span>
+          <span className="text-base font-bold text-green-800 mt-0.5 block">{d.rightEye || '—'}</span>
         </div>
-        <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl px-3 py-2.5 text-center">
-          <span className="text-[10px] text-emerald-500/70 uppercase tracking-wider block">Left Eye</span>
-          <span className="text-lg font-bold text-emerald-300 mt-0.5 block">{d.leftEye || '—'}</span>
+        <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-center">
+          <span className="text-[10px] text-green-600 uppercase tracking-wider block">Left Eye</span>
+          <span className="text-base font-bold text-green-800 mt-0.5 block">{d.leftEye || '—'}</span>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2.5 text-center">
-          <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Spectacles</span>
-          <span className={`text-sm font-bold mt-0.5 block ${d.accessories === 'Yes' ? 'text-cyan-400' : 'text-slate-400'}`}>
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-center">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Spectacles</span>
+          <span className={`text-sm font-bold mt-0.5 block ${d.accessories === 'Yes' ? 'text-blue-600' : 'text-gray-400'}`}>
             {d.accessories === 'Yes' ? '🤓 Yes' : d.accessories === 'No' ? 'No' : '—'}
           </span>
         </div>
@@ -1022,25 +1102,21 @@ function EyeRecordCard({ d }: { d: any }) {
 
 function DentalRecordCard({ d }: { d: any }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {d.teethGums && (
-        <div className="bg-sky-500/5 border border-sky-500/15 rounded-xl px-3 py-2.5">
-          <span className="text-[10px] text-sky-500/70 uppercase tracking-wider">Teeth & Gums Examination</span>
-          <p className="text-sm text-sky-200 mt-1 font-medium">{d.teethGums}</p>
+        <div className="bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+          <span className="text-[10px] text-sky-600 uppercase tracking-wider">Teeth & Gums</span>
+          <p className="text-sm text-sky-800 mt-1 font-medium">{d.teethGums}</p>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2.5 flex items-center justify-between">
-          <span className="text-xs text-slate-500">Dental Implants</span>
-          <span className={`text-xs font-bold ${d.implants === 'Yes' ? 'text-sky-400' : 'text-slate-400'}`}>
-            {d.implants || '—'}
-          </span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-gray-400">Implants</span>
+          <span className={`text-xs font-bold ${d.implants === 'Yes' ? 'text-sky-600' : 'text-gray-400'}`}>{d.implants || '—'}</span>
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl px-3 py-2.5 flex items-center justify-between">
-          <span className="text-xs text-slate-500">Braces</span>
-          <span className={`text-xs font-bold ${d.braces === 'Yes' ? 'text-sky-400' : 'text-slate-400'}`}>
-            {d.braces || '—'}
-          </span>
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-gray-400">Braces</span>
+          <span className={`text-xs font-bold ${d.braces === 'Yes' ? 'text-sky-600' : 'text-gray-400'}`}>{d.braces || '—'}</span>
         </div>
       </div>
       <RemarksBlock data={d} />
@@ -1050,16 +1126,16 @@ function DentalRecordCard({ d }: { d: any }) {
 
 function ENTRecordCard({ d }: { d: any }) {
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
         {[
           { label: '👂 Ear', value: d.ear, key: 'ear' },
           { label: '👃 Nose', value: d.nose, key: 'nose' },
           { label: '🗣 Throat', value: d.throat, key: 'throat' },
         ].map(item => (
-          <div key={item.key} className="bg-amber-500/5 border border-amber-500/15 rounded-xl px-3 py-2.5">
-            <span className="text-[10px] text-amber-500/70 uppercase tracking-wider block">{item.label}</span>
-            <p className="text-sm text-amber-200 mt-1 font-medium leading-snug">{item.value || 'NAD'}</p>
+          <div key={item.key} className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <span className="text-[10px] text-amber-600 uppercase tracking-wider block">{item.label}</span>
+            <p className="text-sm text-amber-800 mt-1 font-medium leading-snug">{item.value || 'NAD'}</p>
           </div>
         ))}
       </div>
@@ -1070,11 +1146,11 @@ function ENTRecordCard({ d }: { d: any }) {
 
 function SkinRecordCard({ d }: { d: any }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {d.skinExam && (
-        <div className="bg-violet-500/5 border border-violet-500/15 rounded-xl px-3 py-2.5">
-          <span className="text-[10px] text-violet-500/70 uppercase tracking-wider">Skin, Nails & Hair</span>
-          <p className="text-sm text-violet-200 mt-1 font-medium">{d.skinExam}</p>
+        <div className="bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+          <span className="text-[10px] text-violet-600 uppercase tracking-wider">Skin, Nails & Hair</span>
+          <p className="text-sm text-violet-800 mt-1 font-medium">{d.skinExam}</p>
         </div>
       )}
       <RemarksBlock data={d} />
@@ -1086,9 +1162,9 @@ function CommunityMedRecordCard({ d }: { d: any }) {
   const vaccStatus = d.vaccinationStatus || {};
   const vaccEntries = Object.entries(vaccStatus) as [string, string][];
   const vaccColor = (s: string) =>
-    s === 'given' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
-    s === 'not_given' ? 'text-red-400 bg-red-500/10 border-red-500/30' :
-    'text-slate-400 bg-slate-800 border-slate-700';
+    s === 'given' ? 'text-green-700 bg-green-50 border-green-200' :
+    s === 'not_given' ? 'text-red-700 bg-red-50 border-red-200' :
+    'text-gray-500 bg-gray-50 border-gray-200';
   const vaccIcon = (s: string) => s === 'given' ? '✓' : s === 'not_given' ? '✗' : '?';
   const pastHistory = Array.isArray(d.pastHistory) ? d.pastHistory : [];
   const SYSTEMS = ['locomotor', 'abdomen', 'respiratory', 'cardiovascular', 'cns'];
@@ -1099,31 +1175,31 @@ function CommunityMedRecordCard({ d }: { d: any }) {
   const sysEntries = SYSTEMS.filter(s => d[s]).map(s => ({ key: s, val: d[s], detail: d[`${s}Detail`] }));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Past History */}
       {(pastHistory.length > 0 || d.pastHistoryOther) && (
-        <div className="bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2.5">
-          <span className="text-[10px] text-rose-500/70 uppercase tracking-wider block mb-1.5">Past History</span>
+        <div className="bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+          <span className="text-[10px] text-rose-600 uppercase tracking-wider block mb-1.5">Past History</span>
           {pastHistory.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {pastHistory.map((h: string) => (
-                <span key={h} className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-md font-medium">{h}</span>
+                <span key={h} className="text-[11px] text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md font-medium">{h}</span>
               ))}
             </div>
           )}
-          {d.pastHistoryOther && <p className="text-xs text-rose-300/80 mt-1">Other: {d.pastHistoryOther}</p>}
+          {d.pastHistoryOther && <p className="text-xs text-rose-600 mt-1">Other: {d.pastHistoryOther}</p>}
         </div>
       )}
 
       {/* Vaccinations */}
       {vaccEntries.length > 0 && (
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl px-3 py-2.5">
-          <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1.5">Immunisation Status</span>
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Immunisation</span>
           <div className="grid grid-cols-2 gap-1.5">
             {vaccEntries.map(([name, status]) => (
-              <div key={name} className={`flex items-center justify-between px-2 py-1 rounded-lg border text-[11px] ${vaccColor(status)}`}>
+              <div key={name} className={`flex items-center justify-between px-2 py-1 rounded-md border text-[11px] ${vaccColor(status)}`}>
                 <span className="font-medium">{name}</span>
-                <span className="font-bold">{vaccIcon(status)} {status === 'given' ? 'Given' : status === 'not_given' ? 'Not Given' : 'Unknown'}</span>
+                <span className="font-bold">{vaccIcon(status)}</span>
               </div>
             ))}
           </div>
@@ -1132,17 +1208,17 @@ function CommunityMedRecordCard({ d }: { d: any }) {
 
       {/* Present Complaint & Medication */}
       {(d.presentComplaint || d.currentMedication) && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           {d.presentComplaint && (
-            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl px-3 py-2.5">
-              <span className="text-[10px] text-blue-500/70 uppercase tracking-wider">Present Complaint</span>
-              <p className="text-sm text-blue-200 mt-1 font-medium">{d.presentComplaint}</p>
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+              <span className="text-[10px] text-blue-600 uppercase tracking-wider">Present Complaint</span>
+              <p className="text-sm text-blue-800 mt-1 font-medium">{d.presentComplaint}</p>
             </div>
           )}
           {d.currentMedication && (
-            <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl px-3 py-2.5">
-              <span className="text-[10px] text-blue-500/70 uppercase tracking-wider">Current Medication</span>
-              <p className="text-sm text-blue-200 mt-1 font-medium">{d.currentMedication}</p>
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+              <span className="text-[10px] text-blue-600 uppercase tracking-wider">Current Medication</span>
+              <p className="text-sm text-blue-800 mt-1 font-medium">{d.currentMedication}</p>
             </div>
           )}
         </div>
@@ -1151,25 +1227,25 @@ function CommunityMedRecordCard({ d }: { d: any }) {
       {/* Anaemia */}
       {d.anaemia && (
         <div className="flex items-center space-x-2">
-          <span className="text-xs text-slate-500">Anaemia:</span>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border ${
-            d.anaemia === 'No' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
-            : d.anaemia === 'Yes' ? 'text-red-400 bg-red-500/10 border-red-500/30'
-            : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+          <span className="text-xs text-gray-400">Anaemia:</span>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
+            d.anaemia === 'No' ? 'text-green-700 bg-green-50 border-green-200'
+            : d.anaemia === 'Yes' ? 'text-red-700 bg-red-50 border-red-200'
+            : 'text-amber-700 bg-amber-50 border-amber-200'
           }`}>{d.anaemia}</span>
         </div>
       )}
 
       {/* Systemic Examination */}
       {sysEntries.length > 0 && (
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl px-3 py-2.5">
-          <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1.5">Systemic Examination</span>
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Systemic</span>
           <div className="grid grid-cols-1 gap-1">
             {sysEntries.map(s => (
               <div key={s.key} className="flex items-center justify-between py-1 text-xs">
-                <span className="text-slate-400 font-medium">{SYSTEM_LABELS[s.key] || s.key}</span>
+                <span className="text-gray-500 font-medium">{SYSTEM_LABELS[s.key] || s.key}</span>
                 <span className={`font-bold px-2 py-0.5 rounded border ${
-                  s.val === 'NAD' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-red-400 bg-red-500/10 border-red-500/30'
+                  s.val === 'NAD' ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'
                 }`}>
                   {s.val === 'Abnormal' && s.detail ? `Abnormal: ${s.detail}` : s.val}
                 </span>
@@ -1220,48 +1296,13 @@ function SpecialistRecordBody({ category, d }: { category: string; d: any }) {
   }
 }
 
-// Category metadata: icon, label, color theme
-const SPECIALIST_META: Record<string, { icon: React.ReactNode; label: string; gradient: string; accent: string; border: string; bg: string }> = {
-  Eye_Specialist: {
-    icon: <Eye className="w-4 h-4" />,
-    label: 'Ophthalmology',
-    gradient: 'from-emerald-500/20 to-teal-500/10',
-    accent: 'text-emerald-400',
-    border: 'border-emerald-500/30',
-    bg: 'bg-emerald-500/5',
-  },
-  Dental: {
-    icon: <span className="text-sm">🦷</span>,
-    label: 'Dental',
-    gradient: 'from-sky-500/20 to-cyan-500/10',
-    accent: 'text-sky-400',
-    border: 'border-sky-500/30',
-    bg: 'bg-sky-500/5',
-  },
-  ENT: {
-    icon: <Ear className="w-4 h-4" />,
-    label: 'ENT',
-    gradient: 'from-amber-500/20 to-orange-500/10',
-    accent: 'text-amber-400',
-    border: 'border-amber-500/30',
-    bg: 'bg-amber-500/5',
-  },
-  Skin_Specialist: {
-    icon: <Scan className="w-4 h-4" />,
-    label: 'Dermatology',
-    gradient: 'from-violet-500/20 to-purple-500/10',
-    accent: 'text-violet-400',
-    border: 'border-violet-500/30',
-    bg: 'bg-violet-500/5',
-  },
-  Community_Medicine: {
-    icon: <Stethoscope className="w-4 h-4" />,
-    label: 'Community Medicine',
-    gradient: 'from-rose-500/20 to-pink-500/10',
-    accent: 'text-rose-400',
-    border: 'border-rose-500/30',
-    bg: 'bg-rose-500/5',
-  },
+// Category metadata (read-only other-records rows)
+const SPECIALIST_META: Record<string, { icon: React.ReactNode; label: string }> = {
+  Eye_Specialist: { icon: <Eye className="h-4 w-4 text-[#6B7280]" />, label: 'Ophthalmology' },
+  Dental: { icon: <span className="text-sm">🦷</span>, label: 'Dental' },
+  ENT: { icon: <Ear className="h-4 w-4 text-[#6B7280]" />, label: 'ENT' },
+  Skin_Specialist: { icon: <Scan className="h-4 w-4 text-[#6B7280]" />, label: 'Dermatology' },
+  Community_Medicine: { icon: <Stethoscope className="h-4 w-4 text-[#6B7280]" />, label: 'Community Medicine' },
 };
 
 function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
@@ -1301,73 +1342,65 @@ function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
   const totalOtherSpecs = Object.keys(SPECIALIST_META).filter(k => k !== currentCategory).length;
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
-      <button onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/50 transition-colors">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center">
-            <ClipboardList className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="text-left">
-            <span className="text-sm font-bold text-white block">Other Specialists' Evaluations</span>
-            <span className="text-[11px] text-slate-500">
-              {loading ? 'Loading...' : `${evaluatedCount} of ${totalOtherSpecs} specialists have evaluated`}
+    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
+      <button type="button" onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between border-b border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-left transition-colors hover:bg-[#F3F4F6]">
+        <div className="flex min-w-0 items-center gap-3">
+          <ClipboardList className="h-4 w-4 shrink-0 text-[#9CA3AF]" />
+          <div className="min-w-0">
+            <span className="block text-sm font-semibold text-[#1F2937]">Other specialists</span>
+            <span className="text-xs text-[#6B7280]">
+              {loading ? 'Loading…' : `${evaluatedCount} of ${totalOtherSpecs} completed`}
             </span>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex shrink-0 items-center gap-2">
           {!loading && evaluatedCount > 0 && (
-            <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-md text-xs font-bold">
+            <span className="rounded-md border border-[#E5E7EB] bg-white px-2 py-0.5 text-xs font-semibold text-[#374151]">
               {evaluatedCount}
             </span>
           )}
-          {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+          {open ? <ChevronDown className="h-4 w-4 text-[#9CA3AF]" /> : <ChevronRight className="h-4 w-4 text-[#9CA3AF]" />}
         </div>
       </button>
 
       {open && (
-        <div className="px-4 pb-4 border-t border-slate-800/50 pt-3 space-y-3">
+        <div className="divide-y divide-[#F3F4F6]">
           {loading ? (
-            <div className="flex items-center justify-center py-6 space-x-2">
-              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-              <span className="text-sm text-slate-500">Loading evaluations...</span>
+            <div className="flex items-center justify-center gap-2 py-8">
+              <Loader2 className="h-4 w-4 animate-spin text-[#9CA3AF]" />
+              <span className="text-sm text-[#6B7280]">Loading…</span>
             </div>
           ) : otherRecords.length === 0 ? (
-            <div className="text-center py-6">
-              <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                <ClipboardList className="w-6 h-6 text-slate-600" />
-              </div>
-              <p className="text-sm text-slate-500 font-medium">No evaluations from other specialists yet</p>
-              <p className="text-xs text-slate-600 mt-1">Records will appear here as other doctors examine the student</p>
+            <div className="py-8 text-center">
+              <ClipboardList className="mx-auto mb-2 h-9 w-9 text-[#E5E7EB]" />
+              <p className="text-sm font-medium text-[#6B7280]">No other specialist records yet</p>
+              <p className="mt-1 text-xs text-[#9CA3AF]">They appear here when colleagues save an exam</p>
             </div>
           ) : (
             otherRecords.map((r, i) => {
               const d = r.parsed_data || {};
               const meta = SPECIALIST_META[r.category] || {
-                icon: <Activity className="w-4 h-4" />,
+                icon: <Activity className="h-4 w-4 text-[#6B7280]" />,
                 label: r.category.replace(/_/g, ' '),
-                gradient: 'from-slate-500/20 to-slate-500/10',
-                accent: 'text-slate-400',
-                border: 'border-slate-500/30',
-                bg: 'bg-slate-500/5',
               };
+              const ts = r.timestamp
+                ? new Date(r.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : null;
 
               return (
-                <div key={i} className={`rounded-2xl border ${meta.border} overflow-hidden bg-gradient-to-br ${meta.gradient} backdrop-blur-sm transition-all hover:shadow-lg`}>
-                  {/* Card Header */}
-                  <div className="px-4 py-3 flex items-center justify-between border-b border-slate-700/30">
-                    <div className="flex items-center space-x-2.5">
-                      <div className={`${meta.accent}`}>{meta.icon}</div>
-                      <div>
-                        <span className={`text-sm font-bold ${meta.accent}`}>{meta.label}</span>
-                        <span className="text-[10px] text-slate-600 block">Dr. {r.doctor_id} {r.timestamp ? `• ${new Date(r.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}</span>
-                      </div>
+                <div key={i} className="bg-[#FAFBFC] px-4 py-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-[#9CA3AF]">{meta.icon}</span>
+                      <span className="text-sm font-semibold text-[#1F2937]">{meta.label}</span>
+                      <span className="truncate text-xs text-[#9CA3AF]">
+                        · {r.doctor_id}{ts ? ` · ${ts}` : ''}
+                      </span>
                     </div>
-                    {d.status && <StatusBadge status={d.status} />}
+                    {d.status ? <StatusBadge status={d.status} /> : null}
                   </div>
-
-                  {/* Card Body */}
-                  <div className="px-4 py-3">
+                  <div className="rounded-md border border-[#E5E7EB] bg-white px-3 py-2">
                     <SpecialistRecordBody category={r.category} d={d} />
                   </div>
                 </div>
@@ -1393,7 +1426,7 @@ export default function DoctorWorkflow({ user }: { user: User }) {
 }
 
 // ════════════════════════════════════════════════
-// ██ CLINICAL WORKFLOW (scoped per specialist)
+// ██ CLINICAL WORKFLOW (3-region workstation layout)
 // ════════════════════════════════════════════════
 function ClinicalWorkflow({ user, campId, campName, onBack }: {
   user: User; campId: number; campName: string; onBack: () => void;
@@ -1412,7 +1445,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [online, setOnline] = useState(navigator.onLine);
   const [offlineCount, setOfflineCount] = useState(0);
-  const [todayCount, setTodayCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1420,7 +1453,12 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   useEffect(() => {
     const checkQueue = async () => setOfflineCount(await getOfflineQueueCount());
     checkQueue();
-    const on = () => { setOnline(true); syncOfflineQueue().then(checkQueue); };
+    const on = async () => {
+      setOnline(true);
+      setSyncing(true);
+      try { await syncOfflineQueue(); } finally { setSyncing(false); }
+      checkQueue();
+    };
     const off = () => setOnline(false);
     window.addEventListener('online', on); window.addEventListener('offline', off);
     const intv = setInterval(checkQueue, 5000);
@@ -1429,10 +1467,15 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
 
   const handleManualSync = async () => {
     if (!online) return;
+    setSyncing(true);
     setSaveStatus('saving');
-    await syncOfflineQueue();
-    setOfflineCount(await getOfflineQueueCount());
-    setSaveStatus('idle');
+    try {
+      await syncOfflineQueue();
+      setOfflineCount(await getOfflineQueueCount());
+    } finally {
+      setSyncing(false);
+      setSaveStatus('idle');
+    }
   };
 
   // Search
@@ -1479,9 +1522,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
     }
     
     setSelectedStudent(s); 
-    setSearchResults([]); 
     setSearchQuery('');
-    setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender('');
 
     // Load existing record for this specialist
     try {
@@ -1541,166 +1582,223 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
     } catch {} onBack();
   };
 
-  const specColor = specialistCategory === 'Community_Medicine' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-    specialistCategory === 'Dental' ? 'bg-sky-500/20 text-sky-400 border-sky-500/30' :
-    specialistCategory === 'ENT' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-    specialistCategory === 'Eye_Specialist' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-    specialistCategory === 'Skin_Specialist' ? 'bg-violet-500/20 text-violet-400 border-violet-500/30' :
-    'bg-slate-500/20 text-slate-400 border-slate-500/30';
+  const specBadgeColor = 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]';
+
+  const rosterTotal = searchResults.length;
+  const rosterExamined = searchResults.filter(s => !!s.is_examined).length;
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500 max-w-5xl mx-auto">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center space-x-3">
-            <button onClick={handleBack} className="text-slate-400 hover:text-cyan-400 transition-colors text-sm flex items-center space-x-1">
-              <ChevronRight className="w-4 h-4 rotate-180" /><span>Exit Camp</span>
-            </button>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Clinical Examination 🩺</h2>
+    <div className="clinical-workstation -mx-8 -mb-8 flex h-full flex-col text-[15px] text-[#1F2937]" style={{ marginTop: '-1rem' }}>
+      {/* ── STICKY TOP BAR ── */}
+      <div className="clinical-topbar sticky top-0 z-30 flex h-14 min-h-[56px] flex-shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-[#F7F9FB] px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-4">
+          <button type="button" onClick={handleBack} className="flex shrink-0 items-center gap-1 text-sm font-medium text-[#6B7280] transition-colors hover:text-[#2563EB]">
+            <ChevronRight className="h-4 w-4 rotate-180" /><span className="hidden sm:inline">Exit</span>
+          </button>
+          <div className="hidden h-6 w-px shrink-0 bg-[#E5E7EB] sm:block" />
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold leading-tight text-[#1F2937]">{campName}</h2>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <span className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${specBadgeColor}`}>{specialistCategory.replace(/_/g, ' ')}</span>
+            </div>
           </div>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {campName}
-            <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold border ${specColor}`}>{specialistCategory.replace(/_/g, ' ')}</span>
-          </p>
         </div>
-        <div className="flex items-center space-x-3">
-          {/* Autosave status */}
-          {saveStatus === 'saving' && <span className="text-xs text-amber-400 flex items-center space-x-1"><Loader2 className="w-3 h-3 animate-spin" /><span>Saving...</span></span>}
-          {saveStatus === 'saved' && <span className="text-xs text-emerald-400 flex items-center space-x-1"><Check className="w-3 h-3" /><span>Saved</span></span>}
-          {saveStatus === 'error' && <span className="text-xs text-red-400 flex items-center space-x-1"><AlertTriangle className="w-3 h-3" /><span>Error</span></span>}
-          
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {saveStatus === 'saving' && !syncing && (
+            <span className="flex items-center gap-1 text-xs text-[#B45309]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /><span>Saving…</span>
+            </span>
+          )}
+          {saveStatus === 'saved' && (
+            <span className="flex items-center gap-1 text-xs text-[#16A34A]">
+              <Check className="h-3.5 w-3.5" /><span>Saved</span>
+            </span>
+          )}
+          {saveStatus === 'error' && (
+            <span className="flex items-center gap-1 text-xs text-[#DC2626]">
+              <AlertTriangle className="h-3.5 w-3.5" /><span>Error</span>
+            </span>
+          )}
+
+          {syncing && (
+            <span className="flex items-center gap-1 text-xs font-medium text-[#2563EB]">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /><span>Syncing</span>
+            </span>
+          )}
+
+          {!online ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-1 text-xs font-semibold text-[#B91C1C]">
+              <Activity className="h-3.5 w-3.5" />Offline
+            </span>
+          ) : !syncing ? (
+            <span className="hidden rounded-md border border-[#BBF7D0] bg-[#F0FDF4] px-2.5 py-1 text-xs font-semibold text-[#166534] sm:inline-flex">Online</span>
+          ) : null}
+
           {offlineCount > 0 && (
-            <button onClick={handleManualSync} disabled={!online || saveStatus === 'saving'}
-              className="flex items-center space-x-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
-              title={online ? "Click to sync now" : "Waiting for connection..."}>
-              {online ? <RefreshCw className="w-3.5 h-3.5" /> : <Activity className="w-3.5 h-3.5" />}
-              <span>{offlineCount} Pending</span>
+            <button type="button" onClick={handleManualSync} disabled={!online || syncing}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#FDE68A] bg-[#FFFBEB] px-2.5 py-1 text-xs font-semibold text-[#B45309] transition-colors hover:bg-[#FEF3C7] disabled:opacity-50"
+              title={online ? 'Sync pending exams' : 'Waiting for connection'}>
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              <span>Queue {offlineCount}</span>
             </button>
           )}
 
-          {!online && <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1"><Activity className="w-3.5 h-3.5" /><span>Offline</span></span>}
-
-          <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm hidden sm:block">
-            <span className="text-slate-400">Today: </span><span className="text-cyan-400 font-bold">{todayCount}</span><span className="text-slate-500"> examined</span>
+          <div className="hidden rounded-md border border-[#E5E7EB] bg-white px-2.5 py-1 text-xs text-[#6B7280] lg:block">
+            <span className="text-[#9CA3AF]">Roster </span>
+            <span className="font-semibold text-[#1F2937]">{rosterExamined}</span>
+            <span className="text-[#9CA3AF]"> / {rosterTotal}</span>
+            <span className="text-[#9CA3AF]"> screened</span>
           </div>
         </div>
       </div>
 
-      {/* Search + Add */}
-      <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800 shadow-xl relative z-40">
-        <div className="flex space-x-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-500 w-5 h-5" />
-            <input ref={searchRef} type="text" placeholder="Search by name, class, section, phone..."
-              value={searchQuery} onChange={e => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
-              onKeyDown={e => e.key === 'Enter' && doSearch()}
-              className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-cyan-500/50 outline-none text-base" />
+      {/* ── MAIN BODY: LEFT + RIGHT ── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* ── LEFT PANE: Student List ── */}
+        <div className="clinical-left-pane flex w-[min(100%,340px)] min-w-[280px] max-w-[340px] flex-shrink-0 flex-col overflow-hidden border-r border-[#E5E7EB] bg-[#F1F4F8]">
+          {/* Search */}
+          <div className="flex-shrink-0 space-y-2 border-b border-[#E5E7EB] bg-[#F7F9FB] p-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+              <input ref={searchRef} type="text" placeholder="Search students..."
+                value={searchQuery} onChange={e => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
+                onKeyDown={e => e.key === 'Enter' && doSearch()}
+                className={`${cls.input} pl-9 py-2.5 text-sm`} />
+            </div>
+            {/* Compact Filters */}
+            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5">
+              <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className={cls.selectSm}>
+                <option value="">Class</option>{CLASSES.filter(Boolean).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={filterSection} onChange={e => setFilterSection(e.target.value)} className={cls.selectSm}>
+                <option value="">Sec</option>{SECTIONS.filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <select value={filterExamined} onChange={e => setFilterExamined(e.target.value)} className={cls.selectSm}>
+                <option value="">Status</option><option value="0">Pending</option><option value="1">Done</option>
+              </select>
+              <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className={cls.selectSm}>
+                <option value="">Sex</option><option value="M">M</option><option value="F">F</option>
+              </select>
+              {(filterClass || filterSection || filterExamined || filterGender) && (
+                <button type="button" onClick={() => { setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender(''); }} className="text-[10px] font-medium text-[#DC2626] transition-colors hover:text-[#991B1B]">Clear</button>
+              )}
+            </div>
+            {/* Add Student */}
+            <button type="button" onClick={() => setShowAddModal(true)}
+              className={`${cls.btnPrimary} flex w-full items-center justify-center gap-1.5 py-2.5 text-sm`}>
+              <Plus className="h-4 w-4" /><span>Add student</span>
+            </button>
           </div>
-          <button onClick={() => setShowAddModal(true)}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-5 py-3.5 rounded-xl font-bold flex items-center space-x-2 shadow-lg whitespace-nowrap">
-            <Plus className="w-5 h-5" /><span>Add Student</span>
-          </button>
+
+          {/* Student List */}
+          <div className="flex-1 overflow-y-auto">
+            {searchResults.length === 0 ? (
+              <div className="text-center py-12 px-4">
+                <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-xs text-gray-400">No students found</p>
+              </div>
+            ) : (
+              <div className="py-1">
+                {searchResults.map(s => {
+                  const isSelected = selectedStudent?.student_id === s.student_id;
+                  return (
+                    <button key={s.student_id} type="button" onClick={() => selectStudent(s)}
+                      className={`flex w-full items-center gap-3 border-l-[3px] border-solid px-3 py-2.5 text-left transition-colors ${
+                        isSelected ? 'border-l-[#2563EB] bg-white shadow-sm' : 'border-l-transparent hover:bg-white/90'
+                      }`}>
+                      <div className={`h-2 w-2 shrink-0 rounded-full ${s.is_examined ? 'bg-[#16A34A]' : 'bg-[#D1D5DB]'}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-semibold ${isSelected ? 'text-[#1E3A8A]' : 'text-[#1F2937]'}`}>{s.name}</p>
+                        <p className="mt-0.5 text-xs text-[#6B7280]">
+                          {s.student_class && `Class ${s.student_class}`}{s.section && `-${s.section}`}
+                          {s.age != null && ` · ${s.age}y`} · {s.gender}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-        {/* Filters */}
-        <div className="flex items-center space-x-2 mt-3 flex-wrap gap-y-2">
-          <span className="text-xs text-slate-500 font-medium">Filters:</span>
-          <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
-            <option value="">All Classes</option>{CLASSES.filter(Boolean).map(c => <option key={c} value={c}>Class {c}</option>)}
-          </select>
-          <select value={filterSection} onChange={e => setFilterSection(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
-            <option value="">All Sections</option>{SECTIONS.filter(Boolean).map(s => <option key={s} value={s}>Section {s}</option>)}
-          </select>
-          <select value={filterExamined} onChange={e => setFilterExamined(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
-            <option value="">All Status</option><option value="0">Not Examined</option><option value="1">Examined</option>
-          </select>
-          <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300">
-            <option value="">All Sex</option><option value="M">Male</option><option value="F">Female</option>
-          </select>
-          {(filterClass || filterSection || filterExamined || filterGender) && (
-            <button onClick={() => { setFilterClass(''); setFilterSection(''); setFilterExamined(''); setFilterGender(''); }} className="text-xs text-red-400 underline">Clear</button>
-          )}
-        </div>
-        {/* Results — inline if no student selected, floating if filling form */}
-        {searchResults.length > 0 && (
-          (!selectedStudent || searchQuery || filterClass || filterSection || filterExamined || filterGender) && (
-            <div className={selectedStudent 
-              ? "absolute left-2 right-2 top-full mt-2 z-50 bg-slate-900/95 backdrop-blur-2xl border border-slate-700 shadow-2xl rounded-2xl max-h-[60vh] overflow-y-auto p-2"
-              : "mt-3 max-h-64 overflow-y-auto space-y-1.5 border-t border-slate-800 pt-3"}>
-              {searchResults.map(s => (
-                <button key={s.student_id} onClick={() => selectStudent(s)}
-                  className="w-full text-left px-4 py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all flex justify-between items-center group mb-1.5">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-2 h-2 rounded-full ${s.is_examined ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                    <div>
-                      <span className="font-bold text-white">{s.name}</span>
-                      <span className="text-slate-400 text-xs ml-2">
-                        {s.student_class && `Class ${s.student_class}`}{s.section && `-${s.section}`}
-                        {s.age && ` • ${s.age}y`} • {s.gender}
-                      </span>
+
+        {/* ── RIGHT PANE: Clinical Workspace ── */}
+        <div className="clinical-right-pane min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#F7F9FB]">
+          {!selectedStudent ? (
+            /* Empty state */
+            <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white">
+                <Stethoscope className="h-8 w-8 text-[#D1D5DB]" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#6B7280]">Select a student</h3>
+              <p className="mt-1 max-w-sm text-sm text-[#9CA3AF]">Choose from the roster on the left to open the clinical workspace.</p>
+            </div>
+          ) : (
+            <div className="max-w-none space-y-8 px-4 py-6 sm:px-8">
+              {/* ── A. Student Context Header ── */}
+              <div className="flex flex-col gap-4 border-b border-[#E5E7EB] pb-6 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] text-lg font-bold text-[#1D4ED8]">
+                    {selectedStudent.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-2xl font-bold tracking-tight text-[#1F2937]">{selectedStudent.name}</h3>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-[#6B7280]">
+                      {selectedStudent.age != null && <span>{selectedStudent.age} yrs</span>}
+                      {selectedStudent.gender && <span>{selectedStudent.gender === 'M' ? 'Male' : 'Female'}</span>}
+                      {selectedStudent.student_class && (
+                        <span>Class {selectedStudent.student_class}{selectedStudent.section && `-${selectedStudent.section}`}</span>
+                      )}
+                    </div>
+                    {selectedStudent.father_name && (
+                      <p className="mt-1 text-sm text-[#6B7280]">
+                        <span className="font-medium text-[#9CA3AF]">Father </span>{selectedStudent.father_name}
+                      </p>
+                    )}
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-[#9CA3AF]">Domain progress</p>
+                      <DomainProgressBar examinedCategories={selectedStudent.examined_categories} />
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <DomainProgressBar examinedCategories={s.examined_categories} />
-                    <span className="text-xs text-slate-500 group-hover:text-cyan-400">Select →</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )
-        )}
-      </div>
-
-      {/* Selected Student: Forms */}
-      {selectedStudent && (
-        <>
-          {/* Student header */}
-          <div className="sticky top-0 z-30 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 backdrop-blur-xl p-4 rounded-2xl border border-cyan-500/20 flex items-center justify-between shadow-lg">
-            <div className="flex items-center space-x-4">
-              <div className="w-11 h-11 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-lg">{selectedStudent.name.charAt(0)}</div>
-              <div>
-                <h3 className="text-lg font-bold text-white">{selectedStudent.name}</h3>
-                <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5">
-                  {selectedStudent.age && <span className="bg-slate-800 px-2 py-0.5 rounded">{selectedStudent.age}y / {selectedStudent.gender}</span>}
-                  {selectedStudent.student_class && <span className="bg-slate-800 px-2 py-0.5 rounded">Class {selectedStudent.student_class}{selectedStudent.section && `-${selectedStudent.section}`}</span>}
-                  <DomainProgressBar examinedCategories={selectedStudent.examined_categories} />
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setShowFullRecord(true)}
+                    className={`${cls.btnSecondary} inline-flex items-center gap-2 text-sm`}>
+                    <FileText className="h-4 w-4" /><span>Full record</span>
+                  </button>
+                  <button type="button" onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); doSearch(); searchRef.current?.focus(); }}
+                    className={`${cls.btnGhost} inline-flex items-center gap-2 text-sm`}>
+                    <X className="h-4 w-4" /><span>Done</span>
+                  </button>
                 </div>
               </div>
+
+              {/* General Info Summary (read-only for specialists) */}
+              <GeneralInfoSummary studentId={selectedStudent.student_id} eventId={campId} />
+
+              {/* ── B. Specialist-specific form ── */}
+              <div className="rounded-lg border border-[#E5E7EB] bg-white p-6">
+                {specialistCategory === 'Eye_Specialist' && <EyeExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+                {specialistCategory === 'Dental' && <DentalExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+                {specialistCategory === 'ENT' && <ENTExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+                {specialistCategory === 'Skin_Specialist' && <SkinExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+                {specialistCategory === 'Community_Medicine' && <CommunityMedForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+                {specialistCategory === 'Other' && <CommunityMedForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
+              </div>
+
+              {/* ── E. Other specialists' records (read-only) ── */}
+              <OtherRecordsPanel studentId={selectedStudent.student_id} eventId={campId} currentCategory={specialistCategory} />
             </div>
-            <div className="flex items-center space-x-2">
-              <button onClick={() => setShowFullRecord(true)}
-                className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 px-4 py-2.5 rounded-xl text-sm font-medium border border-cyan-500/30 flex items-center space-x-2 transition-all">
-                <FileText className="w-4 h-4" /><span>Full Record</span>
-              </button>
-              <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); doSearch(); searchRef.current?.focus(); }}
-                className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-700 text-white flex items-center space-x-2 transition-all">
-                <X className="w-4 h-4" /><span>Done</span>
-              </button>
-            </div>
-          </div>
-
-          {/* General Info Summary (read-only for specialists) */}
-          <GeneralInfoSummary studentId={selectedStudent.student_id} eventId={campId} />
-
-          {/* Specialist-specific form */}
-          {specialistCategory === 'Eye_Specialist' && <EyeExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
-          {specialistCategory === 'Dental' && <DentalExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
-          {specialistCategory === 'ENT' && <ENTExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
-          {specialistCategory === 'Skin_Specialist' && <SkinExamForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
-          {specialistCategory === 'Community_Medicine' && <CommunityMedForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
-          {specialistCategory === 'Other' && <CommunityMedForm data={examData} onChange={handleExamChange} doctorInfo={user} studentInfo={selectedStudent} campName={campName} />}
-
-          {/* Other specialists' records (read-only) */}
-          <OtherRecordsPanel studentId={selectedStudent.student_id} eventId={campId} currentCategory={specialistCategory} />
-        </>
-      )}
+          )}
+        </div>
+      </div>
 
       {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onCreated={(s) => selectStudent(s)} userId={user.username} campId={campId} />}
       
       {showFullRecord && selectedStudent && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowFullRecord(false)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-2">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1F2937]/40 p-4 backdrop-blur-sm" onClick={() => setShowFullRecord(false)}>
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-[#E5E7EB] bg-[#F7F9FB] shadow-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-3 sm:p-4">
               <GeneralInfoForm
                 student={selectedStudent as any}
                 eventId={campId}

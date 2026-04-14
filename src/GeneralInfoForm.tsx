@@ -472,8 +472,8 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
 // ══════════════════════════════════════
 // ██ READ-ONLY GENERAL INFO SUMMARY
 // ══════════════════════════════════════
-export function GeneralInfoSummary({ studentId, eventId }: {
-  studentId: number; eventId: number;
+export function GeneralInfoSummary({ studentId, eventId, className = '' }: {
+  studentId: number; eventId: number; className?: string;
 }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -485,7 +485,7 @@ export function GeneralInfoSummary({ studentId, eventId }: {
       .catch(() => setLoading(false));
   }, [studentId, eventId]);
 
-  if (loading) return <div className="text-slate-400 text-sm py-2">Loading info...</div>;
+  if (loading) return <div className="py-2 text-sm text-[#9CA3AF]">Loading info…</div>;
   if (!data?.student) return null;
 
   const s = data.student;
@@ -495,13 +495,13 @@ export function GeneralInfoSummary({ studentId, eventId }: {
   const bmiCat = bmiCategory(bmi);
 
   return (
-    <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-4 space-y-3">
-      <h4 className="text-xs font-bold text-violet-400 uppercase tracking-wider flex items-center">
-        <User className="w-3.5 h-3.5 mr-1.5" /> General Info & Vitals (Read Only)
+    <div className={`space-y-4 border-b border-[#E5E7EB] pb-6 ${className}`}>
+      <h4 className="flex items-center text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <User className="mr-1.5 h-3.5 w-3.5" /> General info & vitals <span className="ml-1.5 font-normal normal-case text-[#9CA3AF]">(read-only)</span>
       </h4>
 
       {/* Combined Demographics & Vitals */}
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 md:grid-cols-6">
         <InfoChip label="Blood" value={s.blood_group || '—'} />
         <InfoChip label="Father" value={s.father_name || '—'} />
         <InfoChip label="Phone" value={s.phone || '—'} />
@@ -517,14 +517,14 @@ export function GeneralInfoSummary({ studentId, eventId }: {
 
       {/* Symptoms alerts */}
       {symptoms.length > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-          <p className="text-xs font-bold text-amber-400 mb-1.5">
+        <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3">
+          <p className="mb-1.5 text-xs font-semibold text-[#92400E]">
             <AlertTriangle className="w-3 h-3 inline mr-1" />
             Teacher Alerts ({symptoms.length})
           </p>
           <div className="flex flex-wrap gap-1.5">
             {symptoms.map(s => (
-              <span key={s} className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-medium">
+              <span key={s} className="rounded border border-[#FDE68A] bg-white px-2 py-0.5 text-[11px] font-medium text-[#92400E]">
                 {s}
               </span>
             ))}
@@ -539,11 +539,11 @@ function InfoChip({ label, value, highlight }: {
   label: string; value: string; highlight?: boolean;
 }) {
   return (
-    <div className={`bg-slate-950/50 rounded-lg px-2.5 py-1.5 border ${
-      highlight ? 'border-amber-500/30' : 'border-slate-800'
+    <div className={`rounded-lg border px-2.5 py-2 ${
+      highlight ? 'border-[#FDE68A] bg-[#FFFBEB]' : 'border-[#E5E7EB] bg-[#F9FAFB]'
     }`}>
-      <p className="text-[10px] text-slate-500 uppercase">{label}</p>
-      <p className={`font-medium ${highlight ? 'text-amber-400' : 'text-white'}`}>{value}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">{label}</p>
+      <p className={`mt-0.5 text-sm font-semibold ${highlight ? 'text-[#B45309]' : 'text-[#1F2937]'}`}>{value}</p>
     </div>
   );
 }

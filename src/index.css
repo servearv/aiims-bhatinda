@@ -200,3 +200,323 @@ html[data-theme="light"] ::-webkit-scrollbar { width: 8px; }
 html[data-theme="light"] ::-webkit-scrollbar-track { background: #f1f5f9; }
 html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Clinical Workstation Layout ── */
+.clinical-workstation {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+.clinical-workstation .clinical-topbar {
+  background: #ffffff;
+  z-index: 30;
+}
+
+.clinical-workstation .clinical-left-pane {
+  min-width: 280px;
+  max-width: 340px;
+}
+
+.clinical-workstation .clinical-right-pane {
+  background: #F7F9FB;
+}
+
+/* Clinical workstation scrollbar */
+.clinical-left-pane::-webkit-scrollbar,
+.clinical-right-pane::-webkit-scrollbar {
+  width: 6px;
+}
+.clinical-left-pane::-webkit-scrollbar-track,
+.clinical-right-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+.clinical-left-pane::-webkit-scrollbar-thumb,
+.clinical-right-pane::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+.clinical-left-pane::-webkit-scrollbar-thumb:hover,
+.clinical-right-pane::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Clinical workstation camps directory */
+.clinical-camps {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Clinical override: ensure the workstation fills its parent properly */
+html[data-theme="light"] .clinical-workstation,
+html[data-theme="dark"] .clinical-workstation {
+  background: transparent !important;
+}
+
+html[data-theme="light"] .clinical-topbar {
+  background: #ffffff !important;
+}
+
+html[data-theme="light"] .clinical-left-pane {
+  background: #f8f9fb !important;
+}
+
+html[data-theme="light"] .clinical-right-pane {
+  background: #ffffff !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ██ DARK MODE — CLINICAL WORKSTATION
+   The doctor view uses hardcoded hex Tailwind classes (bg-white,
+   bg-[#F7F9FB], text-[#1F2937], border-[#E5E7EB], etc.) that
+   the generic slate-* overrides cannot reach. These rules fix that.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Base text & body */
+html[data-theme="dark"] body {
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* ── Structural panes ── */
+html[data-theme="dark"] .clinical-topbar {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] .clinical-left-pane {
+  background: #1a2235 !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] .clinical-right-pane {
+  background: #0f172a !important;
+}
+
+/* ── bg-white (used extensively in forms, cards, inputs) ── */
+html[data-theme="dark"] .clinical-workstation .bg-white {
+  background-color: #1e293b !important;
+}
+
+/* ── Tailwind arbitrary bg values used in the doctor view ── */
+html[data-theme="dark"] .clinical-workstation .bg-\[\#F7F9FB\] {
+  background-color: #0f172a !important;
+}
+html[data-theme="dark"] .clinical-workstation .bg-\[\#F1F4F8\] {
+  background-color: #1a2235 !important;
+}
+
+/* Search bar area above patient list */
+html[data-theme="dark"] .clinical-workstation .border-b.border-\[\#E5E7EB\].bg-\[\#F7F9FB\] {
+  background-color: #1e293b !important;
+}
+
+/* ── Borders ── */
+html[data-theme="dark"] .clinical-workstation .border-\[\#E5E7EB\] {
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .clinical-workstation .border-gray-100 {
+  border-color: #1e293b !important;
+}
+html[data-theme="dark"] .clinical-workstation .border-gray-50 {
+  border-color: #1e293b !important;
+}
+
+/* ── Text colors ── */
+html[data-theme="dark"] .clinical-workstation .text-\[\#1F2937\] {
+  color: #f1f5f9 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-\[\#374151\] {
+  color: #cbd5e1 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-\[\#6B7280\] {
+  color: #94a3b8 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-\[\#9CA3AF\] {
+  color: #64748b !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-900,
+html[data-theme="dark"] .clinical-workstation .text-gray-800 {
+  color: #f1f5f9 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-700,
+html[data-theme="dark"] .clinical-workstation .text-gray-600 {
+  color: #94a3b8 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-500,
+html[data-theme="dark"] .clinical-workstation .text-gray-400 {
+  color: #64748b !important;
+}
+
+/* ── Inputs / Selects / Textareas in clinical workstation ── */
+html[data-theme="dark"] .clinical-workstation input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="dark"] .clinical-workstation select,
+html[data-theme="dark"] .clinical-workstation textarea {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .clinical-workstation input::placeholder,
+html[data-theme="dark"] .clinical-workstation textarea::placeholder {
+  color: #475569 !important;
+}
+html[data-theme="dark"] .clinical-workstation input:focus,
+html[data-theme="dark"] .clinical-workstation select:focus,
+html[data-theme="dark"] .clinical-workstation textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2) !important;
+}
+html[data-theme="dark"] .clinical-workstation option {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+/* ── SectionCard / accordion buttons inside clinical workspace ── */
+html[data-theme="dark"] .clinical-workstation .rounded-xl.border.border-gray-100 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .clinical-workstation .rounded-xl.border.border-gray-100 button {
+  background-color: transparent !important;
+  color: #e2e8f0 !important;
+}
+html[data-theme="dark"] .clinical-workstation .rounded-xl.border.border-gray-100 button:hover {
+  background-color: rgba(51,65,85,0.5) !important;
+}
+
+/* ── Form cards (white rounded-lg panels) ── */
+html[data-theme="dark"] .clinical-workstation .rounded-lg.border.border-\[\#E5E7EB\].bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* ── Accent / status pill borders (keep their own hue, just lighten bg contrast) ── */
+html[data-theme="dark"] .clinical-workstation .rounded-md.border.border-\[\#E5E7EB\].bg-white {
+  background-color: #263148 !important;
+  border-color: #334155 !important;
+}
+
+/* ── Student list items ── */
+html[data-theme="dark"] .clinical-workstation button.border-l-transparent:hover {
+  background-color: rgba(51,65,85,0.6) !important;
+}
+html[data-theme="dark"] .clinical-workstation button.border-l-\[\#2563EB\] {
+  background-color: #1e3a5f !important;
+}
+
+/* ── Section headings divider line ── */
+html[data-theme="dark"] .clinical-workstation .border-b.border-\[\#E5E7EB\] {
+  border-color: #334155 !important;
+}
+
+/* ── Hover states for secondary/ghost buttons ── */
+html[data-theme="dark"] .clinical-workstation .bg-white.hover\:bg-\[\#F9FAFB\]:hover {
+  background-color: #263148 !important;
+}
+html[data-theme="dark"] .clinical-workstation .hover\:bg-\[\#F3F4F6\]:hover {
+  background-color: #263148 !important;
+}
+html[data-theme="dark"] .clinical-workstation .hover\:bg-gray-50:hover {
+  background-color: rgba(51,65,85,0.4) !important;
+}
+
+/* ── Toggle option buttons (Yes/No etc.) ── */
+html[data-theme="dark"] .clinical-workstation button.border-\[\#E5E7EB\].bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+html[data-theme="dark"] .clinical-workstation button.border-\[\#E5E7EB\].bg-white:hover {
+  border-color: #475569 !important;
+}
+
+/* ── Top bar text ── */
+html[data-theme="dark"] .clinical-topbar .text-\[\#1F2937\] {
+  color: #f1f5f9 !important;
+}
+html[data-theme="dark"] .clinical-topbar .text-\[\#6B7280\] {
+  color: #94a3b8 !important;
+}
+html[data-theme="dark"] .clinical-topbar .bg-\[\#F7F9FB\] {
+  background-color: #1e293b !important;
+}
+html[data-theme="dark"] .clinical-topbar .border-b.border-\[\#E5E7EB\] {
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .clinical-topbar .bg-white {
+  background-color: #263148 !important;
+}
+html[data-theme="dark"] .clinical-topbar .text-\[\#9CA3AF\] {
+  color: #64748b !important;
+}
+
+/* ── Add student / full record modals ── */
+html[data-theme="dark"] .clinical-workstation .bg-white.rounded-2xl {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-500 {
+  color: #94a3b8 !important;
+}
+html[data-theme="dark"] .clinical-workstation .text-gray-400 {
+  color: #64748b !important;
+}
+
+/* ── Scrollbars in dark mode ── */
+html[data-theme="dark"] .clinical-left-pane::-webkit-scrollbar-track,
+html[data-theme="dark"] .clinical-right-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+html[data-theme="dark"] .clinical-left-pane::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .clinical-right-pane::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+html[data-theme="dark"] .clinical-left-pane::-webkit-scrollbar-thumb:hover,
+html[data-theme="dark"] .clinical-right-pane::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ── Empty-state icons ── */
+html[data-theme="dark"] .clinical-workstation .border-\[\#E5E7EB\].bg-white.rounded-2xl,
+html[data-theme="dark"] .clinical-workstation .border-\[\#E5E7EB\].bg-white.rounded-xl {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* ── Small filter selects (cls.selectSm) ── */
+html[data-theme="dark"] .clinical-workstation .rounded-md.border-\[\#E5E7EB\].bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+/* ── Camps directory cards ── */
+html[data-theme="dark"] .clinical-camps .bg-white {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+html[data-theme="dark"] .clinical-camps .text-gray-900 { color: #f1f5f9 !important; }
+html[data-theme="dark"] .clinical-camps .text-gray-500 { color: #94a3b8 !important; }
+html[data-theme="dark"] .clinical-camps .text-gray-400 { color: #64748b !important; }
+html[data-theme="dark"] .clinical-camps .border-gray-100 { border-color: #334155 !important; }
+html[data-theme="dark"] .clinical-camps input {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 768px) {
+  .clinical-workstation .clinical-left-pane {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: auto !important;
+  }
+  .clinical-workstation > div:last-child {
+    flex-direction: column;
+  }
+}
