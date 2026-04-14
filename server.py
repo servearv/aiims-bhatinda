@@ -284,6 +284,22 @@ def init_db():
             FOREIGN KEY(event_id) REFERENCES Events(event_id),
             UNIQUE(student_id, event_id)
         );
+
+        CREATE TABLE IF NOT EXISTS Camp_Requests (
+            request_id SERIAL PRIMARY KEY,
+            school_id INTEGER,
+            school_name TEXT NOT NULL,
+            preferred_date TEXT NOT NULL,
+            alternate_date TEXT DEFAULT '',
+            student_count INTEGER DEFAULT 0,
+            classes TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            status TEXT DEFAULT 'Pending',
+            created_at TEXT,
+            reviewed_at TEXT,
+            reviewed_by TEXT,
+            FOREIGN KEY(school_id) REFERENCES Schools(school_id)
+        );
     """)
 
     conn.commit()
@@ -1389,6 +1405,213 @@ def api_school_events():
     result = rows_to_list(events)
     _enrich_events_with_status(result)
     return jsonify(result)
+
+# ---- Camp Requests ----
+
+@app.route("/api/camp-requests", methods=["POST"])
+def api_create_camp_request():
+    """School POC submits a camp request."""
+    data = request.get_json(force=True)
+    username = data.get("username", "").strip()
+    preferred_date = data.get("preferred_date", "").strip()
+    if not preferred_date:
+        return jsonify({"success": False, "message": "Preferred date is required"}), 400
+    student_count = data.get("student_count", 0)
+    try:
+        student_count = int(student_count)
+        if student_count <= 0:
+            return jsonify({"success": False, "message": "Student count must be a positive number"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "message": "Student count must be a valid number"}), 400
+
+    conn = get_db()
+    school = conn.execute(
+        "SELECT school_id, school_name FROM Schools WHERE poc_username = ?",
+        (username,),
+    ).fetchone()
+    if not school:
+        conn.close()
+        return jsonify({"success": False, "message": "No school found for this user"}), 404
+
+    s = row_to_dict(school)
+    now = datetime.utcnow().isoformat()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO Camp_Requests
+           (school_id, school_name, preferred_date, alternate_date,
+            student_count, classes, notes, status, created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,'Pending',%s) RETURNING request_id""",
+        (
+            s["school_id"], s["school_name"],
+            preferred_date,
+            data.get("alternate_date", ""),
+            student_count,
+            data.get("classes", ""),
+            data.get("notes", ""),
+            now,
+        ),
+    )
+    new_id = cur.fetchone()["request_id"]
+    conn.commit()
+    conn.close()
+    log_audit(username, "CREATE_CAMP_REQUEST",
+              f"Camp request {new_id} submitted for {s['school_name']}")
+    return jsonify({"success": True, "request_id": new_id})
+
+
+@app.route("/api/camp-requests", methods=["GET"])
+def api_list_camp_requests():
+    """Admin: list all camp requests (optionally filter by status)."""
+    status_filter = request.args.get("status", "").strip()
+    conn = get_db()
+    if status_filter:
+        rows = conn.execute(
+            "SELECT * FROM Camp_Requests WHERE status = ? ORDER BY created_at DESC",
+            (status_filter,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM Camp_Requests ORDER BY created_at DESC"
+        ).fetchall()
+    conn.close()
+    return jsonify(rows_to_list(rows))
+
+
+@app.route("/api/camp-requests/school")
+def api_school_camp_requests():
+    """School POC: list their own camp requests."""
+    username = request.args.get("username", "").strip()
+    conn = get_db()
+    school = conn.execute(
+        "SELECT school_id FROM Schools WHERE poc_username = ?",
+        (username,),
+    ).fetchone()
+    if not school:
+        conn.close()
+        return jsonify([])
+    school_id = school["school_id"]
+    rows = conn.execute(
+        "SELECT * FROM Camp_Requests WHERE school_id = ? ORDER BY created_at DESC",
+        (school_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify(rows_to_list(rows))
+
+
+@app.route("/api/camp-requests/count")
+def api_camp_requests_count():
+    """Return count of pending camp requests (for admin badge)."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM Camp_Requests WHERE status = 'Pending'"
+    ).fetchone()
+    conn.close()
+    return jsonify({"pending": row["c"] if row else 0})
+
+
+@app.route("/api/camp-requests/<int:request_id>/approve", methods=["POST"])
+def api_approve_camp_request(request_id):
+    """Admin approves a camp request and creates a real Event."""
+    sess_user = session.get("user")
+    reviewer = sess_user["username"] if sess_user else "admin"
+    data = request.get_json(force=True) or {}
+
+    conn = get_db()
+    req = conn.execute(
+        "SELECT * FROM Camp_Requests WHERE request_id = ?", (request_id,)
+    ).fetchone()
+    if not req:
+        conn.close()
+        return jsonify({"success": False, "message": "Request not found"}), 404
+
+    r = row_to_dict(req)
+    if r["status"] != "Pending":
+        conn.close()
+        return jsonify({"success": False, "message": "Request is not pending"}), 409
+
+    # Fetch school details to populate the event properly
+    school_id = r["school_id"]
+    school_row = None
+    if school_id:
+        school_row = conn.execute(
+            "SELECT * FROM Schools WHERE school_id = ?", (school_id,)
+        ).fetchone()
+
+    school_name = r["school_name"]
+    school_address = ""
+    poc_name = ""
+    poc_designation = ""
+    poc_phone = ""
+    poc_email = ""
+    if school_row:
+        sd = row_to_dict(school_row)
+        school_address = sd.get("school_address", "")
+        poc_name = sd.get("poc_name", "")
+        poc_designation = sd.get("poc_designation", "")
+        poc_phone = sd.get("poc_phone", "")
+        poc_email = sd.get("poc_email", "")
+
+    # Compute tag using existing server logic
+    computed_tag = _compute_event_status(r["preferred_date"], "")
+
+    now = datetime.utcnow().isoformat()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO Events
+           (school_name, school_address, poc_name, poc_designation,
+            poc_phone, poc_email, school_id, start_date, end_date,
+            operational_hours, tag, created_at, created_by)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING event_id""",
+        (
+            school_name, school_address, poc_name, poc_designation,
+            poc_phone, poc_email, school_id,
+            r["preferred_date"], "",
+            data.get("operational_hours", ""),
+            computed_tag, now, reviewer,
+        ),
+    )
+    new_event_id = cur.fetchone()["event_id"]
+
+    # Mark request as Approved
+    conn.execute(
+        "UPDATE Camp_Requests SET status='Approved', reviewed_at=?, reviewed_by=? WHERE request_id=?",
+        (now, reviewer, request_id),
+    )
+    conn.commit()
+    conn.close()
+
+    log_audit(reviewer, "APPROVE_CAMP_REQUEST",
+              f"Approved request {request_id} -> Event {new_event_id}: {school_name}")
+    return jsonify({"success": True, "event_id": new_event_id})
+
+
+@app.route("/api/camp-requests/<int:request_id>/reject", methods=["POST"])
+def api_reject_camp_request(request_id):
+    """Admin rejects a camp request."""
+    sess_user = session.get("user")
+    reviewer = sess_user["username"] if sess_user else "admin"
+
+    conn = get_db()
+    req = conn.execute(
+        "SELECT * FROM Camp_Requests WHERE request_id = ?", (request_id,)
+    ).fetchone()
+    if not req:
+        conn.close()
+        return jsonify({"success": False, "message": "Request not found"}), 404
+
+    if row_to_dict(req)["status"] != "Pending":
+        conn.close()
+        return jsonify({"success": False, "message": "Request is not pending"}), 409
+
+    now = datetime.utcnow().isoformat()
+    conn.execute(
+        "UPDATE Camp_Requests SET status='Rejected', reviewed_at=?, reviewed_by=? WHERE request_id=?",
+        (now, reviewer, request_id),
+    )
+    conn.commit()
+    conn.close()
+    log_audit(reviewer, "REJECT_CAMP_REQUEST", f"Rejected camp request {request_id}")
+    return jsonify({"success": True})
 
 
 # ---- Students ----

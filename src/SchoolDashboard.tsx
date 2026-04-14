@@ -3,7 +3,8 @@ import Papa from 'papaparse';
 import {
   Calendar, Users, Plus, X, Check, ChevronRight, ArrowRight,
   Upload, Download, FileText, Activity, UserPlus, Search,
-  ChevronDown, AlertTriangle, BarChart3, ClipboardList, Printer
+  ChevronDown, AlertTriangle, BarChart3, ClipboardList, Printer,
+  Bell, ClipboardCheck, Loader2, AlertCircle
 } from 'lucide-react';
 import GeneralInfoForm from './GeneralInfoForm';
 
@@ -53,6 +54,18 @@ interface EventStats {
   dept_breakdown?: Record<string, { N: number; O: number; R: number }>;
   records: any[];
   staff: any[];
+}
+
+interface CampRequest {
+  request_id: number;
+  school_name: string;
+  preferred_date: string;
+  alternate_date: string;
+  student_count: number;
+  classes: string;
+  notes: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  created_at: string;
 }
 
 // ── Helpers ──
@@ -120,14 +133,34 @@ export default function SchoolDashboard({ user }: { user: User }) {
 function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventData) => void }) {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'Ongoing' | 'Upcoming' | 'Completed'>('Ongoing');
+  const [activeTab, setActiveTab] = useState<'Ongoing' | 'Upcoming' | 'Completed' | 'My Requests'>('Ongoing');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [campRequests, setCampRequests] = useState<CampRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     fetch(`/api/events/school?username=${encodeURIComponent(user.username)}`)
       .then(r => r.json())
       .then(data => { setEvents(data); setLoading(false); })
       .catch(() => setLoading(false));
+  }, [user.username]);
+
+  const fetchCampRequests = () => {
+    setRequestsLoading(true);
+    fetch(`/api/camp-requests/school?username=${encodeURIComponent(user.username)}`)
+      .then(r => r.json())
+      .then(data => {
+        setCampRequests(data);
+        setPendingCount(data.filter((r: CampRequest) => r.status === 'Pending').length);
+        setRequestsLoading(false);
+      })
+      .catch(() => setRequestsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCampRequests();
   }, [user.username]);
 
   const computeTag = (event: EventData): string => {
@@ -159,6 +192,7 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
 
   const filteredEvents = events.filter(e => {
     const matchesSearch = e.school_name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeTab === 'My Requests') return false;
     const eventTag = computeTag(e);
     return matchesSearch && eventTag === activeTab;
   });
@@ -172,10 +206,10 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex space-x-2 bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-800 self-stretch sm:self-auto overflow-x-auto">
-          {['Ongoing', 'Completed', 'Upcoming'].map(tab => (
+          {(['Ongoing', 'Completed', 'Upcoming'] as const).map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() => setActiveTab(tab)}
               className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none ${
                 activeTab === tab 
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]' 
@@ -185,60 +219,153 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
               {tab}
             </button>
           ))}
+          <button
+            onClick={() => { setActiveTab('My Requests'); fetchCampRequests(); }}
+            className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none flex items-center justify-center space-x-1.5 ${
+              activeTab === 'My Requests'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(251,191,36,0.1)]'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            <span>My Requests</span>
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">
+                {pendingCount}
+              </span>
+            )}
+          </button>
         </div>
-        
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-          <input 
-            type="text" 
-            placeholder="Search events..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all text-sm backdrop-blur-xl"
-          />
+
+        <div className="flex items-center gap-3">
+          {activeTab !== 'My Requests' && (
+            <div className="relative w-full sm:w-52">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+              <input 
+                type="text" 
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all text-sm backdrop-blur-xl"
+              />
+            </div>
+          )}
+          <button
+            onClick={() => setShowRequestModal(true)}
+            className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-sm shadow-lg transition-all whitespace-nowrap"
+          >
+            <Bell className="w-4 h-4" />
+            <span>Request Camp</span>
+          </button>
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-slate-400">Loading events...</div>
-      ) : filteredEvents.length === 0 ? (
-        <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
-          <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-          <p className="text-slate-400">No {activeTab.toLowerCase()} events found.</p>
-          {searchQuery && <p className="text-slate-500 text-sm mt-1">Try adjusting your search query.</p>}
-        </div>
-      ) : (
+      {/* My Requests Tab Content */}
+      {activeTab === 'My Requests' && (
         <div className="space-y-3">
-          {filteredEvents.map(event => (
-            <button key={event.event_id} onClick={() => onSelect(event)}
-              className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-violet-500/40 transition-all p-5 group shadow-xl">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-all flex-shrink-0">
-                    <Calendar className="w-6 h-6 text-violet-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-white font-semibold text-lg group-hover:text-violet-300 transition-colors">{event.school_name}</h3>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                      {formatDate(event.start_date)}{event.end_date ? ` → ${formatDate(event.end_date)}` : ''}
-                      {event.operational_hours ? ` · ${event.operational_hours}` : ''}
-                    </p>
+          {requestsLoading ? (
+            <div className="flex items-center justify-center py-12 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />Loading requests...
+            </div>
+          ) : campRequests.length === 0 ? (
+            <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
+              <ClipboardCheck className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400 font-medium">No camp requests yet.</p>
+              <p className="text-slate-500 text-sm mt-1">Click "Request Camp" to submit your first request.</p>
+            </div>
+          ) : (
+            campRequests.map(req => {
+              const statusStyle = {
+                Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                Approved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                Rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
+              }[req.status];
+              return (
+                <div key={req.request_id} className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 p-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-sm">
+                          Preferred: {req.preferred_date ? new Date(req.preferred_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </p>
+                        <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400">
+                          <span><Users className="w-3 h-3 inline mr-1" />{req.student_count} students</span>
+                          {req.classes && <span>Classes: {req.classes}</span>}
+                          {req.alternate_date && <span>Alt: {new Date(req.alternate_date).toLocaleDateString('en-IN')}</span>}
+                        </div>
+                        {req.notes && <p className="text-xs text-slate-500 mt-0.5 italic">{req.notes}</p>}
+                        <p className="text-xs text-slate-600 mt-0.5">Submitted: {new Date(req.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${statusStyle}`}>{req.status}</span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3 self-end md:self-auto">
-                  <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
-                    <Users className="w-3.5 h-3.5 inline mr-1" />{event.student_count ?? 0} students
-                  </span>
-                  <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
-                    <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0} screened
-                  </span>
-                  <span className={`px-3 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${tagStyle(computeTag(event))}`}>{computeTag(event)}</span>
-                  <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-violet-400 transition-colors" />
-                </div>
-              </div>
-            </button>
-          ))}
+              );
+            })
+          )}
         </div>
+      )}
+
+      {/* Events Tab Content */}
+      {activeTab !== 'My Requests' && (
+        <>
+          {loading ? (
+            <div className="text-center py-12 text-slate-400">Loading events...</div>
+          ) : filteredEvents.length === 0 ? (
+            <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-2xl border border-slate-800 text-center">
+              <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+              <p className="text-slate-400">No {activeTab.toLowerCase()} events found.</p>
+              {searchQuery && <p className="text-slate-500 text-sm mt-1">Try adjusting your search query.</p>}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredEvents.map(event => (
+                <button key={event.event_id} onClick={() => onSelect(event)}
+                  className="w-full text-left bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 hover:border-violet-500/40 transition-all p-5 group shadow-xl">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-all flex-shrink-0">
+                        <Calendar className="w-6 h-6 text-violet-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-white font-semibold text-lg group-hover:text-violet-300 transition-colors">{event.school_name}</h3>
+                        <p className="text-sm text-slate-400 mt-0.5">
+                          {formatDate(event.start_date)}{event.end_date ? ` → ${formatDate(event.end_date)}` : ''}
+                          {event.operational_hours ? ` · ${event.operational_hours}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 self-end md:self-auto">
+                      <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
+                        <Users className="w-3.5 h-3.5 inline mr-1" />{event.student_count ?? 0} students
+                      </span>
+                      <span className="text-xs text-slate-500 whitespace-nowrap hidden sm:inline">
+                        <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0} screened
+                      </span>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${tagStyle(computeTag(event))}`}>{computeTag(event)}</span>
+                      <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-violet-400 transition-colors" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {showRequestModal && (
+        <RequestCampModal
+          user={user}
+          onClose={() => setShowRequestModal(false)}
+          onSubmitted={() => {
+            setShowRequestModal(false);
+            fetchCampRequests();
+            setActiveTab('My Requests');
+          }}
+        />
       )}
     </div>
   );
@@ -1302,3 +1429,185 @@ function StatCard({ label, value, color }: { label: string; value: number; color
     </div>
   );
 }
+
+
+// ════════════════════════════════════════
+// ██ REQUEST CAMP MODAL
+// ════════════════════════════════════════
+function RequestCampModal({ user, onClose, onSubmitted }: {
+  user: User;
+  onClose: () => void;
+  onSubmitted: () => void;
+}) {
+  const [f, setF] = useState({
+    preferred_date: '',
+    alternate_date: '',
+    student_count: '',
+    classes: '',
+    notes: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState(false);
+
+  const upd = (k: string, v: string) => {
+    setF(p => ({ ...p, [k]: v }));
+    setErrors(p => ({ ...p, [k]: '' }));
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    if (!f.preferred_date) e.preferred_date = 'Preferred date is required';
+    const count = parseInt(f.student_count);
+    if (!f.student_count || isNaN(count) || count <= 0) e.student_count = 'Enter a valid number of students';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/camp-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: user.username,
+          preferred_date: f.preferred_date,
+          alternate_date: f.alternate_date,
+          student_count: parseInt(f.student_count),
+          classes: f.classes,
+          notes: f.notes,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess(true);
+        setTimeout(() => onSubmitted(), 1500);
+      } else {
+        setErrors({ submit: data.message || 'Submission failed' });
+      }
+    } catch {
+      setErrors({ submit: 'Connection error. Please try again.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ic = 'w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all placeholder-slate-600';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
+          <X className="w-5 h-5" />
+        </button>
+
+        <h3 className="text-xl font-bold text-white mb-5 flex items-center">
+          <Bell className="w-5 h-5 mr-2 text-amber-400" /> Request Screening Camp
+        </h3>
+
+        {success ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8 text-emerald-400" />
+            </div>
+            <h4 className="text-white font-bold text-lg">Request Submitted!</h4>
+            <p className="text-slate-400 text-sm mt-1">Admin will review your request shortly.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {errors.submit && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-xl text-sm flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{errors.submit}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                  Preferred Date <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={f.preferred_date}
+                  onChange={e => upd('preferred_date', e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className={`${ic} ${errors.preferred_date ? 'border-red-500/50' : ''}`}
+                />
+                {errors.preferred_date && <p className="text-red-400 text-xs mt-1">{errors.preferred_date}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                  Alternate Date
+                </label>
+                <input
+                  type="date"
+                  value={f.alternate_date}
+                  onChange={e => upd('alternate_date', e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className={ic}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                Number of Students <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={f.student_count}
+                onChange={e => upd('student_count', e.target.value)}
+                placeholder="e.g. 250"
+                className={`${ic} ${errors.student_count ? 'border-red-500/50' : ''}`}
+              />
+              {errors.student_count && <p className="text-red-400 text-xs mt-1">{errors.student_count}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                Classes / Grades Involved
+              </label>
+              <input
+                type="text"
+                value={f.classes}
+                onChange={e => upd('classes', e.target.value)}
+                placeholder="e.g. Class 6 to 10, or All"
+                className={ic}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
+                Special Notes / Requirements
+              </label>
+              <textarea
+                value={f.notes}
+                onChange={e => upd('notes', e.target.value)}
+                placeholder="Any special requirements or notes for the admin..."
+                rows={3}
+                className={`${ic} resize-none`}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(251,191,36,0.3)] transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+            >
+              {saving ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /><span>Submitting...</span></>
+              ) : (
+                <><Bell className="w-5 h-5" /><span>Submit Request</span></>
+              )}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
