@@ -164,7 +164,7 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
+    <div className="mx-auto w-full min-w-0 max-w-4xl space-y-6 animate-in fade-in duration-500">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-white tracking-tight">School Dashboard 🏫</h2>
         <p className="text-slate-400 text-sm mt-1">Manage student rosters and track camp progress.</p>
@@ -251,7 +251,7 @@ function EventWorkspace({ user, event, onBack }: { user: User; event: EventData;
   const [activeView, setActiveView] = useState<'roster' | 'progress'>('roster');
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-500 max-w-5xl mx-auto">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -1588,7 +1588,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
   const rosterExamined = searchResults.filter(s => !!s.is_examined).length;
 
   return (
-    <div className="clinical-workstation -mx-8 -mb-8 flex h-full flex-col text-[15px] text-[#1F2937]" style={{ marginTop: '-1rem' }}>
+    <div className="clinical-workstation flex h-full w-full min-w-0 flex-col overflow-hidden text-[15px] text-[#1F2937]">
       {/* ── STICKY TOP BAR ── */}
       <div className="clinical-topbar sticky top-0 z-30 flex h-14 min-h-[56px] flex-shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-[#F7F9FB] px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-4">
@@ -1653,7 +1653,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
       </div>
 
       {/* ── MAIN BODY: LEFT + RIGHT ── */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* ── LEFT PANE: Student List ── */}
         <div className="clinical-left-pane flex w-[min(100%,340px)] min-w-[280px] max-w-[340px] flex-shrink-0 flex-col overflow-hidden border-r border-[#E5E7EB] bg-[#F1F4F8]">
           {/* Search */}
@@ -1723,7 +1723,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
         </div>
 
         {/* ── RIGHT PANE: Clinical Workspace ── */}
-        <div className="clinical-right-pane min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#F7F9FB]">
+        <div className="clinical-right-pane min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#F7F9FB]">
           {!selectedStudent ? (
             /* Empty state */
             <div className="flex h-full flex-col items-center justify-center px-8 text-center">
@@ -1734,7 +1734,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
               <p className="mt-1 max-w-sm text-sm text-[#9CA3AF]">Choose from the roster on the left to open the clinical workspace.</p>
             </div>
           ) : (
-            <div className="max-w-none space-y-8 px-4 py-6 sm:px-8">
+            <div className="max-w-full min-w-0 space-y-8 px-4 py-6 sm:px-8">
               {/* ── A. Student Context Header ── */}
               <div className="flex flex-col gap-4 border-b border-[#E5E7EB] pb-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-start gap-4">

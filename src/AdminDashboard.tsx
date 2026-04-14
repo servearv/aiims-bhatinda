@@ -134,7 +134,7 @@ export default function AdminDashboard({ user }: { user: User }) {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
+    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6 animate-in fade-in duration-500">
       <div>
         <h2 className="text-2xl font-bold text-white tracking-tight">Admin Dashboard ⚙️</h2>
         <p className="text-slate-400 text-sm mt-0.5">Manage screening camps, medical staff, and health records.</p>

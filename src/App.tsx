@@ -116,7 +116,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30 overflow-hidden">
+    <div className="flex h-screen w-full overflow-hidden bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
       <OfflineBanner />
       <UpdatePrompt />
       
@@ -129,7 +129,7 @@ export default function App() {
       )}
       
       {/* Sidebar */}
-      <aside className={`bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl flex flex-col absolute md:relative z-40 h-full transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
+      <aside className={`bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl flex flex-col absolute md:relative z-40 h-full flex-shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
         sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 md:translate-x-0 md:w-0 md:border-r-0'
       }`}>
         <div className="w-72 flex flex-col h-full flex-shrink-0">
@@ -202,7 +202,7 @@ export default function App() {
 
       {/* Main Content */}
       <main
-        className={`relative flex flex-1 flex-col ${
+        className={`relative flex flex-1 min-w-0 flex-col ${
           isSpecialist(user.role) && activeTab === 'dashboard' ? 'min-h-0 overflow-hidden' : 'overflow-y-auto'
         }`}
       >
@@ -225,7 +225,7 @@ export default function App() {
         </div>
 
         <div
-          className={`relative z-10 flex-1 ${
+          className={`relative z-10 flex-1 min-w-0 ${
             isSpecialist(user.role) && activeTab === 'dashboard'
               ? 'flex min-h-0 flex-col overflow-hidden px-0 pb-0'
               : 'px-8 pb-8'
