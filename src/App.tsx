@@ -84,8 +84,8 @@ export default function App() {
         <div className="relative z-10 flex flex-col items-center space-y-6 animate-in pwa-fade-in duration-700">
           <div className="relative">
             <div className="absolute inset-0 bg-cyan-500 blur-xl opacity-20 animate-pulse rounded-full"></div>
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_40px_rgba(34,211,238,0.4)] relative">
-              <ActivitySquare className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center p-2 shadow-[0_0_40px_rgba(34,211,238,0.4)] relative">
+              <img src="/aiims-bathinda-logo.png" alt="AIIMS Bathinda" className="w-full h-full object-contain" />
             </div>
           </div>
           
@@ -129,72 +129,72 @@ export default function App() {
       )}
       
       {/* Sidebar */}
-      <aside className={`bg-slate-900/95 border-r border-slate-800 backdrop-blur-2xl flex flex-col absolute md:relative z-40 h-full flex-shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
+      <aside className={`bg-gradient-to-b from-[#e0f2fe] to-white border-r border-[#e2e8f0] flex flex-col absolute md:relative z-40 h-full flex-shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
         sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 md:translate-x-0 md:w-0 md:border-r-0'
       }`}>
         <div className="w-72 flex flex-col h-full flex-shrink-0">
-        <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
+        <div className="p-6 border-b border-black/5 whitespace-nowrap">
           <div className="flex items-center space-x-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(34,211,238,0.4)] flex-shrink-0">
-              <ActivitySquare className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-full bg-white p-1 flex items-center justify-center shadow-[0_0_15px_rgba(253,186,116,0.5)] flex-shrink-0">
+              <img src="/aiims-bathinda-logo.png" alt="AIIMS Logo" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-white">AIIMS Bathinda</h1>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">AIIMS Bathinda</h1>
             </div>
           </div>
         </div>
         
-        <div className="p-6 border-b border-slate-800/50 whitespace-nowrap">
+        <div className="p-6 border-b border-black/5 whitespace-nowrap">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white">{user.name}</p>
-              <p className="text-xs text-slate-400">{formatRoleDisplay(user.role)}</p>
+              <p className="text-sm font-bold text-slate-900">{user.name}</p>
+              <p className="text-xs font-semibold text-slate-600">{formatRoleDisplay(user.role)}</p>
             </div>
           </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Navigation</div>
+          <div className="px-3 py-2 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Navigation</div>
           <button onClick={() => handleTabSwitch('dashboard')}
             className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all pwa-no-print ${
               activeTab === 'dashboard'
-                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                ? 'bg-blue-50 text-blue-700 border border-blue-200/50 shadow-sm font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 border border-transparent font-semibold shadow-sm'
             }`}>
             {getRoleIcon(user.role)}
-            <span className="font-medium">{formatRoleDisplay(user.role)} Dashboard</span>
+            <span>{formatRoleDisplay(user.role)} Dashboard</span>
           </button>
           <button onClick={() => handleTabSwitch('profile')}
             className={`w-full px-3 py-3 rounded-xl flex items-center space-x-3 transition-all pwa-no-print ${
               activeTab === 'profile'
-                ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                ? 'bg-violet-50 text-violet-700 border border-violet-200/50 shadow-sm font-bold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50 border border-transparent font-semibold shadow-sm'
             }`}>
             <Settings className="w-5 h-5" />
-            <span className="font-medium">Profile Settings</span>
+            <span>Profile Settings</span>
           </button>
         </nav>
 
-        <div className="p-4 border-t border-slate-800/50 space-y-2 pwa-no-print">
+        <div className="p-4 border-t border-black/5 space-y-2 pwa-no-print">
           {canInstall && (
             <button onClick={promptInstall}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium transition-all shadow-lg text-sm mb-4">
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold transition-all shadow-md text-sm mb-4">
               <ArrowRight className="w-4 h-4 rotate-90" />
               <span>Install App</span>
             </button>
           )}
           <button onClick={toggleTheme}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-500/20">
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-white/70 hover:bg-white text-slate-700 hover:text-yellow-600 transition-all border border-transparent hover:border-yellow-200 shadow-sm">
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span className="font-medium text-sm">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            <span className="font-semibold text-sm">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
           <button onClick={handleLogout}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-400 transition-all border border-transparent hover:border-red-500/20">
+            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-xl bg-white/70 hover:bg-red-50 text-slate-700 hover:text-red-600 transition-all border border-transparent hover:border-red-200 shadow-sm">
             <LogOut className="w-4 h-4" />
-            <span className="font-medium text-sm">Logout</span>
+            <span className="font-semibold text-sm">Logout</span>
           </button>
         </div>
         </div>
@@ -403,141 +403,226 @@ function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void
     }
   };
 
-  const inputClass = "w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600";
-  const btnClass = "w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all disabled:opacity-50";
+  const inputClass = "w-full bg-white border border-[#93c5fd] rounded-xl px-4 py-3.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]/50 transition-all placeholder-slate-400 font-medium";
+  const btnClass = "w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white font-bold py-3.5 rounded-xl shadow-md transition-all disabled:opacity-50 mt-6 flex justify-center items-center";
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-500/20 rounded-full blur-[150px] pointer-events-none"></div>
-
-      <div className="relative z-10 w-full max-w-md px-4">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.5)] mb-4">
-            <ActivitySquare className="w-8 h-8 text-white" />
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#f0f2f5] font-sans overflow-hidden">
+      
+      {/* LEFT SIDE: Visual (60%) */}
+      <div className="hidden md:flex w-full md:w-[60%] flex-col p-8 xl:p-16 relative overflow-hidden bg-gradient-to-b from-[#e0f2fe] to-white shadow-[10px_0_30px_rgba(0,0,0,0.1)] z-10 border-r border-[#e2e8f0]">
+        
+        {/* Header Logo */}
+        <div className="relative z-10 flex items-center space-x-4 mb-2">
+          {/* AIIMS Gold Logo representation */}
+          <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm relative overflow-hidden p-1 border border-slate-200">
+             <img src="/aiims-bathinda-logo.png" alt="AIIMS Logo" className="w-full h-full object-contain" />
           </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">AIIMS Bathinda</h2>
-          <p className="text-slate-400 text-sm mt-1">Health Screening Portal</p>
+          <div>
+            <h2 className="text-[28px] font-black text-[#1e293b] tracking-tight leading-none mb-1">AIIMS Bathinda</h2>
+            <p className="text-[#64748b] text-[13px] font-bold tracking-[0.1em] uppercase">School Health Portal</p>
+          </div>
         </div>
 
-        <div className="p-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className="relative z-10 max-w-2xl mt-12 mb-auto">
+          <div className="inline-flex items-center space-x-2 bg-[#e0f2fe] rounded-full px-4 py-1.5 mb-10">
+            <span className="w-2 h-2 rounded-full bg-[#3b82f6]"></span>
+            <span className="text-[#2563eb] text-[11px] font-bold uppercase tracking-widest">Enterprise Grade</span>
+          </div>
+          
+          <h1 className="text-6xl xl:text-7xl font-black text-[#1e293b] tracking-tight leading-[1.05] mb-12">
+            Empowering <br />
+            <span className="text-[#0ea5e9]">Student Wellness</span>
+          </h1>
 
-          {/* Step: Identify */}
-          {step === 'identify' && (
-            <form onSubmit={handleIdentify} className="space-y-5 animate-in fade-in duration-300">
-              <div className="text-center mb-2">
-                <h3 className="text-lg font-semibold text-white">Welcome back</h3>
-                <p className="text-slate-400 text-sm mt-1">Enter your email or username to continue</p>
+          <div className="space-y-10 mt-12 pl-2">
+            {/* Feature 1 */}
+            <div className="flex items-start space-x-6">
+              <div className="w-14 h-14 rounded-full bg-[#e2e8f0] flex items-center justify-center flex-shrink-0 border border-slate-300 shadow-sm opacity-80">
+                 <Activity className="w-6 h-6 text-slate-700" />
               </div>
-              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center flex items-center justify-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
               <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Email or Username</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
-                    className={`${inputClass} pl-10`} placeholder="you@example.com" required autoFocus />
-                </div>
+                <h3 className="text-xl font-bold text-[#1e293b] mb-1.5">Digitized Health Records</h3>
+                <p className="text-[#64748b] text-[14px] leading-relaxed max-w-md">Coordinate, scale, and manage student health metrics across various screening dimensions in medical platform.</p>
               </div>
-              <button type="submit" disabled={loading} className={btnClass}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <span className="flex items-center justify-center space-x-2"><span>Continue</span><ArrowRight className="w-4 h-4" /></span>}
-              </button>
-            </form>
-          )}
-
-          {/* Step: Password Login */}
-          {step === 'password' && (
-            <form onSubmit={handlePasswordLogin} className="space-y-5 animate-in fade-in duration-300">
-              <button type="button" onClick={goBack} className="text-slate-400 hover:text-cyan-400 text-sm flex items-center space-x-1 transition-colors">
-                <ArrowRight className="w-3 h-3 rotate-180" /><span>Back</span>
-              </button>
-              <div className="text-center">
-                <p className="text-slate-400 text-sm">Welcome back,</p>
-                <p className="text-lg font-semibold text-white">{userName}</p>
+            </div>
+            {/* Feature 2 */}
+            <div className="flex items-start space-x-6">
+              <div className="w-14 h-14 rounded-full bg-[#e2e8f0] flex items-center justify-center flex-shrink-0 border border-slate-300 shadow-sm opacity-80">
+                 <School className="w-6 h-6 text-slate-700" />
               </div>
-              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center flex items-center justify-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
               <div>
-                <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Password</label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                    className={`${inputClass} pl-10`} placeholder="••••••••" required autoFocus />
-                </div>
+                <h3 className="text-xl font-bold text-[#1e293b] mb-1.5">Organize Health Camps</h3>
+                <p className="text-[#64748b] text-[14px] leading-relaxed max-w-md">Coordinate comprehensive school health screenings, manage schedules, and generate actionable insights.</p>
               </div>
-              <button type="submit" disabled={loading} className={btnClass}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Log In'}
-              </button>
-              <button type="button" onClick={() => { setError(''); setStep('otp_send'); }}
-                className="w-full text-center text-sm text-slate-500 hover:text-cyan-400 transition-colors mt-2">
-                Use OTP instead →
-              </button>
-            </form>
-          )}
+            </div>
+            {/* Feature 3 */}
+            <div className="flex items-start space-x-6">
+              <div className="w-14 h-14 rounded-full bg-[#e2e8f0] flex items-center justify-center flex-shrink-0 border border-slate-300 shadow-sm opacity-80">
+                 <ShieldCheck className="w-6 h-6 text-slate-700" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-[#1e293b] mb-1.5">Secure & Confidential</h3>
+                <p className="text-[#64748b] text-[14px] leading-relaxed max-w-md">Adhering strictly to the highest standards of data privacy, role-based access, and clinical confidentiality.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          {/* Step: OTP Send */}
-          {step === 'otp_send' && (
-            <div className="space-y-5 animate-in fade-in duration-300">
-              <button type="button" onClick={goBack} className="text-slate-400 hover:text-cyan-400 text-sm flex items-center space-x-1 transition-colors">
-                <ArrowRight className="w-3 h-3 rotate-180" /><span>Back</span>
-              </button>
-              <div className="text-center">
-                {!hasPassword ? (
-                  <>
-                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3">
-                      <Mail className="w-7 h-7 text-emerald-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-white">Welcome, {userName}!</h3>
-                    <p className="text-slate-400 text-sm mt-1">Let's verify your email to get started.</p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-semibold text-white">Login with OTP</h3>
-                    <p className="text-slate-400 text-sm mt-1">We'll send a 6-digit code to your email.</p>
-                  </>
+      {/* RIGHT SIDE: Form (40%) */}
+      <div className="w-full md:w-[40%] flex flex-col justify-center p-8 md:p-12 relative min-h-screen md:min-h-[auto] bg-[#2a3749] overflow-hidden z-10">
+        
+        {/* Background photo of dark clinic */}
+        <div className="absolute inset-0 bg-[url('/clinic-bg.jpg')] bg-cover bg-center bg-no-repeat opacity-40 scale-105 pointer-events-none"></div>
+        {/* Gradient overlay to deepen right side specifically */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#020617]/70 via-[#1e293b]/50 to-[#0f172a]/80 pointer-events-none"></div>
+
+        {/* Mobile Header (Shows only on small screens) */}
+        <div className="md:hidden flex items-center space-x-3 mb-10 mt-8 relative z-10">
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg p-1 border border-slate-200">
+            <img src="/aiims-bathinda-logo.png" alt="AIIMS Logo" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black text-white tracking-tight">AIIMS Bathinda</h2>
+            <p className="text-slate-300 text-[10px] font-bold tracking-widest uppercase">School Health Portal</p>
+          </div>
+        </div>
+
+        <div className="w-full max-w-[420px] mx-auto relative z-10">
+          
+          {/* Solid White Login Card */}
+          <div className="px-8 py-10 bg-[#f8fafc] border border-slate-200 rounded-3xl shadow-xl">
+            
+            {/* Step: Identify */}
+            {step === 'identify' && (
+              <form onSubmit={handleIdentify} className="space-y-5 animate-in fade-in duration-500">
+                <div className="mb-6">
+                  <h3 className="text-[24px] font-bold text-[#1e293b] mb-1.5">Welcome back</h3>
+                  <p className="text-[#64748b] text-[14px]">Enter your email or username to continue</p>
+                </div>
+                {error && <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs flex items-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
+                
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-extrabold text-[#475569] uppercase tracking-wider pl-1">Email or Username</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
+                    <input type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
+                      className={`${inputClass} pl-11`} placeholder="you@example.com" required autoFocus />
+                  </div>
+                </div>
+                <button type="submit" disabled={loading} className={btnClass}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center space-x-2"><span>Continue</span><ArrowRight className="w-4 h-4" /></span>}
+                </button>
+              </form>
+            )}
+
+            {/* Step: Password Login */}
+            {step === 'password' && (
+              <form onSubmit={handlePasswordLogin} className="space-y-5 animate-in fade-in duration-500">
+                <button type="button" onClick={goBack} className="text-[#64748b] hover:text-[#0ea5e9] text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-colors mb-2">
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" /><span>Back</span>
+                </button>
+                <div className="mb-6">
+                  <p className="text-[#64748b] text-[14px]">Welcome back,</p>
+                  <p className="text-[24px] font-bold text-[#1e293b] mt-1">{userName}</p>
+                </div>
+                {error && <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs flex items-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
+                
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-extrabold text-[#475569] uppercase tracking-wider pl-1">Password</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-slate-400" />
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                      className={`${inputClass} pl-11`} placeholder="••••••••" required autoFocus />
+                  </div>
+                </div>
+                <button type="submit" disabled={loading} className={btnClass}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Log In</span>}
+                </button>
+                <div className="pt-3 text-center">
+                  <button type="button" onClick={() => { setError(''); setStep('otp_send'); }}
+                    className="text-sm font-semibold text-[#64748b] hover:text-[#0ea5e9] transition-colors">
+                    Use OTP instead →
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Step: OTP Send */}
+            {step === 'otp_send' && (
+              <div className="space-y-5 animate-in fade-in duration-500">
+                <button type="button" onClick={goBack} className="text-[#64748b] hover:text-[#0ea5e9] text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-colors mb-2">
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" /><span>Back</span>
+                </button>
+                <div className="text-center pt-2 mb-6">
+                  {!hasPassword ? (
+                    <>
+                      <div className="w-16 h-16 rounded-full bg-[#f0f9ff] border border-[#bae6fd] flex items-center justify-center mx-auto mb-4">
+                         <Mail className="w-8 h-8 text-[#0ea5e9]" />
+                      </div>
+                      <h3 className="text-[24px] font-bold text-[#1e293b] mb-1.5">Welcome, {userName}!</h3>
+                      <p className="text-[#64748b] text-[14px]">Let's verify your email to get started.</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-[24px] font-bold text-[#1e293b] mb-1.5">Login with OTP</h3>
+                      <p className="text-[#64748b] text-[14px]">We'll send a 6-digit code to your email.</p>
+                    </>
+                  )}
+                </div>
+                {error && <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs flex items-center justify-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
+                
+                <button onClick={handleSendOtp} disabled={loading} className={btnClass}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center space-x-2"><Mail className="w-[18px] h-[18px]" /><span>Send Code</span></span>}
+                </button>
+                
+                {hasPassword && (
+                  <div className="pt-3 text-center">
+                    <button type="button" onClick={() => { setError(''); setStep('password'); }}
+                      className="text-sm font-semibold text-[#64748b] hover:text-[#0ea5e9] transition-colors">
+                      Login using password →
+                    </button>
+                  </div>
                 )}
               </div>
-              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center">{error}</div>}
-              <button onClick={handleSendOtp} disabled={loading} className={btnClass}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : <span className="flex items-center justify-center space-x-2"><Mail className="w-4 h-4" /><span>Send Code</span></span>}
-              </button>
-              {hasPassword && (
-                <button type="button" onClick={() => { setError(''); setStep('password'); }}
-                  className="w-full text-center text-sm text-slate-500 hover:text-cyan-400 transition-colors mt-2">
-                  Login using password →
+            )}
+
+            {/* Step: OTP Verify */}
+            {step === 'otp_verify' && (
+              <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in duration-500">
+                <button type="button" onClick={goBack} className="text-[#64748b] hover:text-[#0ea5e9] text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5 transition-colors mb-2">
+                  <ArrowRight className="w-3.5 h-3.5 rotate-180" /><span>Back</span>
                 </button>
-              )}
-            </div>
-          )}
-
-          {/* Step: OTP Verify */}
-          {step === 'otp_verify' && (
-            <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in duration-300">
-              <button type="button" onClick={goBack} className="text-slate-400 hover:text-cyan-400 text-sm flex items-center space-x-1 transition-colors">
-                <ArrowRight className="w-3 h-3 rotate-180" /><span>Back</span>
-              </button>
-              <div className="text-center">
-                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto mb-3">
-                  <KeyRound className="w-7 h-7 text-cyan-400" />
+                <div className="text-center pt-2 mb-6">
+                  <div className="w-16 h-16 rounded-full bg-[#f0f9ff] border border-[#bae6fd] flex items-center justify-center mx-auto mb-4">
+                     <KeyRound className="w-8 h-8 text-[#0ea5e9]" />
+                  </div>
+                  <h3 className="text-[24px] font-bold text-[#1e293b] mb-1.5">Enter Code</h3>
+                  <p className="text-[#64748b] text-[14px]">Check your email for a 6-digit code</p>
                 </div>
-                <h3 className="text-lg font-semibold text-white">Enter Code</h3>
-                <p className="text-slate-400 text-sm mt-1">Check your email for a 6-digit code</p>
-              </div>
-              {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-xl text-sm text-center">{error}</div>}
-              <div>
-                <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className={`${inputClass} text-center text-2xl tracking-[0.5em] font-mono`}
-                  placeholder="000000" maxLength={6} required autoFocus />
-              </div>
-              <button type="submit" disabled={loading || otp.length < 6} className={btnClass}>
-                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Verify & Log In'}
-              </button>
-              <button type="button" onClick={() => { setOtp(''); handleSendOtp(); }}
-                className="w-full text-center text-sm text-slate-500 hover:text-cyan-400 transition-colors flex items-center justify-center space-x-1">
-                <RefreshCw className="w-3 h-3" /><span>Resend code</span>
-              </button>
-            </form>
-          )}
+                {error && <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs flex items-center justify-center space-x-2"><AlertCircle className="w-4 h-4 flex-shrink-0" /><span>{error}</span></div>}
+                
+                <div className="space-y-2">
+                  <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full bg-white border border-[#93c5fd] focus:border-[#0ea5e9] focus:ring-2 focus:ring-[#0ea5e9]/50 rounded-xl px-4 py-4 text-[#1e293b] transition-all font-mono text-center text-3xl tracking-[0.5em] shadow-inner outline-none"
+                    placeholder="000000" maxLength={6} required autoFocus />
+                </div>
+                
+                <button type="submit" disabled={loading || otp.length < 6} className={btnClass}>
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Verify & Log In</span>}
+                </button>
+                
+                <div className="pt-3 text-center">
+                  <button type="button" onClick={() => { setOtp(''); handleSendOtp(); }}
+                    className="text-[13px] font-semibold text-[#64748b] hover:text-[#0ea5e9] transition-colors flex items-center justify-center space-x-1.5 mx-auto">
+                    <RefreshCw className="w-[14px] h-[14px]" /><span>Resend code</span>
+                  </button>
+                </div>
+              </form>
+            )}
 
+          </div>
         </div>
       </div>
     </div>
