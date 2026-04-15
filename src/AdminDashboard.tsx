@@ -143,7 +143,7 @@ export default function AdminDashboard({ user }: { user: User }) {
     fetch('/api/camp-requests/count')
       .then(r => r.json())
       .then(d => setPendingCount(d.pending || 0))
-      .catch(() => {});
+      .catch(() => { });
   };
 
   useEffect(() => {
@@ -183,31 +183,28 @@ export default function AdminDashboard({ user }: { user: User }) {
       <div className="flex space-x-2 bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-800">
         <button
           onClick={() => { setActiveTab('events'); setDefaultRole(''); }}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            activeTab === 'events'
+          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeTab === 'events'
               ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
+            }`}
         >
           <Calendar className="w-4 h-4" /><span>Events</span>
         </button>
         <button
           onClick={() => setActiveTab('register')}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            activeTab === 'register'
+          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeTab === 'register'
               ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
+            }`}
         >
           <UserPlus className="w-4 h-4" /><span>Register Users</span>
         </button>
         <button
           onClick={() => { setActiveTab('camp-requests'); fetchPendingCount(); }}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center relative ${
-            activeTab === 'camp-requests'
+          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center relative ${activeTab === 'camp-requests'
               ? 'bg-gradient-to-r from-amber-500/20 to-orange-600/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(251,191,36,0.1)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
+            }`}
         >
           <ClipboardCheck className="w-4 h-4" />
           <span>Camp Requests</span>
@@ -852,6 +849,10 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
             </div>
           )}
 
+          <button type="submit" disabled={saving}
+            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 mt-4">
+            {saving ? 'Creating...' : 'Create User'}
+          </button>
         </form>
       </div>
     </div>
@@ -959,12 +960,11 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                filterStatus === s
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${filterStatus === s
                   ? s === '' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
                     : REQUEST_STATUS_STYLES[s]
                   : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-              }`}
+                }`}
             >
               {s === '' ? 'All' : s}
             </button>
@@ -974,11 +974,10 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
 
       {/* Message */}
       {message && (
-        <div className={`p-3 rounded-xl text-sm border ${
-          message.type === 'success'
+        <div className={`p-3 rounded-xl text-sm border ${message.type === 'success'
             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
             : 'bg-red-500/10 border-red-500/30 text-red-400'
-        }`}>
+          }`}>
           {message.text}
         </div>
       )}
