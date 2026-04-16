@@ -388,52 +388,85 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
   const filteredCamps = camps.filter(c => c.school_name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="clinical-camps space-y-6 max-w-4xl mx-auto py-8">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Screening Camps</h2>
-        <p className="text-gray-500 text-sm mt-1">Select an active camp to begin clinical screening</p>
-      </div>
-
-      <div className="relative max-w-md mx-auto">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <input 
-          type="text" 
-          placeholder="Search camps..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={`${cls.input} pl-10`}
-        />
+    <div className="clinical-camps w-full max-w-7xl mx-auto px-4 md:px-8 py-8 space-y-6">
+      {/* Header Row */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 pt-2 border-b border-gray-100 pb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Screening Camps</h2>
+          <p className="text-gray-500 text-sm mt-1.5">Select an active camp to begin clinical screening.</p>
+        </div>
+        <div className="relative w-full md:w-96 flex-shrink-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5" />
+          <input 
+            type="text" 
+            placeholder="Search camps..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={`${cls.input} pl-11 py-2.5 bg-white shadow-sm border-gray-200 text-sm w-full`}
+          />
+        </div>
       </div>
 
       {loading ? <div className="text-center py-12 text-gray-400">Loading camps...</div>
       : filteredCamps.length === 0 ? (
-        <div className="bg-white p-12 rounded-xl border border-gray-100 text-center">
+        <div className="bg-white p-12 rounded-2xl border border-gray-100 text-center w-full shadow-sm">
           <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No active camps available.</p>
+          <p className="text-gray-500 font-medium">No active camps available.</p>
           {searchQuery && <p className="text-gray-400 text-sm mt-1">Try adjusting your search query.</p>}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filteredCamps.map((camp: any) => (
-            <div key={camp.event_id} className="w-full text-left bg-white rounded-xl border border-gray-100 hover:border-blue-200 transition-all p-5 hover:shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-11 h-11 rounded-lg bg-blue-50 flex items-center justify-center"><Calendar className="w-5 h-5 text-blue-600" /></div>
-                  <div>
-                    <h3 className="text-gray-900 font-semibold text-base">{camp.school_name}</h3>
-                    <p className="text-sm text-gray-400 mt-0.5">{formatDate(camp.start_date)}{camp.end_date ? ` → ${formatDate(camp.end_date)}` : ''}</p>
+            <div key={camp.event_id} className="w-full text-left bg-white rounded-2xl border border-gray-200 hover:border-blue-300 transition-all p-5 hover:shadow-md group">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                
+                {/* Left region: Icon + School Name & Date */}
+                <div className="flex items-center space-x-5 flex-1 min-w-0">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50/80 flex items-center justify-center flex-shrink-0 border border-blue-100/50 group-hover:scale-105 transition-transform">
+                    <Calendar className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="min-w-0 truncate">
+                    <h3 className="text-gray-900 font-bold text-lg truncate pr-4">{camp.school_name}</h3>
+                    <div className="flex items-center space-x-3 text-sm text-gray-500 mt-1">
+                      <span className="flex items-center font-medium bg-gray-50 px-2.5 py-0.5 rounded-md border border-gray-100">
+                        <Calendar className="w-3.5 h-3.5 mr-1.5 text-gray-400"/> 
+                        {formatDate(camp.start_date)}{camp.end_date && ` → ${formatDate(camp.end_date)}`}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="text-right mr-2 hidden sm:block">
-                    <span className="text-xs text-gray-400 block"><Users className="w-3.5 h-3.5 inline mr-1" />{camp.volunteer_count ?? 0} staff</span>
-                    <span className="text-xs text-gray-400 block mt-0.5"><Activity className="w-3.5 h-3.5 inline mr-1" />{camp.screened_count ?? 0}/{camp.student_count ?? 0}</span>
+
+                {/* Right region: Metrics & Actions */}
+                <div className="flex flex-wrap md:flex-nowrap items-center gap-6 md:gap-8 flex-shrink-0">
+                  
+                  {/* Detailed Stats */}
+                  <div className="flex items-center gap-6 hidden sm:flex border-r border-gray-100 pr-8">
+                    <div className="flex flex-col justify-center">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5 text-center">Staff</span>
+                      <span className="text-sm font-semibold text-gray-700 flex items-center justify-center">
+                        <Users className="w-4 h-4 mr-1.5 text-blue-400/80" />
+                        {camp.volunteer_count ?? 0}
+                      </span>
+                    </div>
+                    <div className="flex flex-col justify-center">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5 text-center">Screened</span>
+                      <span className="text-sm font-semibold text-gray-700 flex items-center justify-center bg-emerald-50 px-2 rounded font-mono text-emerald-700">
+                        {camp.screened_count ?? 0} / {camp.student_count ?? 0}
+                      </span>
+                    </div>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-green-50 text-green-700 border-green-200' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-gray-50 text-gray-500 border-gray-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}</span>
-                  <button onClick={() => handleVolunteer(camp)} disabled={joining === camp.event_id}
-                    className={`${cls.btnPrimary} flex items-center space-x-2 text-sm disabled:opacity-50`}>
-                    <ArrowRight className="w-4 h-4" /><span>{joining === camp.event_id ? 'Joining...' : 'Join Camp'}</span>
-                  </button>
+
+                  {/* Actions Area */}
+                  <div className="flex items-center space-x-4">
+                    <span className={`px-4 py-1.5 rounded-lg text-xs font-bold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-gray-50 text-gray-500 border-gray-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                      {(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}
+                    </span>
+                    <button onClick={() => handleVolunteer(camp)} disabled={joining === camp.event_id}
+                      className={`${cls.btnPrimary} flex items-center space-x-2 text-sm px-6 py-2.5 rounded-xl disabled:opacity-50 font-bold transition-all`}>
+                      <span>{joining === camp.event_id ? 'Joining...' : 'Join Camp'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
