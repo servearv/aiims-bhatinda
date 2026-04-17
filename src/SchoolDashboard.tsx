@@ -589,6 +589,25 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
     setTimeout(() => { pw.print(); pw.close(); }, 300);
   };
 
+  // Helper: check if a parsed record has any meaningful prescription/referral content
+  const hasPrintableContent = (d: any): boolean => {
+    if (!d) return false;
+    const status = d.status;
+    // Only print Observation (O) or Referral (R) records
+    if (status !== 'O' && status !== 'R') return false;
+    if (status === 'R') {
+      // Referral needs at least a reason or dept
+      return !!(d.referralReason?.trim() || d.referralDept?.trim() || d.clinicalFindings?.trim());
+    }
+    // Observation/Prescription: needs at least one meaningful field
+    return !!(
+      d.clinicalFindings?.trim() ||
+      d.diagnosis?.trim() ||
+      d.advice?.trim() ||
+      (Array.isArray(d.medicines) && d.medicines.some((m: any) => m.name?.trim()))
+    );
+  };
+
   // Bulk print all docs
   const handleBulkPrint = async () => {
     setBulkPrinting(true);
@@ -597,12 +616,15 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
       for (const s of examinedStudentsList) {
         const res = await fetch(`/api/students/${s.student_id}/all-records?event_id=${eventId}`);
         const data = await res.json();
-        const docs = data.records || [];
+        const docs = (data.records || []).filter((doc: any) => {
+          const parsed = doc.parsed_data || {};
+          return hasPrintableContent(parsed);
+        });
         for (const doc of docs) {
           allDocs.push({ student: data.student || s, record: doc });
         }
       }
-      if (allDocs.length === 0) { setBulkPrinting(false); return; }
+      if (allDocs.length === 0) { setBulkPrinting(false); alert('No prescriptions or referrals with content to print.'); return; }
       const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
       let fullHTML = '<html><head><title>Print All Documents</title><style>body{margin:0;padding:0;font-family:serif;}@page{size:A4;margin:15mm;}.page-break{page-break-after:always;}</style></head><body>';
       allDocs.forEach((item, idx) => {

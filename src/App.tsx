@@ -425,9 +425,8 @@ function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void
         </div>
 
         <div className="relative z-10 max-w-2xl mt-12 mb-auto">
-          <div className="inline-flex items-center space-x-2 bg-[#e0f2fe] rounded-full px-4 py-1.5 mb-10">
+          <div className="inline-flex items-center space-x-2 bg-[#e0f2fe] rounded-full px-4 py-1.5 mb-10 opacity-0 pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-[#3b82f6]"></span>
-            <span className="text-[#2563eb] text-[11px] font-bold uppercase tracking-widest">Enterprise Grade</span>
           </div>
           
           <h1 className="text-6xl xl:text-7xl font-black text-[#1e293b] tracking-tight leading-[1.05] mb-12">

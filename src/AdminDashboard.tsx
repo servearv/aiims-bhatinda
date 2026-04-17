@@ -3,7 +3,8 @@ import {
   Calendar, Users, UserPlus, Search, Plus, X, Check,
   MapPin, Phone, Mail, Clock, Tag, ChevronDown, ChevronRight,
   Activity, FileText, Stethoscope, School, ExternalLink,
-  HeartPulse, Eye, Ear, Scan, Bell, ClipboardCheck, AlertCircle, Loader2
+  HeartPulse, Eye, Ear, Scan, Bell, ClipboardCheck, AlertCircle, Loader2,
+  ScrollText, RefreshCw, Filter, ShieldCheck
 } from 'lucide-react';
 
 type User = { username: string; role: string; name: string };
@@ -135,7 +136,7 @@ function formatDateDisplay(dateStr: string): string {
 // ██ ADMIN DASHBOARD
 // ══════════════════════════════════════════
 export default function AdminDashboard({ user }: { user: User }) {
-  const [activeTab, setActiveTab] = useState<'events' | 'register' | 'camp-requests'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'register' | 'camp-requests' | 'logs'>('events');
   const [defaultRole, setDefaultRole] = useState('');
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -180,10 +181,10 @@ export default function AdminDashboard({ user }: { user: User }) {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex space-x-2 bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-800">
+      <div className="flex space-x-2 bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-800 flex-wrap gap-1">
         <button
           onClick={() => { setActiveTab('events'); setDefaultRole(''); }}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeTab === 'events'
+          className={`flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center min-w-0 ${activeTab === 'events'
               ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
@@ -192,7 +193,7 @@ export default function AdminDashboard({ user }: { user: User }) {
         </button>
         <button
           onClick={() => setActiveTab('register')}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeTab === 'register'
+          className={`flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center min-w-0 ${activeTab === 'register'
               ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
@@ -201,7 +202,7 @@ export default function AdminDashboard({ user }: { user: User }) {
         </button>
         <button
           onClick={() => { setActiveTab('camp-requests'); fetchPendingCount(); }}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center relative ${activeTab === 'camp-requests'
+          className={`flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center min-w-0 relative ${activeTab === 'camp-requests'
               ? 'bg-gradient-to-r from-amber-500/20 to-orange-600/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(251,191,36,0.1)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
@@ -214,11 +215,21 @@ export default function AdminDashboard({ user }: { user: User }) {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`flex items-center space-x-2 px-4 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center min-w-0 ${activeTab === 'logs'
+              ? 'bg-gradient-to-r from-violet-500/20 to-purple-600/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+        >
+          <ScrollText className="w-4 h-4" /><span>Activity Log</span>
+        </button>
       </div>
 
       {activeTab === 'events' && <EventsTab user={user} onAddNewSchool={switchToRegisterSchool} />}
       {activeTab === 'register' && <RegisterTab user={user} defaultRole={defaultRole} onRoleConsumed={() => setDefaultRole('')} />}
       {activeTab === 'camp-requests' && <CampRequestsTab user={user} onCountChange={fetchPendingCount} />}
+      {activeTab === 'logs' && <AdminLogsTab />}
     </div>
   );
 }
@@ -1075,6 +1086,307 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// TAB 4: ADMIN ACTIVITY LOG — Compact Feed
+// ═══════════════════════════════════════════
+
+interface AuditLog {
+  log_id: number;
+  timestamp: string;
+  user_id: string;
+  action: string;
+  details: string;
+}
+
+// ── Action colour / label map ──────────────────────────────────────────────
+function getActionDot(action: string): { dot: string; label: string; textColor: string } {
+  const a = (action || '').toUpperCase();
+  if (a === 'LOGIN' || a === 'LOGIN_OTP')
+    return { dot: 'bg-emerald-400', label: a === 'LOGIN_OTP' ? 'Login · OTP' : 'Login', textColor: 'text-emerald-400' };
+  if (a === 'LOGOUT')
+    return { dot: 'bg-slate-500', label: 'Logout', textColor: 'text-slate-400' };
+  if (a === 'SET_PASSWORD')
+    return { dot: 'bg-blue-400', label: 'Set password', textColor: 'text-blue-400' };
+  if (a === 'CHANGE_PASSWORD')
+    return { dot: 'bg-blue-400', label: 'Changed password', textColor: 'text-blue-400' };
+  if (a === 'CHANGE_USERNAME')
+    return { dot: 'bg-blue-400', label: 'Changed username', textColor: 'text-blue-400' };
+  if (a === 'CREATE_EVENT')
+    return { dot: 'bg-cyan-400', label: 'Created event', textColor: 'text-cyan-400' };
+  if (a === 'UPDATE_EVENT')
+    return { dot: 'bg-cyan-400', label: 'Updated event', textColor: 'text-cyan-400' };
+  if (a === 'REGISTER_USER')
+    return { dot: 'bg-violet-400', label: 'Registered user', textColor: 'text-violet-400' };
+  if (a === 'SAVE_EXAM')
+    return { dot: 'bg-rose-400', label: 'Exam record', textColor: 'text-rose-400' };
+  if (a === 'AUTOSAVE_EXAM' || a === 'AUTOSAVE')
+    return { dot: 'bg-rose-300', label: 'Autosaved', textColor: 'text-rose-300' };
+  if (a.includes('APPROVE') || a.includes('CAMP') || a.includes('REQUEST'))
+    return { dot: 'bg-amber-400', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-amber-400' };
+  if (a.includes('STUDENT') || a.includes('RECORD') || a.includes('EXAM'))
+    return { dot: 'bg-rose-400', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-rose-400' };
+  return { dot: 'bg-slate-500', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-slate-400' };
+}
+
+// ── Compact detail parser ──────────────────────────────────────────────────
+// Converts verbose detail strings into short "a • b • c" summaries
+function compactDetail(details: string): string {
+  if (!details) return '';
+  // "Saved Community_Medicine exam for student 10" → "Community Medicine · Student 10"
+  // (the action label already says "Exam record", so no need to repeat "Saved exam")
+  const examMatch = details.match(/saved\s+([\w_]+)\s+exam\s+for\s+student\s+(\d+)/i);
+  if (examMatch) {
+    const spec = examMatch[1].replace(/_/g, ' ');
+    return `${spec} · Student ${examMatch[2]}`;
+  }
+  // "Created event 5: School Name" → "Event 5 · School Name"
+  const createEvt = details.match(/created event (\d+):\s*(.*)/i);
+  if (createEvt) return `Event #${createEvt[1]} · ${createEvt[2]}`;
+  // "Updated event 5" → "Event #5"
+  const updEvt = details.match(/updated event (\d+)/i);
+  if (updEvt) return `Event #${updEvt[1]}`;
+  // "Changed from X to Y"
+  const changed = details.match(/changed from (.+) to (.+)/i);
+  if (changed) return `${changed[1]} → ${changed[2]}`;
+  // Generic: truncate to ~60 chars
+  return details.length > 65 ? details.slice(0, 62) + '…' : details;
+}
+
+// ── Date-key helpers ───────────────────────────────────────────────────────
+function toIso(ts: string): Date {
+  return new Date(ts && !ts.endsWith('Z') ? ts + 'Z' : ts);
+}
+
+function dateKey(ts: string): string {
+  const d = toIso(ts);
+  if (isNaN(d.getTime())) return 'Unknown';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function timeOnly(ts: string): string {
+  const d = toIso(ts);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function timeAgoShort(ts: string): string {
+  const diff = Math.floor((Date.now() - toIso(ts).getTime()) / 1000);
+  if (isNaN(diff) || diff < 0) return '';
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+// ── Filter options ─────────────────────────────────────────────────────────
+const KNOWN_ACTIONS = [
+  'LOGIN', 'LOGIN_OTP', 'LOGOUT',
+  'SET_PASSWORD', 'CHANGE_PASSWORD', 'CHANGE_USERNAME',
+  'CREATE_EVENT', 'UPDATE_EVENT', 'REGISTER_USER',
+];
+
+// ══════════════════════════════════════════════════════════════════════════
+function AdminLogsTab() {
+  const [logs, setLogs]             = React.useState<AuditLog[]>([]);
+  const [loading, setLoading]       = React.useState(true);
+  const [actionFilter, setAction]   = React.useState('');
+  const [userFilter, setUser]       = React.useState('');
+  const [limit, setLimit]           = React.useState(200);
+  const [lastRefreshed, setRefreshed] = React.useState<Date>(new Date());
+  const [autoRefresh, setAuto]      = React.useState(true);
+  const intervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchLogs = React.useCallback(() => {
+    setLoading(true);
+    const p = new URLSearchParams({ limit: String(limit) });
+    if (actionFilter) p.set('action', actionFilter);
+    if (userFilter.trim()) p.set('user_id', userFilter.trim());
+    fetch(`/api/admin/logs?${p}`)
+      .then(r => r.json())
+      .then(data => { setLogs(Array.isArray(data) ? data : []); setRefreshed(new Date()); })
+      .catch(() => setLogs([]))
+      .finally(() => setLoading(false));
+  }, [actionFilter, userFilter, limit]);
+
+  React.useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  React.useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (autoRefresh) intervalRef.current = setInterval(fetchLogs, 30000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [autoRefresh, fetchLogs]);
+
+  // Group logs by date key
+  const groups: { date: string; items: AuditLog[] }[] = React.useMemo(() => {
+    const map = new Map<string, AuditLog[]>();
+    for (const log of logs) {
+      const dk = dateKey(log.timestamp);
+      if (!map.has(dk)) map.set(dk, []);
+      map.get(dk)!.push(log);
+    }
+    return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
+  }, [logs]);
+
+  return (
+    <div className="space-y-3">
+
+      {/* ── Header bar ─────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center space-x-2">
+          <ShieldCheck className="w-4 h-4 text-violet-400" />
+          <span className="text-sm font-bold text-white">Activity Log</span>
+          {!loading && (
+            <span className="text-[11px] text-slate-500 font-mono">{logs.length} entries</span>
+          )}
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Actor search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+            <input
+              type="text" placeholder="Actor…" value={userFilter}
+              onChange={e => setUser(e.target.value)}
+              className="pl-7 pr-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-[11px] focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all placeholder-slate-600 w-28"
+            />
+          </div>
+          {/* Action filter */}
+          <select value={actionFilter} onChange={e => setAction(e.target.value)}
+            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-300 focus:ring-1 focus:ring-violet-500/50 outline-none transition-all">
+            <option value="">All actions</option>
+            {KNOWN_ACTIONS.map(a => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
+          </select>
+          {/* Limit */}
+          <select value={limit} onChange={e => setLimit(Number(e.target.value))}
+            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-300 focus:ring-1 focus:ring-violet-500/50 outline-none transition-all">
+            {[100, 200, 500].map(n => <option key={n} value={n}>Last {n}</option>)}
+          </select>
+          {(actionFilter || userFilter) && (
+            <button onClick={() => { setAction(''); setUser(''); }}
+              className="text-[11px] text-red-400 hover:text-red-300 transition-colors flex items-center space-x-0.5">
+              <X className="w-3 h-3" /><span>Clear</span>
+            </button>
+          )}
+          {/* Auto-refresh toggle */}
+          <button onClick={() => setAuto(v => !v)}
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-all ${autoRefresh ? 'bg-violet-500/15 text-violet-400 border-violet-500/25' : 'bg-slate-900 text-slate-500 border-slate-800'}`}>
+            <RefreshCw className={`w-3 h-3 ${autoRefresh && !loading ? 'animate-spin' : ''}`}
+              style={autoRefresh && !loading ? { animationDuration: '4s' } : {}} />
+            <span>{autoRefresh ? 'Live' : 'Paused'}</span>
+          </button>
+          {/* Manual refresh */}
+          <button onClick={fetchLogs} disabled={loading}
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-[11px] border bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800 transition-all disabled:opacity-40">
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Empty / loading states ──────────────────────── */}
+      {loading && logs.length === 0 && (
+        <div className="py-12 text-center text-slate-500 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />Loading logs…
+        </div>
+      )}
+      {!loading && logs.length === 0 && (
+        <div className="py-12 text-center">
+          <ScrollText className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+          <p className="text-slate-400 text-sm">No log entries found.</p>
+          {(actionFilter || userFilter) && <p className="text-slate-600 text-xs mt-1">Try clearing the filters.</p>}
+        </div>
+      )}
+
+      {/* ── Date-grouped feed ──────────────────────────── */}
+      {logs.length > 0 && (
+        <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 backdrop-blur-xl overflow-hidden">
+
+          {/* Column headers */}
+          <div className="grid grid-cols-[72px_100px_1fr] gap-0 border-b border-slate-800/60 bg-slate-950/60 px-4 py-2">
+            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Time</span>
+            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Actor</span>
+            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Action · Details</span>
+          </div>
+
+          {/* Date groups */}
+          {groups.map(({ date, items }) => (
+            <div key={date}>
+
+              {/* Sticky date header */}
+              <div className="sticky top-0 z-10 px-4 py-1 bg-slate-950/80 backdrop-blur border-b border-t border-slate-800/40 flex items-center space-x-2">
+                <Calendar className="w-3 h-3 text-slate-600" />
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{date}</span>
+                <span className="text-[10px] text-slate-700 font-mono">{items.length} events</span>
+              </div>
+
+              {/* Log rows */}
+              {items.map((log, idx) => {
+                const meta = getActionDot(log.action);
+                const compact = compactDetail(log.details);
+                const ago = timeAgoShort(log.timestamp);
+                return (
+                  <div
+                    key={log.log_id ?? idx}
+                    className="grid grid-cols-[72px_100px_1fr] gap-0 px-4 py-1.5 border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group items-center"
+                  >
+                    {/* Time */}
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-mono text-slate-300 leading-none">
+                        {timeOnly(log.timestamp)}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-600 mt-0.5">{ago}</span>
+                    </div>
+
+                    {/* Actor */}
+                    <div className="min-w-0 pr-2">
+                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/50 text-[11px] font-mono text-cyan-400/80 max-w-[90px]">
+                        <span className="truncate">{log.user_id || '—'}</span>
+                      </span>
+                    </div>
+
+                    {/* Action + detail inline */}
+                    <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                      {/* Colour dot */}
+                      <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                      {/* Action label */}
+                      <span className={`text-[12px] font-semibold whitespace-nowrap ${meta.textColor}`}>
+                        {meta.label}
+                      </span>
+                      {/* Separator + compact detail */}
+                      {compact && (
+                        <>
+                          <span className="text-slate-700 text-[11px] flex-shrink-0">·</span>
+                          <span
+                            className="text-[11px] text-slate-400 truncate group-hover:text-slate-200 transition-colors"
+                            title={log.details}
+                          >
+                            {compact}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+
+          {/* Footer */}
+          <div className="px-4 py-2 border-t border-slate-800/50 flex items-center justify-between bg-slate-950/40">
+            <span className="text-[11px] text-slate-600">
+              {logs.length} entries · updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {autoRefresh && ' · live'}
+            </span>
+            <button onClick={fetchLogs} disabled={loading}
+              className="flex items-center space-x-1 text-[11px] text-violet-500 hover:text-violet-300 transition-colors disabled:opacity-40">
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

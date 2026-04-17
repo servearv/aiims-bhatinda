@@ -817,8 +817,18 @@ def api_change_display_name():
         return jsonify({"success": False, "message": "This username is already taken"}), 409
 
     old_username = sess_user['username']
-    # Update username in all related tables
-    conn.execute("UPDATE Users SET username = ? WHERE username = ?", (new_username, old_username))
+    
+    # Retrieve existing user stats to migrate
+    old_user = conn.execute("SELECT * FROM Users WHERE username = ?", (old_username,)).fetchone()
+    if old_user:
+        u_dict = row_to_dict(old_user)
+        # 1. Insert new user record
+        conn.execute(
+            "INSERT INTO Users (username, password, name, role, designation, specialization) VALUES (?, ?, ?, ?, ?, ?)",
+            (new_username, u_dict.get('password'), u_dict.get('name'), u_dict.get('role'), u_dict.get('designation', ''), u_dict.get('specialization', ''))
+        )
+    
+    # 2. Update username references in all related tables
     for table_col in [
         ("Event_Volunteers", "username"), ("Event_Staff", "username"),
         ("Audit_Logs", "user_id"), ("Health_Records", "doctor_id"),
@@ -832,6 +842,11 @@ def api_change_display_name():
             )
         except Exception:
             pass  # table/column might not exist
+            
+    # 3. Safely delete the old username record now that foreign keys point to the new one
+    if old_user:
+        conn.execute("DELETE FROM Users WHERE username = ?", (old_username,))
+        
     conn.commit()
     conn.close()
 
@@ -2296,6 +2311,44 @@ if HAS_SOCKETIO and socketio:
     @socketio.on("disconnect")
     def handle_disconnect():
         logger.info("[socket.io] Client disconnected")
+
+
+
+# ---------------------------------------------------------------------------
+# Admin Logs API
+# ---------------------------------------------------------------------------
+@app.route("/api/admin/logs", methods=["GET"])
+def api_admin_logs():
+    """Return audit log entries — Admin only."""
+    sess_user = session.get("user")
+    if not sess_user or sess_user.get("role") != "Admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    limit = min(int(request.args.get("limit", 200)), 500)
+    action_filter = request.args.get("action", "").strip()
+    user_filter = request.args.get("user_id", "").strip()
+
+    conn = get_db()
+    conditions = []
+    params: list = []
+
+    if action_filter:
+        conditions.append("action = %s")
+        params.append(action_filter)
+    if user_filter:
+        conditions.append("user_id ILIKE %s")
+        params.append(f"%{user_filter}%")
+
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
+    rows = conn.execute(
+        f"SELECT log_id, timestamp, user_id, action, details "
+        f"FROM Audit_Logs {where_clause} ORDER BY timestamp DESC LIMIT %s",
+        params,
+    ).fetchall()
+    conn.close()
+    return jsonify(rows_to_list(rows))
 
 
 # ---------------------------------------------------------------------------
