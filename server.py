@@ -2282,46 +2282,7 @@ def api_admin_audit_logs():
 
 
 # ---- Digitise (MedDigitizer Streamlit launcher) ----
-digitise_process = None
-
-
-@app.route("/api/digitise/launch", methods=["POST"])
-def api_digitise_launch():
-    global digitise_process
-    DIGITISE_PORT = 8501
-
-    if digitise_process is not None and digitise_process.poll() is None:
-        return jsonify({
-            "success": True,
-            "url": f"http://localhost:{DIGITISE_PORT}",
-            "message": "MedDigitizer is already running.",
-        })
-
-    digitise_path = os.path.join(BASE_DIR, "Digitise")
-    try:
-        digitise_process = subprocess.Popen(
-            [
-                sys.executable, "-m", "streamlit", "run", "app.py",
-                "--server.port", str(DIGITISE_PORT),
-                "--server.headless", "true",
-            ],
-            cwd=digitise_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        data = request.get_json(force=True) if request.is_json else {}
-        log_audit(data.get("user_id", "system"), "LAUNCH_DIGITISE",
-                  "Launched MedDigitizer Streamlit app")
-        return jsonify({
-            "success": True,
-            "url": f"http://localhost:{DIGITISE_PORT}",
-            "message": "MedDigitizer is starting...",
-        })
-    except Exception as exc:
-        return jsonify({
-            "success": False,
-            "message": f"Failed to launch MedDigitizer: {exc}"
-        }), 500
+# Removed: MedDigitizer integration has been deleted
 
 
 # ---------------------------------------------------------------------------

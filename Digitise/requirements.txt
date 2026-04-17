@@ -1,7 +1,0 @@
-streamlit
-google-generativeai
-python-dotenv
-Pillow
-pandas
-openpyxl
-requests

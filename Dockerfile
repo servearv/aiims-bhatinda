@@ -30,7 +30,6 @@ COPY --from=frontend /app/dist ./dist
 
 # Copy backend source files
 COPY server.py .
-COPY Digitise ./Digitise
 
 # Expose port
 EXPOSE 5000
