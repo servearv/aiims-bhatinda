@@ -290,7 +290,7 @@ def init_db():
             school_id INTEGER,
             school_name TEXT NOT NULL,
             preferred_date TEXT NOT NULL,
-            alternate_date TEXT DEFAULT '',
+            end_date TEXT DEFAULT '',
             student_count INTEGER DEFAULT 0,
             classes TEXT DEFAULT '',
             notes TEXT DEFAULT '',
@@ -343,6 +343,12 @@ def init_db():
     except Exception:
         conn.rollback()
 
+    try:
+        cur.execute("ALTER TABLE Camp_Requests RENAME COLUMN alternate_date TO end_date")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     # --- Migration: Medical Staff → Specialist roles ---
     try:
         staff_users = cur.execute(
@@ -388,11 +394,13 @@ def init_db():
             ("Admin", "admin", "Admin", "Admin", "", "", "nachiketavachat@gmail.com"),
         )
 
-    # Migration: update existing admin email from old to new
+    # Migration: update existing admin email from old to new, ensuring Admin/admin11 can login
     try:
         cur.execute(
-            "UPDATE Users SET email = %s WHERE username = %s AND email = %s",
-            ("nachiketavachat@gmail.com", "Admin", "atharvam1580@gmail.com"),
+            """UPDATE Users SET email = %s 
+               WHERE (username = %s OR username = %s) 
+               AND (email IS NULL OR email = %s OR email = %s)""",
+            ("nachiketavachat@gmail.com", "Admin", "admin11", "", "atharvam1580@gmail.com"),
         )
         conn.commit()
     except Exception:
@@ -1453,13 +1461,13 @@ def api_create_camp_request():
     cur = conn.cursor()
     cur.execute(
         """INSERT INTO Camp_Requests
-           (school_id, school_name, preferred_date, alternate_date,
+           (school_id, school_name, preferred_date, end_date,
             student_count, classes, notes, status, created_at)
            VALUES (%s,%s,%s,%s,%s,%s,%s,'Pending',%s) RETURNING request_id""",
         (
             s["school_id"], s["school_name"],
             preferred_date,
-            data.get("alternate_date", ""),
+            data.get("end_date", ""),
             student_count,
             data.get("classes", ""),
             data.get("notes", ""),
@@ -1597,7 +1605,34 @@ def api_approve_camp_request(request_id):
 
     log_audit(reviewer, "APPROVE_CAMP_REQUEST",
               f"Approved request {request_id} -> Event {new_event_id}: {school_name}")
-    return jsonify({"success": True, "event_id": new_event_id})
+
+    email_sent = False
+    if poc_email:
+        subject = f"Camp Request Approved - {school_name}"
+        body_html = f"""
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;">
+            <h2 style="color:#059669;margin-top:0;">Camp Request Approved</h2>
+            <p style="color:#334155;font-size:16px;">Dear {poc_name or 'School Representative'},</p>
+            <p style="color:#334155;font-size:15px;line-height:1.6;">
+                We are pleased to inform you that your screening camp request for <strong>{school_name}</strong> has been approved.
+            </p>
+            <div style="background-color:#f8fafc;padding:16px;border-radius:8px;margin:20px 0;">
+                <p style="margin:0 0 8px 0;font-size:14px;color:#475569;"><strong>Scheduled Start Date:</strong> {_normalize_date(r["preferred_date"])}</p>
+                <p style="margin:0 0 8px 0;font-size:14px;color:#475569;"><strong>Expected Students:</strong> {r["student_count"]}</p>
+                <p style="margin:0;font-size:14px;color:#475569;"><strong>Medical Staff:</strong> AIIMS Bathinda Specialist Team</p>
+            </div>
+            <p style="color:#334155;font-size:15px;line-height:1.6;">
+                Our team will be in touch shortly to coordinate logistics. You can log into your School POC dashboard for further details.
+            </p>
+            <p style="color:#64748b;font-size:14px;margin-top:30px;">
+                Warm Regards,<br/>
+                <strong>AIIMS Bathinda Administration</strong>
+            </p>
+        </div>
+        """
+        email_sent = send_email(poc_email, subject, body_html)
+
+    return jsonify({"success": True, "event_id": new_event_id, "email_sent": email_sent})
 
 
 @app.route("/api/camp-requests/<int:request_id>/reject", methods=["POST"])

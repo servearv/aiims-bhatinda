@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
   Calendar, Users, Plus, X, Check, ChevronRight, ArrowRight,
   Upload, Download, FileText, Activity, UserPlus, Search,
@@ -60,7 +60,7 @@ interface CampRequest {
   request_id: number;
   school_name: string;
   preferred_date: string;
-  alternate_date: string;
+  end_date: string;
   student_count: number;
   classes: string;
   notes: string;
@@ -294,7 +294,7 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
                         <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400">
                           <span><Users className="w-3 h-3 inline mr-1" />{req.student_count} students</span>
                           {req.classes && <span>Classes: {req.classes}</span>}
-                          {req.alternate_date && <span>Alt: {new Date(req.alternate_date).toLocaleDateString('en-IN')}</span>}
+                          {req.end_date && <span>End: {new Date(req.end_date).toLocaleDateString('en-IN')}</span>}
                         </div>
                         {req.notes && <p className="text-xs text-slate-500 mt-0.5 italic">{req.notes}</p>}
                         <p className="text-xs text-slate-600 mt-0.5">Submitted: {new Date(req.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
@@ -542,11 +542,21 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 
   const toggleAbsent = async (studentId: number, currentStatus: string) => {
     const newStatus = currentStatus === 'Absent' ? 'Pending Examination' : 'Absent';
-    await fetch(`/api/students/${studentId}/status`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
-    });
-    fetchStudents();
+    // Optimistic update: immediately update local state to preserve scroll position
+    setStudents(prev => prev.map(s =>
+      s.student_id === studentId ? { ...s, status: newStatus } : s
+    ));
+    try {
+      await fetch(`/api/students/${studentId}/status`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch {
+      // Revert on failure
+      setStudents(prev => prev.map(s =>
+        s.student_id === studentId ? { ...s, status: currentStatus } : s
+      ));
+    }
   };
 
   const totalStudents = students.length;
@@ -677,7 +687,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
             </button>
             <button onClick={() => setShowCSVUpload(true)}
               className="bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-2xl font-bold transition-all flex items-center space-x-3 border border-slate-700 hover:border-violet-500/30">
-              <Upload className="w-6 h-6 text-violet-400" /><span>Bulk Upload via CSV</span>
+              <Upload className="w-6 h-6 text-violet-400" /><span>Bulk Upload via Excel</span>
             </button>
           </div>
         </div>
@@ -718,7 +728,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
             </button>
             <button onClick={() => setShowCSVUpload(true)}
               className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 text-violet-400 border border-slate-700 hover:border-violet-500/30 px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 whitespace-nowrap text-sm">
-              <Upload className="w-4 h-4" /><span>CSV Upload</span>
+              <Upload className="w-4 h-4" /><span>Excel Upload</span>
             </button>
             {docCount > 0 && (
               <button onClick={handleBulkPrint} disabled={bulkPrinting}
@@ -1039,7 +1049,7 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
 }
 
 // ════════════════════════════════════════
-// ██ CSV UPLOAD PANEL
+// ██ STUDENT UPLOAD PANEL (EXCEL/CSV)
 // ════════════════════════════════════════
 interface ParsedRow {
   data: Record<string, string>;
@@ -1066,41 +1076,65 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
 
     setUploadError(null);
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.trim().toLowerCase().replace(/^\uFEFF/, ''),
-      complete: (results) => {
-        if (results.data.length > 0) {
-          const firstRow = results.data[0] as Record<string, any>;
-          // Check if at least one expected column exists
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        
+        if (data.length > 0) {
+          const normalizedData = data.map((row: any) => {
+            const newRow: any = {};
+            for (const key of Object.keys(row)) {
+              newRow[key.trim().toLowerCase()] = row[key];
+            }
+            return newRow;
+          });
+
+          const firstRow = normalizedData[0];
           if (firstRow.name === undefined && firstRow.gender === undefined && firstRow.dob === undefined) {
-             const detected = results.meta?.fields?.join(', ') || 'None';
-             setUploadError(`Invalid columns detected. Expected 'name', 'dob', etc. \n\nFound: [${detected}]. \n\nIf you see gibberish, you uploaded an Excel (.xlsx) file instead of CSV. If columns are joined with semicolons, save the CSV properly.`);
+             const detected = Object.keys(firstRow).join(', ') || 'None';
+             setUploadError(`Invalid columns detected. Expected 'name', 'dob', etc. \n\nFound: [${detected}]. \n\nPlease upload a valid Excel or CSV file with appropriate headers.`);
              setParsedRows([]);
              return;
           }
-        }
 
-        const rows: ParsedRow[] = results.data.map((row: any) => {
-          const errors: string[] = [];
-          if (!row.name?.trim()) errors.push('Name is required');
-          if (row.gender && !['M', 'F', 'm', 'f'].includes(row.gender.trim())) errors.push('Gender must be M or F');
-          if (row.dob) {
-            const normalized = normalizeDateStr(row.dob);
-            row.dob = normalized;  // update the row so the backend gets yyyy-mm-dd
-            const d = new Date(normalized);
-            if (isNaN(d.getTime())) errors.push('Invalid DOB format (use DD-MM-YYYY or YYYY-MM-DD)');
-          }
-          if (row.phone?.trim()) {
-            if (!/^\d{10}$/.test(row.phone.replace(/\D/g, ''))) errors.push('Invalid 10-digit phone number');
-          }
-          return { data: row, valid: errors.length === 0, errors };
-        });
-        setParsedRows(rows);
-        setResult(null);
-      },
-    });
+          const rows: ParsedRow[] = normalizedData.map((row: any) => {
+            const errors: string[] = [];
+            if (!row.name?.toString().trim()) errors.push('Name is required');
+            if (row.gender && !['M', 'F', 'm', 'f'].includes(row.gender.toString().trim())) errors.push('Gender must be M or F');
+            if (row.dob) {
+              let dobStr = row.dob.toString();
+              if (typeof row.dob === 'number') {
+                const d = new Date((row.dob - 25569) * 86400 * 1000);
+                dobStr = d.toISOString().split('T')[0];
+              }
+              const normalized = normalizeDateStr(dobStr);
+              row.dob = normalized;  
+              const d = new Date(normalized);
+              if (isNaN(d.getTime())) errors.push('Invalid DOB format (use DD-MM-YYYY or YYYY-MM-DD)');
+            }
+            if (row.phone?.toString().trim()) {
+              if (!/^\d{10}$/.test(row.phone.toString().replace(/\D/g, ''))) errors.push('Invalid 10-digit phone number');
+            }
+            return { data: row, valid: errors.length === 0, errors };
+          });
+          setParsedRows(rows);
+          setResult(null);
+        } else {
+           setUploadError('The uploaded file is empty.');
+           setParsedRows([]);
+        }
+      } catch (err) {
+        console.error(err);
+        setUploadError('Failed to parse file. Please ensure it is a valid .xlsx, .xls or .csv file.');
+        setParsedRows([]);
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleUpload = async () => {
@@ -1138,9 +1172,9 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
             </button>
             <button onClick={() => fileRef.current?.click()}
               className="flex items-center space-x-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 border border-violet-500/30 px-4 py-2.5 rounded-xl text-sm font-medium transition-all">
-              <FileText className="w-4 h-4" /><span>Choose CSV File</span>
+              <FileText className="w-4 h-4" /><span>Choose Excel File</span>
             </button>
-            <input ref={fileRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
+            <input ref={fileRef} type="file" accept=".xlsx, .xls, .csv" onChange={handleFileChange} className="hidden" />
           </div>
 
           {uploadError && (
@@ -1463,7 +1497,7 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
 }) {
   const [f, setF] = useState({
     preferred_date: '',
-    alternate_date: '',
+    end_date: '',
     student_count: '',
     classes: '',
     notes: '',
@@ -1497,7 +1531,7 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
         body: JSON.stringify({
           username: user.username,
           preferred_date: f.preferred_date,
-          alternate_date: f.alternate_date,
+          end_date: f.end_date,
           student_count: parseInt(f.student_count),
           classes: f.classes,
           notes: f.notes,
@@ -1562,12 +1596,12 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">
-                  Alternate Date
+                  End Date
                 </label>
                 <input
                   type="date"
-                  value={f.alternate_date}
-                  onChange={e => upd('alternate_date', e.target.value)}
+                  value={f.end_date}
+                  onChange={e => upd('end_date', e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
                   className={ic}
                 />

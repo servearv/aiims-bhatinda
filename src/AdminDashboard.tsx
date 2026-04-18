@@ -909,7 +909,8 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
       });
       const data = await res.json();
       if (data.success) {
-        setMessage({ type: 'success', text: `✅ Approved! Event created (ID: ${data.event_id})` });
+        const emailNote = data.email_sent ? "\n\n📧 Approval email sent to school." : "\n\n⚠️ Failed to send approval email.";
+        setMessage({ type: 'success', text: `✅ Approved! Event created (ID: ${data.event_id})${emailNote}` });
         fetchRequests();
         onCountChange();
       } else {
