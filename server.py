@@ -2331,8 +2331,7 @@ def api_admin_audit_logs():
     return jsonify(rows_to_list(logs))
 
 
-# ---- Digitise (MedDigitizer Streamlit launcher) ----
-# Removed: MedDigitizer integration has been deleted
+
 
 
 # ---------------------------------------------------------------------------
