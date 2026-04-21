@@ -673,7 +673,7 @@ function PasswordSetupWizard({ userName, onComplete }: { userName: string; onCom
             <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
               <KeyRound className="w-8 h-8 text-emerald-400" />
             </div>
-            <h2 className="text-xl font-bold text-white">Welcome, {userName}! 👋</h2>
+            <h2 className="text-xl font-bold text-white">Welcome, {userName}!</h2>
             <p className="text-slate-400 text-sm mt-2">Create a password to secure your account.</p>
           </div>
 

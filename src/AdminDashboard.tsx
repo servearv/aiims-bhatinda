@@ -166,7 +166,7 @@ export default function AdminDashboard({ user }: { user: User }) {
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6 animate-in fade-in duration-500">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Admin Dashboard ⚙️</h2>
+          <h2 className="text-2xl font-bold text-white tracking-tight">Admin Dashboard</h2>
           <p className="text-slate-400 text-sm mt-0.5">Manage screening camps, medical staff, and health records.</p>
         </div>
         {pendingCount > 0 && (
@@ -252,7 +252,8 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
 
   const filtered = events
     .filter(e => {
-      const matchTag = filterTag ? e.tag === filterTag : true;
+      const actualStatus = e.computed_status || e.tag;
+      const matchTag = filterTag ? actualStatus === filterTag : true;
       const matchSearch = e.school_name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchTag && matchSearch;
     })
