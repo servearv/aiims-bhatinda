@@ -1,84 +1,103 @@
-# AIIMS Bathinda - School Health System
+# AIIMS Bathinda — School Health System
 
-A comprehensive digital health management system for AIIMS Bathinda school screening camps.
+Digital health management system for AIIMS Bathinda school screening camps.
 
-## Tech Stack
-- **Frontend**: React, Vite, Tailwind CSS, TypeScript
-- **Backend**: Python (Flask)
-- **Database**: SQLite
-- **Session**: Server-side filesytem-backed sessions
+**Stack**: React + Vite + TypeScript · Flask · PostgreSQL
 
 ---
 
-## 🚀 Running Locally
+## Local Development
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
+```bash
+# Prerequisites: Python 3.11+, Node.js 18+
 
-### Setup
+# 1. Install dependencies
+pip install -r requirements.txt
+npm install
 
-1. **Install Python dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# 2. Set environment variables (copy and edit)
+cp .env.example .env
 
-2. **Install Node.js dependencies:**
-   ```bash
-   npm install
-   ```
+# 3. Start both Flask (port 3000) and Vite (port 5173)
+python run_dev.py
+```
 
-3. **Set up Environment Variables:**
-   Copy the example `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-   *Note: `SECRET_KEY` is required for production sessions. For local dev, a default is used.*
-
-4. **Start Development Servers:**
-   The following script automatically starts **both** the Flask backend (`http://localhost:3000`) and the Vite React frontend (`http://localhost:5173`) with Hot Module Reloading (HMR).
-   ```bash
-   python run_dev.py
-   ```
-
-5. **Access the App:**
-   Open [http://localhost:5173](http://localhost:5173) in your browser.
-   *(Default Admin credentials: `Admin` / `admin`)*
+Open [http://localhost:5173](http://localhost:5173). Default admin: `Admin` / `admin`.
 
 ---
 
-## ☁️ Deployment (Render)
+## Docker Deployment
 
-This application is configured for one-click deployment using **Render** (Free Tier).
-Since Render's free tier does not support persistent disks, the application has been refactored to use **PostgreSQL**. The best and easiest option is to use **Render's Free PostgreSQL Database** since it natively works together perfectly.
+```bash
+docker compose up --build
+```
 
-### Step 1: Create a PostgreSQL Database on Render
-1. Go to your [Render Dashboard](https://dashboard.render.com/).
-2. Click **New** -> **PostgreSQL**.
-3. Name your database (e.g., `aiims-db`), leave the defaults, and ensure the **Free** tier is selected.
-4. Click **Create Database**.
-5. Once created, scroll down to the **Connections** section and copy the **Internal Database URL** (e.g., `postgres://user:password@dpg-...-a/aiims_db`). Keep this copied for the next step.
+App: [http://localhost:8080](http://localhost:8080). Postgres runs alongside in a separate container.
 
-### Step 2: Create the Web Service (Manual Setup)
+### Environment Variables
 
-1. Create a new **Web Service** on [Render.com](https://render.com).
-2. Connect this GitHub repository.
-3. Configure the service:
-   - **Environment**: `Python 3`
-   - **Build Command**: `./build.sh`
-   - **Start Command**: `gunicorn server:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120`
-4. Add Environment Variables:
-   - `PYTHON_VERSION`: `3.11.0`
-   - `NODE_VERSION`: `20`
-   - `DATABASE_URL`: *(Paste the **Internal Database URL** you copied from your Render Postgres Database)*
-   - `SECRET_KEY`: *(Generate a secure random string)*
-5. Click **Create Web Service** at the bottom of the page.
+Set these in `docker-compose.yml` or pass via `.env`:
 
-### Option 2: Render Blueprint (Automatic Setup)
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `SECRET_KEY` | Yes | Random string for session security |
+| `LOGTAIL_TOKEN` | No | [Better Stack](https://betterstack.com) source token for remote log viewing |
+| `SMTP_EMAIL` | No | Gmail address for sending OTP emails |
+| `SMTP_PASSWORD` | No | Google App Password for the above |
+| `REDIS_URL` | No | Redis URL for distributed sessions & Socket.IO |
 
-Render can automatically detect and configure this app using the provided `render.yaml` file.
+---
 
-1. Go to your Render Dashboard > Blueprints.
-2. Select this repository.
-3. Render will prompt you to enter the `DATABASE_URL` for your external Postgres database.
-4. Render will automatically set up the Python environment, run the `/build.sh` script, and start `gunicorn`.
+## Logs
+
+All application logs are structured JSON. In the Docker setup, they are automatically stored in **Loki** and can be viewed visually in **Grafana**.
+
+1. Navigate to Grafana at: [http://localhost:3001](http://localhost:3001).
+2. Go to **Explore** (Compass icon on the left panel).
+3. The "Loki" data source is selected by default.
+4. Click the "Label browser" to search your logs or run queries like `{application="aiims-bathinda-flask"}`.
+
+*You can also still view raw container output via `docker compose logs -f app` if needed.*
+
+---
+
+## Database Migrations (Alembic)
+
+Migrations run **automatically** on container startup. For manual control:
+
+```bash
+# Apply all pending migrations
+docker compose exec app alembic upgrade head
+
+# Create a new migration after schema changes
+docker compose exec app alembic revision --autogenerate -m "describe change"
+
+# Check current migration version
+docker compose exec app alembic current
+
+# Rollback one migration
+docker compose exec app alembic downgrade -1
+```
+
+Migration scripts live in `migrations/versions/`.
+
+---
+
+## Database Backup & Restore
+
+### Export
+```bash
+docker compose exec db pg_dump -U aiims aiims_db > backup.sql
+```
+
+### Import into a new server
+```bash
+cat backup.sql | docker exec -i <db-container> psql -U aiims -d aiims_db
+```
+
+Utility scripts are also available in `scripts/`:
+```bash
+DATABASE_URL=<url> ./scripts/db_export.sh
+DATABASE_URL=<url> ./scripts/db_import.sh backup.dump
+```

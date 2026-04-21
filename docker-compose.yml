@@ -35,9 +35,36 @@ services:
       SECRET_KEY: local-dev-secret-key
       SMTP_EMAIL: ${SMTP_EMAIL:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      LOKI_URL: "http://loki:3100/loki/api/v1/push"
     depends_on:
       db:
         condition: service_healthy
+      loki:
+        condition: service_started
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./data/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
 
 volumes:
   pgdata:
+  loki_data:
+  grafana_data:

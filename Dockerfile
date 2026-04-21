@@ -29,6 +29,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=frontend /app/dist ./dist
 
 # Copy backend source files
+COPY app/ ./app/
+COPY migrations/ ./migrations/
+COPY alembic.ini .
 COPY server.py .
 
 # Expose port
