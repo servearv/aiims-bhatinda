@@ -5,15 +5,12 @@ import json
 import logging
 import random
 import string
-import subprocess
-import sys
 import re
 import smtplib
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date, timedelta
-from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
 # Logging Configuration
@@ -28,7 +25,6 @@ logger = logging.getLogger('aiims')
 try:
     import psycopg2
     import psycopg2.extras
-    from psycopg2 import sql
 except ImportError:
     pass
 
@@ -74,7 +70,6 @@ else:
     socketio = None
 
 PORT = int(os.environ.get("PORT", 3000))
-DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(DATA_DIR, "database.db"))
 
 # Valid specialist roles (replaces the old "Medical Staff" role)
 SPECIALIST_ROLES = [
@@ -2331,9 +2326,6 @@ def api_admin_audit_logs():
     return jsonify(rows_to_list(logs))
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # Socket.IO event handlers
 # ---------------------------------------------------------------------------
@@ -2345,7 +2337,6 @@ if HAS_SOCKETIO and socketio:
     @socketio.on("disconnect")
     def handle_disconnect():
         logger.info("[socket.io] Client disconnected")
-
 
 
 # ---------------------------------------------------------------------------
@@ -2434,14 +2425,15 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Error initializing database: {e}")
 
-    logger.info(f"")
-    logger.info(f"  AIIMS Bathinda - Flask Server")
-    logger.info(f"  =============================")
+    db_display = os.environ.get("DATABASE_URL", "(not set)")[:40] + "..."
+    logger.info("")
+    logger.info("  AIIMS Bathinda - Flask Server")
+    logger.info("  =============================")
     logger.info(f"  Server running on: http://localhost:{PORT}")
-    logger.info(f"  Database:          {DB_PATH}")
+    logger.info(f"  Database:          {db_display}")
     logger.info(f"  Frontend (dist/):  {'FOUND' if os.path.isdir(DIST_DIR) else 'NOT BUILT - run: npm run build'}")
     logger.info(f"  Socket.IO:         {'ENABLED' if HAS_SOCKETIO else 'DISABLED (pip install flask-socketio)'}")
-    logger.info(f"")
+    logger.info("")
 
     if HAS_SOCKETIO and socketio:
         socketio.run(app, host="0.0.0.0", port=PORT, debug=False,

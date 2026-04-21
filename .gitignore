@@ -12,3 +12,6 @@ venv/
 *.pyc
 data/
 flask_session/
+*.swp
+*.swo
+.cursor/
