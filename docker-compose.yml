@@ -32,9 +32,10 @@ services:
       - "8080:5000"
     environment:
       DATABASE_URL: postgresql://aiims:aiims_pass@db:5432/aiims_db
-      SECRET_KEY: local-dev-secret-key
+      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-key}
       SMTP_EMAIL: ${SMTP_EMAIL:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       LOKI_URL: "http://loki:3100/loki/api/v1/push"
     depends_on:
       db:

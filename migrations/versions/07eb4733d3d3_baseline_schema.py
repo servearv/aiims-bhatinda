@@ -143,6 +143,7 @@ def upgrade() -> None:
             school_id INTEGER,
             school_name TEXT NOT NULL,
             preferred_date TEXT NOT NULL,
+            alternate_date TEXT DEFAULT '',
             end_date TEXT DEFAULT '',
             student_count INTEGER DEFAULT 0,
             classes TEXT DEFAULT '',
