@@ -9,7 +9,7 @@ import GeneralInfoForm, { GeneralInfoSummary } from './GeneralInfoForm';
 
 // Socket.IO client (optional)
 let io: any = null;
-try { io = require('socket.io-client'); } catch {}
+try { io = require('socket.io-client'); } catch { }
 
 // ── Types ──
 type User = { username: string; role: string; name: string; specialization?: string };
@@ -90,10 +90,10 @@ async function getOfflineQueueCount(): Promise<number> {
   try {
     const db = await openIDB();
     const tx = db.transaction(STORE, 'readonly');
-    return new Promise(r => { 
-      const req = tx.objectStore(STORE).count(); 
-      req.onsuccess = () => r(req.result); 
-      req.onerror = () => r(0); 
+    return new Promise(r => {
+      const req = tx.objectStore(STORE).count();
+      req.onsuccess = () => r(req.result);
+      req.onerror = () => r(0);
     });
   } catch { return 0; }
 }
@@ -192,9 +192,8 @@ function DomainProgressBar({ examinedCategories }: { examinedCategories?: string
         return (
           <span
             key={d.key}
-            className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
-              isDone ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]' : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#9CA3AF]'
-            }`}
+            className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${isDone ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]' : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#9CA3AF]'
+              }`}
           >
             {isDone && <CheckCircle className="h-2.5 w-2.5 text-[#16A34A]" />}
             {d.short}
@@ -277,15 +276,14 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
                 className={`${cls.inputLg} ${errors.name ? 'border-red-300 focus:ring-red-500/30 focus:border-red-500' : ''}`} placeholder="Full name" />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
-            <FormInput label="Age" value={f.age} onChange={() => {}} type="number" id="add-age" placeholder="Auto from DOB" disabled />
+            <FormInput label="Age" value={f.age} onChange={() => { }} type="number" id="add-age" placeholder="Auto from DOB" disabled />
             <div>
               <label className={cls.label}>Sex *</label>
               <div className="flex space-x-3 mt-1">
                 {[{ v: 'M', label: 'Male' }, { v: 'F', label: 'Female' }].map(opt => (
                   <button key={opt.v} type="button" onClick={() => upd('gender', opt.v)}
-                    className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all border flex items-center justify-center space-x-2 ${
-                      f.gender === opt.v ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                    }`}>
+                    className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all border flex items-center justify-center space-x-2 ${f.gender === opt.v ? 'bg-blue-50 text-blue-700 border-blue-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                      }`}>
                     {f.gender === opt.v && <Check className="w-3.5 h-3.5" />}<span>{opt.label}</span>
                   </button>
                 ))}
@@ -332,12 +330,10 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
                     const active = symptoms.includes(symptom);
                     return (
                       <button key={symptom} type="button" onClick={() => toggleSymptom(symptom)}
-                        className={`flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-left transition-all border ${
-                          active ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300'
-                        }`}>
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                          active ? 'bg-amber-500 border-amber-500' : 'border-gray-300'
-                        }`}>
+                        className={`flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-left transition-all border ${active ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300'
+                          }`}>
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${active ? 'bg-amber-500 border-amber-500' : 'border-gray-300'
+                          }`}>
                           {active && <Check className="w-2.5 h-2.5 text-white" />}
                         </div>
                         <span>{symptom}</span>
@@ -397,8 +393,8 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
         </div>
         <div className="relative w-full md:w-96 flex-shrink-0">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search camps..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -408,71 +404,71 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
       </div>
 
       {loading ? <div className="text-center py-12 text-gray-400">Loading camps...</div>
-      : filteredCamps.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl border border-gray-100 text-center w-full shadow-sm">
-          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 font-medium">No active camps available.</p>
-          {searchQuery && <p className="text-gray-400 text-sm mt-1">Try adjusting your search query.</p>}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredCamps.map((camp: any) => (
-            <div key={camp.event_id} className="w-full text-left bg-white rounded-2xl border border-gray-200 hover:border-blue-300 transition-all p-5 hover:shadow-md group">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                
-                {/* Left region: Icon + School Name & Date */}
-                <div className="flex items-center space-x-5 flex-1 min-w-0">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50/80 flex items-center justify-center flex-shrink-0 border border-blue-100/50 group-hover:scale-105 transition-transform">
-                    <Calendar className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div className="min-w-0 truncate">
-                    <h3 className="text-gray-900 font-bold text-lg truncate pr-4">{camp.school_name}</h3>
-                    <div className="flex items-center space-x-3 text-sm text-gray-500 mt-1">
-                      <span className="flex items-center font-medium bg-gray-50 px-2.5 py-0.5 rounded-md border border-gray-100">
-                        <Calendar className="w-3.5 h-3.5 mr-1.5 text-gray-400"/> 
-                        {formatDate(camp.start_date)}{camp.end_date && ` → ${formatDate(camp.end_date)}`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+        : filteredCamps.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl border border-gray-100 text-center w-full shadow-sm">
+            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 font-medium">No active camps available.</p>
+            {searchQuery && <p className="text-gray-400 text-sm mt-1">Try adjusting your search query.</p>}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredCamps.map((camp: any) => (
+              <div key={camp.event_id} className="w-full text-left bg-white rounded-2xl border border-gray-200 hover:border-blue-300 transition-all p-5 hover:shadow-md group">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
 
-                {/* Right region: Metrics & Actions */}
-                <div className="flex flex-wrap md:flex-nowrap items-center gap-6 md:gap-8 flex-shrink-0">
-                  
-                  {/* Detailed Stats */}
-                  <div className="flex items-center gap-6 hidden sm:flex border-r border-gray-100 pr-8">
-                    <div className="flex flex-col justify-center">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5 text-center">Staff</span>
-                      <span className="text-sm font-semibold text-gray-700 flex items-center justify-center">
-                        <Users className="w-4 h-4 mr-1.5 text-blue-400/80" />
-                        {camp.volunteer_count ?? 0}
-                      </span>
+                  {/* Left region: Icon + School Name & Date */}
+                  <div className="flex items-center space-x-5 flex-1 min-w-0">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-50/80 flex items-center justify-center flex-shrink-0 border border-blue-100/50 group-hover:scale-105 transition-transform">
+                      <Calendar className="w-6 h-6 text-blue-600" />
                     </div>
-                    <div className="flex flex-col justify-center">
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5 text-center">Screened</span>
-                      <span className="text-sm font-semibold text-gray-700 flex items-center justify-center bg-emerald-50 px-2 rounded font-mono text-emerald-700">
-                        {camp.screened_count ?? 0} / {camp.student_count ?? 0}
-                      </span>
+                    <div className="min-w-0 truncate">
+                      <h3 className="text-gray-900 font-bold text-lg truncate pr-4">{camp.school_name}</h3>
+                      <div className="flex items-center space-x-3 text-sm text-gray-500 mt-1">
+                        <span className="flex items-center font-medium bg-gray-50 px-2.5 py-0.5 rounded-md border border-gray-100">
+                          <Calendar className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
+                          {formatDate(camp.start_date)}{camp.end_date && ` → ${formatDate(camp.end_date)}`}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Actions Area */}
-                  <div className="flex items-center space-x-4">
-                    <span className={`px-4 py-1.5 rounded-lg text-xs font-bold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-gray-50 text-gray-500 border-gray-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
-                      {(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}
-                    </span>
-                    <button onClick={() => handleVolunteer(camp)} disabled={joining === camp.event_id}
-                      className={`${cls.btnPrimary} flex items-center space-x-2 text-sm px-6 py-2.5 rounded-xl disabled:opacity-50 font-bold transition-all`}>
-                      <span>{joining === camp.event_id ? 'Joining...' : 'Join Camp'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                  {/* Right region: Metrics & Actions */}
+                  <div className="flex flex-wrap md:flex-nowrap items-center gap-6 md:gap-8 flex-shrink-0">
+
+                    {/* Detailed Stats */}
+                    <div className="flex items-center gap-6 hidden sm:flex border-r border-gray-100 pr-8">
+                      <div className="flex flex-col justify-center">
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5 text-center">Staff</span>
+                        <span className="text-sm font-semibold text-gray-700 flex items-center justify-center">
+                          <Users className="w-4 h-4 mr-1.5 text-blue-400/80" />
+                          {camp.volunteer_count ?? 0}
+                        </span>
+                      </div>
+                      <div className="flex flex-col justify-center">
+                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5 text-center">Screened</span>
+                        <span className="text-sm font-semibold text-gray-700 flex items-center justify-center bg-emerald-50 px-2 rounded font-mono text-emerald-700">
+                          {camp.screened_count ?? 0} / {camp.student_count ?? 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions Area */}
+                    <div className="flex items-center space-x-4">
+                      <span className={`px-4 py-1.5 rounded-lg text-xs font-bold border ${(camp.computed_status || camp.tag) === 'Ongoing' ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.1)]' : (camp.computed_status || camp.tag) === 'Completed' ? 'bg-gray-50 text-gray-500 border-gray-200' : 'bg-blue-50 text-blue-600 border-blue-200'}`}>
+                        {(camp.computed_status || camp.tag) === 'Ongoing' ? 'Live' : (camp.computed_status || camp.tag)}
+                      </span>
+                      <button onClick={() => handleVolunteer(camp)} disabled={joining === camp.event_id}
+                        className={`${cls.btnPrimary} flex items-center space-x-2 text-sm px-6 py-2.5 rounded-xl disabled:opacity-50 font-bold transition-all`}>
+                        <span>{joining === camp.event_id ? 'Joining...' : 'Join Camp'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
     </div>
   );
 }
@@ -514,7 +510,7 @@ function DentalExamForm({ data, onChange, disabled, doctorInfo, studentInfo, cam
   const u = (k: string, v: any) => onChange({ ...data, [k]: v });
   return (
     <div className="space-y-6">
-      <SectionHeading title="Dental Examination" icon={<span className="text-base">🦷</span>} />
+      <SectionHeading title="Dental Examination" icon={<span className="text-base"></span>} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <label htmlFor="dental-exam" className={cls.label}>
@@ -640,13 +636,12 @@ function CommunityMedForm({ data, onChange, disabled, doctorInfo, studentInfo, c
                       ].map(opt => (
                         <button key={opt.key} type="button" disabled={disabled}
                           onClick={() => !disabled && u('vaccinationStatus', { ...(data.vaccinationStatus || {}), [v]: opt.key })}
-                          className={`min-h-[36px] rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                            val === opt.key
+                          className={`min-h-[36px] rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-all ${val === opt.key
                               ? opt.color === 'green' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]'
-                              : opt.color === 'red' ? 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]'
-                              : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#4B5563]'
+                                : opt.color === 'red' ? 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]'
+                                  : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#4B5563]'
                               : 'border-[#E5E7EB] bg-white text-[#9CA3AF] hover:border-[#D1D5DB]'
-                          } disabled:opacity-50`}>
+                            } disabled:opacity-50`}>
                           {opt.label}
                         </button>
                       ))}
@@ -849,9 +844,8 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
             { v: 'R', label: 'Referral', active: 'bg-white text-[#B91C1C] shadow-sm ring-1 ring-[#FECACA]' },
           ].map(opt => (
             <button key={opt.v} type="button" onClick={() => !disabled && u('status', opt.v)} disabled={disabled}
-              className={`min-h-[48px] flex-1 rounded-md px-2 text-center text-sm font-semibold transition-all disabled:opacity-50 ${
-                data.status === opt.v ? opt.active : 'text-[#6B7280] hover:bg-white/80'
-              }`}>
+              className={`min-h-[48px] flex-1 rounded-md px-2 text-center text-sm font-semibold transition-all disabled:opacity-50 ${data.status === opt.v ? opt.active : 'text-[#6B7280] hover:bg-white/80'
+                }`}>
               {opt.label}
             </button>
           ))}
@@ -987,13 +981,12 @@ function StatusAndRemarks({ data, onChange, disabled, doctorInfo, studentInfo, c
             <div className="flex space-x-2">
               {['Routine', 'Priority', 'Urgent'].map(urg => (
                 <button key={urg} type="button" onClick={() => u('urgency', urg)}
-                  className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${
-                    data.urgency === urg
+                  className={`min-h-[44px] flex-1 rounded-lg border text-sm font-semibold transition-all ${data.urgency === urg
                       ? urg === 'Routine' ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]'
-                      : urg === 'Priority' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]'
-                      : 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]'
+                        : urg === 'Priority' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]'
+                          : 'border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]'
                       : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#D1D5DB]'
-                  }`}>
+                    }`}>
                   {urg}
                 </button>
               ))}
@@ -1058,10 +1051,10 @@ function StatusBadge({ status }: { status: string }) {
   const cfg = status === 'N'
     ? { label: '✓ Normal', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' }
     : status === 'O'
-    ? { label: '⦿ Observation', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }
-    : status === 'R'
-    ? { label: '⚑ Referred', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' }
-    : { label: status || '—', bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' };
+      ? { label: '⦿ Observation', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }
+      : status === 'R'
+        ? { label: '⚑ Referred', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' }
+        : { label: status || '—', bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200' };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
       {cfg.label}
@@ -1196,8 +1189,8 @@ function CommunityMedRecordCard({ d }: { d: any }) {
   const vaccEntries = Object.entries(vaccStatus) as [string, string][];
   const vaccColor = (s: string) =>
     s === 'given' ? 'text-green-700 bg-green-50 border-green-200' :
-    s === 'not_given' ? 'text-red-700 bg-red-50 border-red-200' :
-    'text-gray-500 bg-gray-50 border-gray-200';
+      s === 'not_given' ? 'text-red-700 bg-red-50 border-red-200' :
+        'text-gray-500 bg-gray-50 border-gray-200';
   const vaccIcon = (s: string) => s === 'given' ? '✓' : s === 'not_given' ? '✗' : '?';
   const pastHistory = Array.isArray(d.pastHistory) ? d.pastHistory : [];
   const SYSTEMS = ['locomotor', 'abdomen', 'respiratory', 'cardiovascular', 'cns'];
@@ -1261,11 +1254,10 @@ function CommunityMedRecordCard({ d }: { d: any }) {
       {d.anaemia && (
         <div className="flex items-center space-x-2">
           <span className="text-xs text-gray-400">Anaemia:</span>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
-            d.anaemia === 'No' ? 'text-green-700 bg-green-50 border-green-200'
-            : d.anaemia === 'Yes' ? 'text-red-700 bg-red-50 border-red-200'
-            : 'text-amber-700 bg-amber-50 border-amber-200'
-          }`}>{d.anaemia}</span>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${d.anaemia === 'No' ? 'text-green-700 bg-green-50 border-green-200'
+              : d.anaemia === 'Yes' ? 'text-red-700 bg-red-50 border-red-200'
+                : 'text-amber-700 bg-amber-50 border-amber-200'
+            }`}>{d.anaemia}</span>
         </div>
       )}
 
@@ -1277,9 +1269,8 @@ function CommunityMedRecordCard({ d }: { d: any }) {
             {sysEntries.map(s => (
               <div key={s.key} className="flex items-center justify-between py-1 text-xs">
                 <span className="text-gray-500 font-medium">{SYSTEM_LABELS[s.key] || s.key}</span>
-                <span className={`font-bold px-2 py-0.5 rounded border ${
-                  s.val === 'NAD' ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'
-                }`}>
+                <span className={`font-bold px-2 py-0.5 rounded border ${s.val === 'NAD' ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'
+                  }`}>
                   {s.val === 'Abnormal' && s.detail ? `Abnormal: ${s.detail}` : s.val}
                 </span>
               </div>
@@ -1307,8 +1298,8 @@ function GenericRecordCard({ d }: { d: any }) {
         {entries.map(([k, v]) => {
           if (v === null || v === undefined || v === '') return null;
           let display: string;
-          if (Array.isArray(v)) display = v.map(i => typeof i === 'object' ? Object.entries(i).map(([a,b])=>`${a}: ${b}`).join(', ') : String(i)).join(' | ');
-          else if (typeof v === 'object') display = Object.entries(v).map(([a,b])=>`${a}: ${b}`).join(', ');
+          if (Array.isArray(v)) display = v.map(i => typeof i === 'object' ? Object.entries(i).map(([a, b]) => `${a}: ${b}`).join(', ') : String(i)).join(' | ');
+          else if (typeof v === 'object') display = Object.entries(v).map(([a, b]) => `${a}: ${b}`).join(', ');
           else display = String(v);
           return <div key={k}><RecordField label={k.replace(/_/g, ' ')} value={display} /></div>;
         })}
@@ -1363,11 +1354,11 @@ function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
           fetch(`/api/students/${studentId}/all-records?event_id=${eventId}`)
             .then(r => r.json())
             .then(d => setRecords(d.records || []))
-            .catch(() => {});
+            .catch(() => { });
         }
       });
       return () => { socket.disconnect(); };
-    } catch {}
+    } catch { }
   }, [studentId, eventId]);
 
   const otherRecords = records.filter(r => r.category !== currentCategory);
@@ -1544,7 +1535,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
       socket.on('students_bulk_created', refresh);
       socket.on('exam_saved', refresh);
       return () => { socket.disconnect(); };
-    } catch {}
+    } catch { }
   }, [campId, doSearch]);
 
   // Load existing exam data when student selected
@@ -1553,8 +1544,8 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
     if (selectedStudent && examData) {
       await autoSave(examData);
     }
-    
-    setSelectedStudent(s); 
+
+    setSelectedStudent(s);
     setSearchQuery('');
 
     // Load existing record for this specialist
@@ -1612,7 +1603,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
         method: 'DELETE', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username }),
       });
-    } catch {} onBack();
+    } catch { } onBack();
   };
 
   const specBadgeColor = 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]';
@@ -1736,9 +1727,8 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
                   const isSelected = selectedStudent?.student_id === s.student_id;
                   return (
                     <button key={s.student_id} type="button" onClick={() => selectStudent(s)}
-                      className={`flex w-full items-center gap-3 border-l-[3px] border-solid px-3 py-2.5 text-left transition-colors ${
-                        isSelected ? 'border-l-[#2563EB] bg-white shadow-sm' : 'border-l-transparent hover:bg-white/90'
-                      }`}>
+                      className={`flex w-full items-center gap-3 border-l-[3px] border-solid px-3 py-2.5 text-left transition-colors ${isSelected ? 'border-l-[#2563EB] bg-white shadow-sm' : 'border-l-transparent hover:bg-white/90'
+                        }`}>
                       <div className={`h-2 w-2 shrink-0 rounded-full ${s.is_examined ? 'bg-[#16A34A]' : 'bg-[#D1D5DB]'}`} />
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-sm font-semibold ${isSelected ? 'text-[#1E3A8A]' : 'text-[#1F2937]'}`}>{s.name}</p>
@@ -1827,7 +1817,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
       </div>
 
       {showAddModal && <AddStudentModal onClose={() => setShowAddModal(false)} onCreated={(s) => selectStudent(s)} userId={user.username} campId={campId} />}
-      
+
       {showFullRecord && selectedStudent && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1F2937]/40 p-4 backdrop-blur-sm" onClick={() => setShowFullRecord(false)}>
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-[#E5E7EB] bg-[#F7F9FB] shadow-lg" onClick={e => e.stopPropagation()}>

@@ -734,7 +734,7 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
     school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '',
   });
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (defaultRole) {
@@ -774,14 +774,6 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
       });
       const data = await res.json();
       if (data.success) {
-        const displayName = f.role === 'School POC' ? f.school_name : f.name;
-        const emailNote = data.email_sent
-          ? `📧 A welcome email with credentials has been sent to ${f.email}.`
-          : `⚠️ Email could not be sent (SMTP not configured). Please share credentials manually.`;
-        setMessage({
-          type: 'success',
-          text: `✅ ${displayName} registered as ${f.role}.\n\n🔑 User ID: ${data.username}\n🔒 Password: ${data.password}\n\n${emailNote}`
-        });
         setF({
           email: '', name: '', role: 'Other', designation: '',
           school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '',
@@ -808,10 +800,7 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         </h3>
 
         {message && (
-          <div className={`p-3 rounded-xl text-sm mb-4 border whitespace-pre-line ${message.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-            : 'bg-red-500/10 border-red-500/30 text-red-400'
-            }`}>
+          <div className="p-3 rounded-xl text-sm mb-4 border whitespace-pre-line bg-red-500/10 border-red-500/30 text-red-400">
             {message.text}
           </div>
         )}
@@ -885,7 +874,7 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<'' | 'Pending' | 'Approved' | 'Rejected'>('');
   const [actionLoading, setActionLoading] = useState<number | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'error'; text: string } | null>(null);
 
   const fetchRequests = () => {
     setLoading(true);
@@ -910,8 +899,6 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
       });
       const data = await res.json();
       if (data.success) {
-        const emailNote = data.email_sent ? "\n\n📧 Approval email sent to school." : "\n\n⚠️ Failed to send approval email.";
-        setMessage({ type: 'success', text: `✅ Approved! Event created (ID: ${data.event_id})${emailNote}` });
         fetchRequests();
         onCountChange();
       } else {
@@ -936,7 +923,6 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
       });
       const data = await res.json();
       if (data.success) {
-        setMessage({ type: 'success', text: '❌ Request rejected.' });
         fetchRequests();
         onCountChange();
       } else {
@@ -987,10 +973,7 @@ function CampRequestsTab({ user, onCountChange }: { user: User; onCountChange: (
 
       {/* Message */}
       {message && (
-        <div className={`p-3 rounded-xl text-sm border ${message.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-            : 'bg-red-500/10 border-red-500/30 text-red-400'
-          }`}>
+        <div className="p-3 rounded-xl text-sm border bg-red-500/10 border-red-500/30 text-red-400">
           {message.text}
         </div>
       )}

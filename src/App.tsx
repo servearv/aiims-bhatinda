@@ -725,6 +725,11 @@ function ProfileSettings({ user, onBack }: { user: User; onBack: () => void }) {
   const [confirmPw, setConfirmPw] = useState('');
   const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
+  
+  const [useOtp, setUseOtp] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
 
   // Debounced username check
   useEffect(() => {
@@ -777,15 +782,17 @@ function ProfileSettings({ user, onBack }: { user: User; onBack: () => void }) {
     setPwSaving(true);
     setPwMsg(null);
     try {
-      const res = await fetch('/api/users/profile/password', {
+      const endpoint = useOtp ? '/api/users/profile/password/otp' : '/api/users/profile/password';
+      const body = useOtp ? { otp, new_password: newPw } : { old_password: oldPw, new_password: newPw };
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ old_password: oldPw, new_password: newPw }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
         setPwMsg({ type: 'success', text: 'Password updated successfully!' });
-        setOldPw(''); setNewPw(''); setConfirmPw('');
+        setOldPw(''); setNewPw(''); setConfirmPw(''); setOtp(''); setUseOtp(false); setOtpSent(false);
       } else {
         setPwMsg({ type: 'error', text: data.message || 'Failed to update' });
       }
@@ -793,6 +800,29 @@ function ProfileSettings({ user, onBack }: { user: User; onBack: () => void }) {
       setPwMsg({ type: 'error', text: 'Connection error' });
     } finally {
       setPwSaving(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    setOtpSending(true);
+    setPwMsg(null);
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: user.email || user.username }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOtpSent(true);
+        setPwMsg({ type: 'success', text: 'OTP sent to your email.' });
+      } else {
+        setPwMsg({ type: 'error', text: data.message || 'Failed to send OTP' });
+      }
+    } catch {
+      setPwMsg({ type: 'error', text: 'Connection error' });
+    } finally {
+      setOtpSending(false);
     }
   };
 
@@ -848,8 +878,36 @@ function ProfileSettings({ user, onBack }: { user: User; onBack: () => void }) {
           </div>
         )}
         <form onSubmit={handlePasswordChange} className="space-y-3">
-          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)}
-            className={inputClass} placeholder="Current password" required />
+          {useOtp ? (
+            <div className="space-y-2">
+              <div className="flex space-x-2">
+                <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className={`${inputClass} flex-1`} placeholder="Enter 6-digit OTP" required />
+                <button type="button" onClick={handleSendOtp} disabled={otpSending}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold text-sm hover:bg-slate-700 transition-colors whitespace-nowrap">
+                  {otpSending ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}
+                </button>
+              </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={() => { setUseOtp(false); setPwMsg(null); }}
+                  className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors">
+                  I remember my password
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)}
+                className={inputClass} placeholder="Current password" required />
+              <div className="flex justify-end">
+                <button type="button" onClick={() => { setUseOtp(true); setPwMsg(null); }}
+                  className="text-xs font-semibold text-slate-400 hover:text-cyan-400 transition-colors">
+                  Forgot password? Use OTP
+                </button>
+              </div>
+            </div>
+          )}
+
           <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)}
             className={inputClass} placeholder="New password (min 4 chars)" required />
           <div>
@@ -862,8 +920,8 @@ function ProfileSettings({ user, onBack }: { user: User; onBack: () => void }) {
               </div>
             )}
           </div>
-          <button type="submit" disabled={!pwMatch || pwSaving}
-            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50 transition-all mt-1">
+          <button type="submit" disabled={!pwMatch || pwSaving || (useOtp && !otp)}
+            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-3 rounded-xl shadow-lg disabled:opacity-50 transition-all mt-3">
             {pwSaving ? 'Saving...' : 'Update Password'}
           </button>
         </form>

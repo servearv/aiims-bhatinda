@@ -80,6 +80,53 @@ def api_change_display_name():
     return jsonify({"success": True, "username": new_username})
 
 
+@bp.route("/api/users/profile/password/otp", methods=["POST"])
+def api_change_password_otp():
+    """Change password using OTP verification."""
+    sess_user = session.get("user")
+    if not sess_user:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    data = request.get_json(force=True)
+    otp = data.get("otp", "").strip()
+    new_password = data.get("new_password", "").strip()
+
+    if len(new_password) < 4:
+        return jsonify({"success": False, "message": "Password must be at least 4 characters"}), 400
+
+    with get_db_conn() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT otp_code, otp_expires FROM Users WHERE username = %s",
+            (sess_user['username'],),
+        )
+        user = cur.fetchone()
+
+        if not user:
+            return jsonify({"success": False, "message": "Account not found"}), 404
+
+        u = row_to_dict(user)
+
+        if not u.get('otp_code') or u['otp_code'] != otp:
+            return jsonify({"success": False, "message": "Incorrect code"}), 401
+
+        try:
+            expires = datetime.fromisoformat(u['otp_expires'])
+            if datetime.utcnow() > expires:
+                return jsonify({"success": False, "message": "Code expired. Request a new one."}), 401
+        except Exception:
+            return jsonify({"success": False, "message": "Code expired"}), 401
+
+        cur.execute(
+            "UPDATE Users SET password = %s, otp_code = NULL, otp_expires = NULL WHERE username = %s",
+            (new_password, sess_user['username']),
+        )
+        conn.commit()
+
+    log_audit(sess_user['username'], "CHANGE_PASSWORD_OTP", "User changed their password using OTP")
+    return jsonify({"success": True})
+
+
 @bp.route("/api/users/check-username")
 def api_check_username():
     """Real-time uniqueness check for usernames."""
