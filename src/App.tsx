@@ -1,13 +1,57 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import DoctorWorkflow from './DoctorWorkflow';
-import AdminDashboard from './AdminDashboard';
-import SchoolDashboard from './SchoolDashboard';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Activity, Stethoscope, ActivitySquare,
   LogOut, ShieldCheck, Sun, Moon, School,
   HeartPulse, Eye, Ear, Scan, Menu, X, User as UserIcon,
-  Mail, KeyRound, ArrowRight, Loader2, Check, AlertCircle, RefreshCw, Settings
+  Mail, KeyRound, ArrowRight, Loader2, Check, AlertCircle, RefreshCw, Settings,
+  WifiOff,
 } from 'lucide-react';
+
+// ── Lazy-loaded route components ──────────────────────────────────────────
+// Each is split into its own JS chunk, loaded only when the user's role matches.
+// AdminDashboard: ~36KB, SchoolDashboard: ~72KB, DoctorWorkflow: ~81KB
+const AdminDashboard  = lazy(() => import('./AdminDashboard'));
+const SchoolDashboard = lazy(() => import('./SchoolDashboard'));
+const DoctorWorkflow  = lazy(() => import('./DoctorWorkflow'));
+
+// ── useOnlineStatus hook ───────────────────────────────────────────────────
+// Subscribes to the custom event dispatched from main.tsx.
+// Falls back to navigator.onLine on mount.
+function useOnlineStatus(): boolean {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setOnline((e as CustomEvent<{ online: boolean }>).detail.online);
+    };
+    window.addEventListener('app:onlinestatus', handler);
+    // Also catch raw browser events in case main.tsx isn't loaded yet
+    const setOn  = () => setOnline(true);
+    const setOff = () => setOnline(false);
+    window.addEventListener('online',  setOn);
+    window.addEventListener('offline', setOff);
+    return () => {
+      window.removeEventListener('app:onlinestatus', handler);
+      window.removeEventListener('online',  setOn);
+      window.removeEventListener('offline', setOff);
+    };
+  }, []);
+  return online;
+}
+
+// ── Dashboard loading fallback ─────────────────────────────────────────────
+function DashboardSkeleton() {
+  return (
+    <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+      <div className="flex flex-col items-center space-y-4">
+        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600
+                        flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.4)] animate-pulse">
+          <ActivitySquare className="w-5 h-5 text-white" />
+        </div>
+        <p className="text-slate-400 text-sm">Loading dashboard...</p>
+      </div>
+    </div>
+  );
+}
 
 // --- Types ---
 type User = {
@@ -93,6 +137,8 @@ export default function App() {
     return <PasswordSetupWizard userName={user.name} onComplete={handlePasswordSet} />;
   }
 
+  const isOnline = useOnlineStatus();
+
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500/30">
       {/* Sidebar */}
@@ -161,6 +207,21 @@ export default function App() {
         <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
         
+        {/* ── Offline Banner ─────────────────────────────────────────────── */}
+        {/* Shown as a slim, non-blocking bar at the top when network is lost  */}
+        {/* Socket.IO will attempt reconnection automatically — no intervention */}
+        {!isOnline && (
+          <div className="relative z-30 flex items-center justify-center gap-2 px-4 py-2
+                          bg-amber-500/10 border-b border-amber-500/20
+                          text-amber-400 text-xs font-medium
+                          animate-in slide-in-from-top duration-300">
+            <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>
+              You're offline — live updates paused. Reconnecting automatically...
+            </span>
+          </div>
+        )}
+
         {/* Topbar with Sidebar Toggle */}
         <div className="p-4 flex items-center relative z-20">
           <button 
@@ -175,11 +236,11 @@ export default function App() {
           {activeTab === 'profile' ? (
             <ProfileSettings user={user} onBack={() => setActiveTab('dashboard')} />
           ) : (
-            <>
-              {user.role === 'Admin' && <AdminDashboard user={user} />}
+            <Suspense fallback={<DashboardSkeleton />}>
+              {user.role === 'Admin'      && <AdminDashboard user={user} />}
               {user.role === 'School POC' && <SchoolDashboard user={user} />}
-              {isSpecialist(user.role) && <DoctorWorkflow user={user} />}
-            </>
+              {isSpecialist(user.role)    && <DoctorWorkflow user={user} />}
+            </Suspense>
           )}
         </div>
       </main>

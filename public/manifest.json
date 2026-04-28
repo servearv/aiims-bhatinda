@@ -1,0 +1,26 @@
+{
+  "name": "AIIMS Bathinda Health Screening Portal",
+  "short_name": "AIIMS Camp",
+  "description": "Real-time medical camp management system for AIIMS Bathinda school health screening",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#06b6d4",
+  "categories": ["medical", "health"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

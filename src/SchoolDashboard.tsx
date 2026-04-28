@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import {
   Calendar, Users, Plus, X, Check, ChevronRight, ArrowRight,
   Upload, Download, FileText, Activity, UserPlus, Search,
-  ChevronDown, AlertTriangle, BarChart3, ClipboardList, Printer
+  ChevronDown, AlertTriangle, BarChart3, ClipboardList, Printer, History, Loader2
 } from 'lucide-react';
 import GeneralInfoForm from './GeneralInfoForm';
 
@@ -24,6 +24,7 @@ interface EventData {
   tag: string;
   student_count?: number;
   screened_count?: number;
+  school_id?: number;
 }
 
 interface Student {
@@ -41,6 +42,8 @@ interface Student {
   is_examined?: number;
   last_exam_data?: string;
   assessment?: string;
+  registration_number?: string;
+  event_id?: number;
 }
 
 interface EventStats {
@@ -250,7 +253,7 @@ function EventWorkspace({ user, event, onBack }: { user: User; event: EventData;
         </button>
       </div>
 
-      {activeView === 'roster' && <RosterManagement user={user} eventId={event.event_id} />}
+      {activeView === 'roster' && <RosterManagement user={user} eventId={event.event_id} event={event} />}
       {activeView === 'progress' && <ProgressTracking eventId={event.event_id} />}
     </div>
   );
@@ -282,7 +285,8 @@ function buildDocumentBody(d: any, doctorInfo: any, studentInfo: any, campName: 
   html += `<table style="width:100%;font-size:13px;margin-bottom:16px;border-collapse:collapse;"><tbody>`;
   html += `<tr><td style="padding:3px 0;font-weight:bold;width:120px;">Student Name:</td><td>${studentName}</td><td style="font-weight:bold;width:60px;">Age:</td><td style="width:50px;">${studentAge}</td><td style="font-weight:bold;width:60px;">Sex:</td><td style="width:50px;">${studentGender}</td></tr>`;
   html += `<tr><td style="padding:3px 0;font-weight:bold;">Class:</td><td>${studentClass}${studentSection}</td><td style="font-weight:bold;">Father:</td><td colspan="3">${fatherName}</td></tr>`;
-  if (phone) html += `<tr><td style="padding:3px 0;font-weight:bold;">Contact:</td><td colspan="5">${phone}</td></tr>`;
+  const regNo = studentInfo?.registration_number || '—';
+  html += `<tr><td style="padding:3px 0;font-weight:bold;">Reg No:</td><td>${regNo}</td><td style="font-weight:bold;">Contact:</td><td colspan="3">${phone || '—'}</td></tr>`;
   html += `</tbody></table>`;
   html += `<div style="border-top:1px solid #ccc;padding-top:12px;margin-bottom:12px;"><h3 style="font-size:14px;font-weight:bold;margin:0 0 6px;">Clinical Findings</h3>`;
   html += `<p style="font-size:13px;white-space:pre-wrap;">${d.clinicalFindings || '—'}</p></div>`;
@@ -325,7 +329,7 @@ function buildPrintableHTML(d: any, doctorInfo: any, studentInfo: any, campName:
 // ════════════════════════════════════════
 // ██ OPTION A: ROSTER MANAGEMENT
 // ════════════════════════════════════════
-function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
+function RosterManagement({ user, eventId, event }: { user: User; eventId: number; event: EventData }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -340,6 +344,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const [studentDocs, setStudentDocs] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [bulkPrinting, setBulkPrinting] = useState(false);
+  const [viewingHistoryStudent, setViewingHistoryStudent] = useState<Student | null>(null);
   const bulkPrintRef = useRef<HTMLDivElement>(null);
 
   const CLASSES = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
@@ -502,7 +507,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
     );
   }
 
-  return (
+  const mainContent = (
     <div className="space-y-4">
       {/* Progress Bar */}
       <div className="bg-slate-900/80 backdrop-blur-xl p-4 rounded-2xl border border-slate-800">
@@ -584,6 +589,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
             <table className="w-full text-left text-sm">
               <thead className="text-slate-500 border-b border-slate-800 bg-slate-950/50">
                 <tr>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Reg No</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Name</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Class</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Gender</th>
@@ -609,6 +615,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 
                   return (
                     <tr key={s.student_id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-5 py-3 text-slate-400 text-xs font-mono">{s.registration_number || '—'}</td>
                       <td className="px-5 py-3 text-white font-medium">{s.name}</td>
                       <td className="px-5 py-3 text-slate-300">{s.student_class || '—'}{s.section ? `-${s.section}` : ''}</td>
                       <td className="px-5 py-3 text-slate-300">{s.gender === 'M' ? 'Male' : s.gender === 'F' ? 'Female' : '—'}</td>
@@ -632,6 +639,13 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                           <button onClick={() => toggleAbsent(s.student_id, s.status)}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">
                             {s.status === 'Absent' ? 'Present' : 'Absent'}
+                          </button>
+                        )}
+                        {s.registration_number && (
+                          <button onClick={() => setViewingHistoryStudent(s)}
+                            className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5"
+                            title="View previous camp evaluations">
+                            <History className="w-3 h-3" /><span className="hidden sm:inline">History</span>
                           </button>
                         )}
                       </td>
@@ -709,6 +723,159 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
       )}
     </div>
   );
+
+  // Previous records modal for school view
+  const historyModalContent = viewingHistoryStudent && (
+    <SchoolPreviousRecordsModal
+      student={viewingHistoryStudent}
+      schoolId={event.school_id ?? null}
+      onClose={() => setViewingHistoryStudent(null)}
+    />
+  );
+
+  return (
+    <>
+      {mainContent}
+      {historyModalContent}
+    </>
+  );
+}
+
+// ════════════════════════════════════════
+// ██ PREVIOUS RECORDS MODAL (cross-camp history)
+// ════════════════════════════════════════
+function SchoolPreviousRecordsModal({ student, schoolId, onClose }: {
+  student: Student; schoolId: number | null; onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!student.registration_number || !schoolId) {
+      setLoading(false);
+      return;
+    }
+    const params = new URLSearchParams({
+      school_id: String(schoolId),
+      registration_number: student.registration_number,
+      current_event_id: String(student.event_id || ''),
+    });
+    fetch(`/api/students/previous-records?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        setRecords(data.records || []);
+        setEvents(data.events || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [student, schoolId]);
+
+  const catLabel = (c: string) => c.replace(/_/g, ' ');
+  const statusLabel = (s: string) => s === 'N' ? 'Normal' : s === 'O' ? 'Observation' : s === 'R' ? 'Referred' : s;
+  const statusColor = (s: string) => s === 'N' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : s === 'R' ? 'text-red-400 bg-red-500/10 border-red-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+  // Group records by event_id
+  const recordsByEvent: Record<number, any[]> = {};
+  for (const r of records) {
+    const eid = r.event_id;
+    if (!recordsByEvent[eid]) recordsByEvent[eid] = [];
+    recordsByEvent[eid].push(r);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        <h3 className="text-lg font-bold text-white mb-1 flex items-center">
+          <History className="w-5 h-5 mr-2 text-indigo-400" />
+          Previous Camp Evaluations
+        </h3>
+        <p className="text-xs text-slate-500 mb-4">
+          {student.name} · Reg: {student.registration_number || '—'}
+        </p>
+
+        {loading ? (
+          <div className="text-center py-12 text-slate-400 flex items-center justify-center space-x-2">
+            <Loader2 className="w-5 h-5 animate-spin" /><span>Loading records...</span>
+          </div>
+        ) : !student.registration_number ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">No registration number assigned.</p>
+            <p className="text-slate-500 text-xs mt-1">A registration number is needed to track students across camps.</p>
+          </div>
+        ) : records.length === 0 ? (
+          <div className="text-center py-12">
+            <ClipboardList className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">No previous evaluations found.</p>
+            <p className="text-slate-500 text-xs mt-1">This is the first examination for this student.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {events.map(evt => {
+              const evtRecords = recordsByEvent[evt.event_id] || [];
+              if (evtRecords.length === 0) return null;
+              return (
+                <div key={evt.event_id} className="bg-slate-950/50 rounded-2xl border border-slate-800 overflow-hidden">
+                  <div className="px-4 py-3 bg-indigo-500/5 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-indigo-400" />
+                      <span className="text-sm font-bold text-white">{evt.school_name}</span>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {formatDate(evt.start_date)}{evt.end_date ? ` → ${formatDate(evt.end_date)}` : ''}
+                    </span>
+                  </div>
+                  {evt.general_info && (evt.general_info.height || evt.general_info.weight) && (
+                    <div className="px-4 py-2 border-b border-slate-800/50 flex items-center space-x-4 text-xs text-slate-400">
+                      {evt.general_info.height && <span>Height: <b className="text-slate-300">{evt.general_info.height} cm</b></span>}
+                      {evt.general_info.weight && <span>Weight: <b className="text-slate-300">{evt.general_info.weight} kg</b></span>}
+                      {evt.general_info.bmi && <span>BMI: <b className="text-slate-300">{evt.general_info.bmi}</b></span>}
+                    </div>
+                  )}
+                  <div className="p-3 space-y-2">
+                    {evtRecords.map((r: any, i: number) => {
+                      const d = r.parsed_data || {};
+                      return (
+                        <div key={i} className="bg-slate-900/80 rounded-lg px-3 py-2 border border-slate-800">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-cyan-400">{catLabel(r.category)}</span>
+                            <div className="flex items-center space-x-2">
+                              {d.status && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusColor(d.status)}`}>
+                                  {statusLabel(d.status)}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-600">{r.doctor_id}</span>
+                            </div>
+                          </div>
+                          {d.clinicalFindings && <p className="text-[11px] text-slate-400 mt-1"><span className="text-slate-600">Findings:</span> {d.clinicalFindings}</p>}
+                          {d.diagnosis && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Dx:</span> {d.diagnosis}</p>}
+                          {d.referralReason && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Referral:</span> {d.referralReason}</p>}
+                          {(d.medicines || []).length > 0 && (
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              <span className="text-slate-600">Rx:</span>
+                              {d.medicines.map((m: any, j: number) => (
+                                <span key={j} className="ml-1">{m.name} {m.dosage} {m.frequency} {m.duration}{j < d.medicines.length - 1 ? ',' : ''}</span>
+                              ))}
+                            </div>
+                          )}
+                          {d.advice && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Advice:</span> {d.advice}</p>}
+                          {d.referralDept && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Refer to:</span> {d.referralDept}</p>}
+                          {d.urgency && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Urgency:</span> {d.urgency}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ════════════════════════════════════════
@@ -717,7 +884,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 function AddStudentModal({ onClose, onCreated, userId, eventId }: {
   onClose: () => void; onCreated: () => void; userId: string; eventId: number;
 }) {
-  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '' });
+  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '', registration_number: '' });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
@@ -833,6 +1000,12 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Phone</label>
               <input value={f.phone} onChange={e => upd('phone', e.target.value)} placeholder="Optional" type="tel"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder-slate-600" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Registration Number</label>
+              <input value={f.registration_number} onChange={e => upd('registration_number', e.target.value)} placeholder="School reg. number"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder-slate-600" />
             </div>
           </div>
@@ -980,6 +1153,7 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
                   <thead className="bg-slate-950 text-slate-500 sticky top-0">
                     <tr>
                       <th className="px-3 py-2 font-medium">#</th>
+                      <th className="px-3 py-2 font-medium">Reg No</th>
                       <th className="px-3 py-2 font-medium">Name</th>
                       <th className="px-3 py-2 font-medium">Gender</th>
                       <th className="px-3 py-2 font-medium">DOB</th>
@@ -992,6 +1166,7 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
                     {parsedRows.map((row, i) => (
                       <tr key={i} className={row.valid ? 'bg-emerald-500/5' : 'bg-red-500/5'}>
                         <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                        <td className="px-3 py-2 text-slate-300">{row.data.registration_number || '—'}</td>
                         <td className="px-3 py-2 text-white font-medium">{row.data.name || '—'}</td>
                         <td className="px-3 py-2 text-slate-300">{row.data.gender || '—'}</td>
                         <td className="px-3 py-2 text-slate-300">{row.data.dob || '—'}</td>

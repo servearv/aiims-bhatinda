@@ -3,7 +3,7 @@ import {
   Search, Plus, ChevronDown, ChevronRight, X, Save,
   ArrowRight, AlertTriangle, Eye, Ear, Stethoscope,
   Activity, Check, UserPlus, Calendar, HeartPulse, Scan,
-  Users, CheckCircle, Loader2, ClipboardList, Printer, Trash2, PlusCircle, FileText
+  Users, CheckCircle, Loader2, ClipboardList, Printer, Trash2, PlusCircle, FileText, History
 } from 'lucide-react';
 import { GeneralInfoSummary } from './GeneralInfoForm';
 
@@ -19,6 +19,8 @@ interface Student {
   student_class: string; section: string; blood_group: string;
   father_name: string; phone: string; is_examined?: number;
   examined_categories?: string;
+  registration_number?: string;
+  event_id?: number;
 }
 
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -162,7 +164,7 @@ function DomainProgressBar({ examinedCategories }: { examinedCategories?: string
 function AddStudentModal({ onClose, onCreated, userId, campId }: {
   onClose: () => void; onCreated: (s: Student) => void; userId: string; campId: number;
 }) {
-  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '' });
+  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '', registration_number: '' });
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [showSymptoms, setShowSymptoms] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -255,6 +257,7 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
             <FormSelect label="Section" value={f.section} onChange={v => upd('section', v)} options={SECTIONS} id="add-section" />
             <FormSelect label="Blood Group" value={f.blood_group} onChange={v => upd('blood_group', v)} options={BLOOD_GROUPS} id="add-bg" />
             <FormInput label="Father's Name" value={f.father_name} onChange={v => upd('father_name', v)} id="add-father" placeholder="Optional" />
+            <FormInput label="Registration Number" value={f.registration_number} onChange={v => upd('registration_number', v)} id="add-reg" placeholder="School reg. number" />
             <FormInput label="Contact Number" value={f.phone} onChange={v => upd('phone', v)} id="add-phone" placeholder="Optional" type="tel" />
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Date of Birth *</label>
@@ -315,7 +318,7 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
 // ════════════════════════════════════════════════
 // ██ ACTIVE CAMPS DIRECTORY
 // ════════════════════════════════════════════════
-function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: (campId: number, campName: string) => void; }) {
+function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: (campId: number, campName: string, schoolId?: number) => void; }) {
   const [camps, setCamps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState<number | null>(null);
@@ -333,7 +336,7 @@ function ActiveCampsDirectory({ user, onVolunteer }: { user: User; onVolunteer: 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user.username, category: user.role }),
       });
-      onVolunteer(camp.event_id, camp.school_name);
+      onVolunteer(camp.event_id, camp.school_name, camp.school_id);
     } catch { alert('Failed to join camp'); } finally { setJoining(null); }
   };
   return (
@@ -615,7 +618,7 @@ function PrintableDocument({ data, doctorInfo, studentInfo, campName }: { data: 
         <tbody>
           <tr><td style={{ padding: '3px 0', fontWeight: 'bold', width: '120px' }}>Student Name:</td><td>{studentInfo?.name || '—'}</td><td style={{ fontWeight: 'bold', width: '60px' }}>Age:</td><td style={{ width: '50px' }}>{studentInfo?.age || '—'}</td><td style={{ fontWeight: 'bold', width: '60px' }}>Sex:</td><td style={{ width: '50px' }}>{studentInfo?.gender === 'M' ? 'Male' : studentInfo?.gender === 'F' ? 'Female' : '—'}</td></tr>
           <tr><td style={{ padding: '3px 0', fontWeight: 'bold' }}>Class:</td><td>{studentInfo?.student_class || '—'}{studentInfo?.section ? `-${studentInfo.section}` : ''}</td><td style={{ fontWeight: 'bold' }}>Father:</td><td colSpan={3}>{studentInfo?.father_name || '—'}</td></tr>
-          {studentInfo?.phone && <tr><td style={{ padding: '3px 0', fontWeight: 'bold' }}>Contact:</td><td colSpan={5}>{studentInfo.phone}</td></tr>}
+          <tr><td style={{ padding: '3px 0', fontWeight: 'bold' }}>Reg No:</td><td>{studentInfo?.registration_number || '—'}</td><td style={{ fontWeight: 'bold' }}>Contact:</td><td colSpan={3}>{studentInfo?.phone || '—'}</td></tr>
         </tbody>
       </table>
       <div style={{ borderTop: '1px solid #ccc', paddingTop: '12px', marginBottom: '12px' }}>
@@ -1087,29 +1090,169 @@ function OtherRecordsPanel({ studentId, eventId, currentCategory }: {
   );
 }
 
+// ── Previous Evaluations Modal (cross-camp) ──
+function PreviousEvaluationsModal({ student, schoolId, onClose }: {
+  student: Student; schoolId: number | null; onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!student.registration_number || !schoolId) {
+      setLoading(false);
+      return;
+    }
+    const params = new URLSearchParams({
+      school_id: String(schoolId),
+      registration_number: student.registration_number,
+      current_event_id: String(student.event_id || ''),
+    });
+    fetch(`/api/students/previous-records?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        setRecords(data.records || []);
+        setEvents(data.events || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [student, schoolId]);
+
+  const formatDate = (d: string) => {
+    if (!d) return ''; const dt = new Date(d); if (isNaN(dt.getTime())) return d;
+    return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
+  };
+
+  const catLabel = (c: string) => c.replace(/_/g, ' ');
+  const statusLabel = (s: string) => s === 'N' ? 'Normal' : s === 'O' ? 'Observation' : s === 'R' ? 'Referred' : s;
+  const statusColor = (s: string) => s === 'N' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : s === 'R' ? 'text-red-400 bg-red-500/10 border-red-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+  // Group records by event_id
+  const recordsByEvent: Record<number, any[]> = {};
+  for (const r of records) {
+    const eid = r.event_id;
+    if (!recordsByEvent[eid]) recordsByEvent[eid] = [];
+    recordsByEvent[eid].push(r);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        <h3 className="text-lg font-bold text-white mb-1 flex items-center">
+          <History className="w-5 h-5 mr-2 text-indigo-400" />
+          Previous Evaluations
+        </h3>
+        <p className="text-xs text-slate-500 mb-4">
+          {student.name} · Reg: {student.registration_number || '—'}
+        </p>
+
+        {loading ? (
+          <div className="text-center py-12 text-slate-400 flex items-center justify-center space-x-2">
+            <Loader2 className="w-5 h-5 animate-spin" /><span>Loading records...</span>
+          </div>
+        ) : !student.registration_number ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">No registration number assigned.</p>
+            <p className="text-slate-500 text-xs mt-1">A registration number is needed to track students across camps.</p>
+          </div>
+        ) : records.length === 0 ? (
+          <div className="text-center py-12">
+            <ClipboardList className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">No previous evaluations found.</p>
+            <p className="text-slate-500 text-xs mt-1">This is the first examination for this student.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {events.map(evt => {
+              const evtRecords = recordsByEvent[evt.event_id] || [];
+              if (evtRecords.length === 0) return null;
+              return (
+                <div key={evt.event_id} className="bg-slate-950/50 rounded-2xl border border-slate-800 overflow-hidden">
+                  <div className="px-4 py-3 bg-indigo-500/5 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-indigo-400" />
+                      <span className="text-sm font-bold text-white">{evt.school_name}</span>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {formatDate(evt.start_date)}{evt.end_date ? ` → ${formatDate(evt.end_date)}` : ''}
+                    </span>
+                  </div>
+                  {evt.general_info && (evt.general_info.height || evt.general_info.weight) && (
+                    <div className="px-4 py-2 border-b border-slate-800/50 flex items-center space-x-4 text-xs text-slate-400">
+                      {evt.general_info.height && <span>Height: <b className="text-slate-300">{evt.general_info.height} cm</b></span>}
+                      {evt.general_info.weight && <span>Weight: <b className="text-slate-300">{evt.general_info.weight} kg</b></span>}
+                      {evt.general_info.bmi && <span>BMI: <b className="text-slate-300">{evt.general_info.bmi}</b></span>}
+                    </div>
+                  )}
+                  <div className="p-3 space-y-2">
+                    {evtRecords.map((r: any, i: number) => {
+                      const d = r.parsed_data || {};
+                      return (
+                        <div key={i} className="bg-slate-900/80 rounded-lg px-3 py-2 border border-slate-800">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-cyan-400">{catLabel(r.category)}</span>
+                            <div className="flex items-center space-x-2">
+                              {d.status && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusColor(d.status)}`}>
+                                  {statusLabel(d.status)}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-600">{r.doctor_id}</span>
+                            </div>
+                          </div>
+                          <SpecialistRecordBody category={r.category} d={d} />
+                          {d.clinicalFindings && <p className="text-[11px] text-slate-400 mt-1"><span className="text-slate-600">Findings:</span> {d.clinicalFindings}</p>}
+                          {d.diagnosis && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Dx:</span> {d.diagnosis}</p>}
+                          {d.referralReason && <p className="text-[11px] text-slate-400 mt-0.5"><span className="text-slate-600">Referral:</span> {d.referralReason}</p>}
+                          {(d.medicines || []).length > 0 && (
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              <span className="text-slate-600">Rx:</span>
+                              {d.medicines.map((m: any, j: number) => (
+                                <span key={j} className="ml-1">{m.name} {m.dosage} {m.frequency} {m.duration}{j < d.medicines.length - 1 ? ',' : ''}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════════
 // ██ MAIN DOCTOR WORKFLOW
 // ════════════════════════════════════════════════
 export default function DoctorWorkflow({ user }: { user: User }) {
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);
   const [selectedCampName, setSelectedCampName] = useState('');
+  const [selectedCampSchoolId, setSelectedCampSchoolId] = useState<number | null>(null);
   if (!selectedCampId) {
-    return <ActiveCampsDirectory user={user} onVolunteer={(id, name) => { setSelectedCampId(id); setSelectedCampName(name); }} />;
+    return <ActiveCampsDirectory user={user} onVolunteer={(id, name, schoolId) => { setSelectedCampId(id); setSelectedCampName(name); setSelectedCampSchoolId(schoolId ?? null); }} />;
   }
-  return <ClinicalWorkflow user={user} campId={selectedCampId} campName={selectedCampName} onBack={() => { setSelectedCampId(null); setSelectedCampName(''); }} />;
+  return <ClinicalWorkflow user={user} campId={selectedCampId} campName={selectedCampName} campSchoolId={selectedCampSchoolId} onBack={() => { setSelectedCampId(null); setSelectedCampName(''); setSelectedCampSchoolId(null); }} />;
 }
 
 // ════════════════════════════════════════════════
 // ██ CLINICAL WORKFLOW (scoped per specialist)
 // ════════════════════════════════════════════════
-function ClinicalWorkflow({ user, campId, campName, onBack }: {
-  user: User; campId: number; campName: string; onBack: () => void;
+function ClinicalWorkflow({ user, campId, campName, campSchoolId, onBack }: {
+  user: User; campId: number; campName: string; campSchoolId: number | null; onBack: () => void;
 }) {
   const specialistCategory = user.role;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showPrevEvals, setShowPrevEvals] = useState(false);
   const [filterClass, setFilterClass] = useState('');
   const [filterSection, setFilterSection] = useState('');
   const [filterGender, setFilterGender] = useState('');
@@ -1178,6 +1321,8 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
       } else {
         setExamData({ status: 'N' });
       }
+      // Store the student's event_id for later use
+      s.event_id = campId;
     } catch {
       setExamData({ status: 'N' });
     }
@@ -1306,6 +1451,7 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
                   <div>
                     <span className="font-bold text-white">{s.name}</span>
                     <span className="text-slate-400 text-xs ml-2">
+                      {s.registration_number && `Reg: ${s.registration_number} • `}
                       {s.student_class && `Class ${s.student_class}`}{s.section && `-${s.section}`}
                       {s.age && ` • ${s.age}y`} • {s.gender}
                     </span>
@@ -1337,10 +1483,20 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
                 </div>
               </div>
             </div>
-            <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); doSearch(); searchRef.current?.focus(); }}
-              className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-700 text-white flex items-center space-x-2">
-              <X className="w-4 h-4" /><span>Done</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button onClick={() => { setSelectedStudent(null); setExamData({ status: 'N' }); setShowPrevEvals(false); doSearch(); searchRef.current?.focus(); }}
+                className="bg-slate-800 hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium border border-slate-700 text-white flex items-center space-x-2">
+                <X className="w-4 h-4" /><span>Done</span>
+              </button>
+              {/* Previous Evaluations button */}
+              {selectedStudent.registration_number && (
+                <button onClick={() => setShowPrevEvals(true)}
+                  className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/30 px-3 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5"
+                  title="View previous evaluations from other camps">
+                  <History className="w-4 h-4" /><span className="hidden md:inline">History</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* General Info Summary (read-only for specialists) */}
@@ -1356,6 +1512,15 @@ function ClinicalWorkflow({ user, campId, campName, onBack }: {
 
           {/* Other specialists' records (read-only) */}
           <OtherRecordsPanel studentId={selectedStudent.student_id} eventId={campId} currentCategory={specialistCategory} />
+
+          {/* Previous Evaluations Modal */}
+          {showPrevEvals && (
+            <PreviousEvaluationsModal
+              student={selectedStudent}
+              schoolId={campSchoolId}
+              onClose={() => setShowPrevEvals(false)}
+            />
+          )}
         </>
       )}
 

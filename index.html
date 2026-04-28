@@ -2,12 +2,96 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AIIMS Bathinda</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Primary meta -->
+    <title>AIIMS Bathinda — Health Screening Portal</title>
+    <meta name="description" content="Real-time medical camp management system for AIIMS Bathinda school health screening." />
+    <meta name="theme-color" content="#06b6d4" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+
+
+    <!-- ── Apple / iOS PWA Support ──────────────────────────────── -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AIIMS Camp" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
+
+
+    <!--
+      Apple Splash Screens
+      iOS requires exact pixel-matched images for each device.
+      We reuse the 512px icon as a placeholder — replace with proper
+      2x/3x splash images (generated via pwa-asset-generator) for prod.
+
+      Device targets (portrait):
+      iPhone SE (2nd gen)   : 640×1136
+      iPhone 8              : 750×1334
+      iPhone 8 Plus         : 1242×2208
+      iPhone X/XS           : 1125×2436
+      iPhone XS Max         : 1242×2688
+      iPhone 12/13/14       : 1170×2532
+      iPhone 14 Pro         : 1179×2556
+      iPhone 14 Pro Max     : 1290×2796
+      iPad (9th gen)        : 1536×2048
+      iPad Air (5th gen)    : 1668×2224
+      iPad Pro 11"          : 1668×2388
+      iPad Pro 12.9"        : 2048×2732
+    -->
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+    <link rel="apple-touch-startup-image"
+          media="screen and (device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+          href="/icons/icon-512.png" />
+
+    <!-- Microsoft Tiles (Edge / Windows) -->
+    <meta name="msapplication-TileColor" content="#020617" />
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png" />
+
+    <!-- Open Graph (for link sharing) -->
+    <meta property="og:title" content="AIIMS Bathinda Health Screening Portal" />
+    <meta property="og:description" content="Real-time medical camp management for AIIMS Bathinda." />
+    <meta property="og:image" content="/icons/icon-512.png" />
+    <meta property="og:type" content="website" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

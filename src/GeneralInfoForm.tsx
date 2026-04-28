@@ -23,6 +23,7 @@ interface StudentData {
   phone: string;
   address: string;
   pincode: string;
+  registration_number?: string;
 }
 
 interface GeneralInfoData {
@@ -155,6 +156,7 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
     phone: student.phone || '',
     address: student.address || '',
     pincode: student.pincode || '',
+    registration_number: student.registration_number || '',
   });
 
   // Vitals + symptoms state
@@ -367,6 +369,10 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
               {BLOOD_GROUPS.map(o => <option key={o} value={o}>{o || '— Select —'}</option>)}
             </select>
           </FormField>
+          <FormField label="Registration Number">
+            <input value={demo.registration_number} onChange={e => updateDemo('registration_number', e.target.value)}
+              readOnly={readOnly} className={inputCls} placeholder="School Reg. No" />
+          </FormField>
         </div>
       </SectionCard>
 
@@ -501,7 +507,8 @@ export function GeneralInfoSummary({ studentId, eventId }: {
       </h4>
 
       {/* Demographics row */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+      <div className="grid grid-cols-3 md:grid-cols-7 gap-2 text-xs">
+        <InfoChip label="Reg No" value={s.registration_number || '—'} />
         <InfoChip label="Age" value={s.age ? `${s.age}y` : '—'} />
         <InfoChip label="Gender" value={s.gender === 'M' ? 'Male' : s.gender === 'F' ? 'Female' : s.gender || '—'} />
         <InfoChip label="Class" value={s.student_class ? `${s.student_class}${s.section ? '-' + s.section : ''}` : '—'} />

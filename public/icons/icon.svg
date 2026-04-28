@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#020617"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+    <filter id="glowFx">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <rect width="512" height="512" rx="100" ry="100" fill="none"
+        stroke="#1e293b" stroke-width="0.5" opacity="0.5"/>
+
+  <!-- Ambient glow circle -->
+  <circle cx="256" cy="256" r="180" fill="url(#glow)" opacity="0.08"/>
+
+  <!-- Medical cross (larger arms) with glow -->
+  <g filter="url(#glowFx)">
+    <!-- Vertical arm -->
+    <rect x="220" y="140" width="72" height="232" rx="16" fill="url(#glow)" opacity="0.95"/>
+    <!-- Horizontal arm -->
+    <rect x="140" y="220" width="232" height="72" rx="16" fill="url(#glow)" opacity="0.95"/>
+  </g>
+
+  <!-- ECG pulse line over cross -->
+  <polyline
+    points="156,256 190,256 206,210 224,302 244,218 264,294 282,256 356,256"
+    fill="none"
+    stroke="#f0fdff"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.9"
+    filter="url(#glowFx)"
+  />
+
+  <!-- Corner accent dots -->
+  <circle cx="108" cy="108" r="8" fill="#06b6d4" opacity="0.4"/>
+  <circle cx="404" cy="108" r="8" fill="#06b6d4" opacity="0.4"/>
+  <circle cx="108" cy="404" r="8" fill="#06b6d4" opacity="0.4"/>
+  <circle cx="404" cy="404" r="8" fill="#06b6d4" opacity="0.4"/>
+</svg>

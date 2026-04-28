@@ -5,7 +5,7 @@
 FROM node:20-alpine AS frontend
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
 
@@ -28,11 +28,11 @@ COPY --from=frontend /app/dist ./dist
 COPY server.py .
 
 # Expose port
-EXPOSE 5000
+EXPOSE 8080
 
 # Default env vars (override in docker-compose or CLI)
-ENV PORT=5000
+ENV PORT=8080
 ENV SECRET_KEY=change-me-in-production
 
 # Start with database initialization, then gunicorn (same as Render)
-CMD sh -c 'python -c "import server; server.init_db()" && exec gunicorn server:app --bind 0.0.0.0:5000 --workers 2 --timeout 120'
+CMD sh -c 'python -c "import server; server.init_db()" && exec gunicorn server:app --bind 0.0.0.0:8080 --workers 2 --timeout 120'
