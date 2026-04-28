@@ -240,6 +240,7 @@ export default function AdminDashboard({ user }: { user: User }) {
 function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () => void }) {
   const [events, setEvents] = useState<EventData[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [rescheduleEvent, setRescheduleEvent] = useState<EventData | null>(null);
   const [filterTag, setFilterTag] = useState('');
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -353,6 +354,17 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
                         Cancel
                       </button>
                     )}
+                    {((event.computed_status || event.tag) === 'Upcoming' || (event.computed_status || event.tag) === 'Ongoing') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRescheduleEvent(event);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold border bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20 transition-colors shadow-sm cursor-pointer"
+                      >
+                        Reschedule
+                      </button>
+                    )}
                     {(event.computed_status || event.tag) === 'Ongoing' && (
                       <button
                         onClick={async () => {
@@ -388,6 +400,92 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
 
       {/* Create Event Modal */}
       {showCreate && <CreateEventModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); fetchEvents(); }} user={user} onAddNewSchool={() => { setShowCreate(false); onAddNewSchool(); }} />}
+
+      {/* Reschedule Event Modal */}
+      {rescheduleEvent && <RescheduleModal event={rescheduleEvent} onClose={() => setRescheduleEvent(null)} onRescheduled={() => { setRescheduleEvent(null); fetchEvents(); }} user={user} />}
+    </div>
+  );
+}
+
+function RescheduleModal({ event, onClose, onRescheduled, user }: {
+  event: EventData; onClose: () => void; onRescheduled: () => void; user: User;
+}) {
+  const [f, setF] = useState({
+    start_date: event.start_date || '',
+    end_date: event.end_date || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const upd = (k: string, v: string) => {
+    setF(p => ({ ...p, [k]: v }));
+    setErrors(p => ({ ...p, [k]: '' }));
+  };
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!f.start_date) {
+      e.start_date = 'Required';
+    } else {
+      const startDate = new Date(f.start_date);
+      startDate.setHours(0, 0, 0, 0);
+      if (startDate < today) e.start_date = 'Cannot be in the past';
+    }
+
+    if (f.end_date) {
+      if (!f.start_date) {
+        e.end_date = 'Set start date first';
+      } else {
+        const startDate = new Date(f.start_date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(f.end_date);
+        endDate.setHours(0, 0, 0, 0);
+        if (endDate < startDate) e.end_date = 'Cannot be before start date';
+      }
+    }
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/events/${event.event_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_date: f.start_date, end_date: f.end_date, user_id: user.username }),
+      });
+      const data = await res.json();
+      if (data.success) onRescheduled();
+    } catch { alert('Error rescheduling event'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-md p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        <h3 className="text-xl font-bold text-white mb-5 flex items-center"><Calendar className="w-5 h-5 mr-2 text-cyan-400" /> Reschedule Event</h3>
+        <div className="mb-4 text-sm text-slate-300">
+          <p><strong>School:</strong> {event.school_name}</p>
+        </div>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="space-y-3">
+            <ModalInput label="Start Date *" value={f.start_date} onChange={v => upd('start_date', v)} type="date" required error={errors.start_date} min={new Date().toISOString().split('T')[0]} />
+            <ModalInput label="End Date" value={f.end_date} onChange={v => upd('end_date', v)} type="date" error={errors.end_date} min={f.start_date || new Date().toISOString().split('T')[0]} />
+          </div>
+          <button type="submit" disabled={saving}
+            className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50 mt-2">
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -591,8 +689,31 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     if (!f.school_id) e.school_id = 'Please select a school';
-    if (!f.start_date) e.start_date = 'Required';
+
+    if (!f.start_date) {
+      e.start_date = 'Required';
+    } else {
+      const startDate = new Date(f.start_date);
+      startDate.setHours(0, 0, 0, 0);
+      if (startDate < today) e.start_date = 'Cannot be in the past';
+    }
+
+    if (f.end_date) {
+      if (!f.start_date) {
+        e.end_date = 'Set start date first';
+      } else {
+        const startDate = new Date(f.start_date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(f.end_date);
+        endDate.setHours(0, 0, 0, 0);
+        if (endDate < startDate) e.end_date = 'Cannot be before start date';
+      }
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -694,8 +815,8 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Scheduling</h4>
             <div className="grid grid-cols-3 gap-3">
-              <ModalInput label="Start Date *" value={f.start_date} onChange={v => upd('start_date', v)} type="date" required error={errors.start_date} />
-              <ModalInput label="End Date" value={f.end_date} onChange={v => upd('end_date', v)} type="date" />
+              <ModalInput label="Start Date *" value={f.start_date} onChange={v => upd('start_date', v)} type="date" required error={errors.start_date} min={new Date().toISOString().split('T')[0]} />
+              <ModalInput label="End Date" value={f.end_date} onChange={v => upd('end_date', v)} type="date" error={errors.end_date} min={f.start_date || new Date().toISOString().split('T')[0]} />
               <ModalInput label="Operational Hours" value={f.operational_hours} onChange={v => upd('operational_hours', v)} placeholder="e.g. 9 AM - 4 PM" />
             </div>
           </div>
@@ -714,11 +835,11 @@ function CreateEventModal({ onClose, onCreated, user, onAddNewSchool }: {
 // ── Modal Input Helper ──
 const ModalInput = React.forwardRef<HTMLInputElement, {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; type?: string; required?: boolean; error?: string;
-}>(({ label, value, onChange, placeholder, type = 'text', required, error }, ref) => (
+  placeholder?: string; type?: string; required?: boolean; error?: string; min?: string;
+}>(({ label, value, onChange, placeholder, type = 'text', required, error, min }, ref) => (
   <div>
     <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">{label}</label>
-    <input ref={ref} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} required={required}
+    <input ref={ref} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} required={required} min={min}
       className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all placeholder-slate-600 ${error ? 'border-red-500/50' : 'border-slate-800'}`} />
     {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
   </div>

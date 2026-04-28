@@ -1513,7 +1513,29 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    if (!f.preferred_date) e.preferred_date = 'Preferred date is required';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!f.preferred_date) {
+      e.preferred_date = 'Preferred date is required';
+    } else {
+      const preferredDate = new Date(f.preferred_date);
+      preferredDate.setHours(0, 0, 0, 0);
+      if (preferredDate < today) e.preferred_date = 'Cannot be in the past';
+    }
+
+    if (f.end_date) {
+      if (!f.preferred_date) {
+        e.end_date = 'Set preferred date first';
+      } else {
+        const preferredDate = new Date(f.preferred_date);
+        preferredDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(f.end_date);
+        endDate.setHours(0, 0, 0, 0);
+        if (endDate < preferredDate) e.end_date = 'Cannot be before preferred date';
+      }
+    }
+
     const count = parseInt(f.student_count);
     if (!f.student_count || isNaN(count) || count <= 0) e.student_count = 'Enter a valid number of students';
     setErrors(e);
@@ -1602,9 +1624,10 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
                   type="date"
                   value={f.end_date}
                   onChange={e => upd('end_date', e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className={ic}
+                  min={f.preferred_date || new Date().toISOString().split('T')[0]}
+                  className={`${ic} ${errors.end_date ? 'border-red-500/50' : ''}`}
                 />
+                {errors.end_date && <p className="text-red-400 text-xs mt-1">{errors.end_date}</p>}
               </div>
             </div>
 
