@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "python run_dev.py",
+    "dev": "python3 run_dev.py",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
