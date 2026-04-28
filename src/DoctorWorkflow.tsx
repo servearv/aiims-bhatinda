@@ -276,7 +276,12 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
                 className={`${cls.inputLg} ${errors.name ? 'border-red-300 focus:ring-red-500/30 focus:border-red-500' : ''}`} placeholder="Full name" />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
-            <FormInput label="Age" value={f.age} onChange={() => { }} type="number" id="add-age" placeholder="Auto from DOB" disabled />
+            <div>
+              <label className={cls.label}>Date of Birth *</label>
+              <input type="date" value={f.dob} onChange={e => upd('dob', e.target.value)}
+                className={`${cls.input} ${errors.dob ? 'border-red-300' : ''}`} />
+              {errors.dob && <p className="text-red-500 text-xs mt-1">{errors.dob}</p>}
+            </div>
             <div>
               <label className={cls.label}>Sex *</label>
               <div className="flex space-x-3 mt-1">
@@ -301,12 +306,7 @@ function AddStudentModal({ onClose, onCreated, userId, campId }: {
             <FormSelect label="Blood Group" value={f.blood_group} onChange={v => upd('blood_group', v)} options={BLOOD_GROUPS} id="add-bg" />
             <FormInput label="Father's Name" value={f.father_name} onChange={v => upd('father_name', v)} id="add-father" placeholder="Optional" />
             <FormInput label="Contact Number" value={f.phone} onChange={v => upd('phone', v)} id="add-phone" placeholder="Optional" type="tel" />
-            <div>
-              <label className={cls.label}>Date of Birth *</label>
-              <input type="date" value={f.dob} onChange={e => upd('dob', e.target.value)}
-                className={`${cls.input} ${errors.dob ? 'border-red-300' : ''}`} />
-              {errors.dob && <p className="text-red-500 text-xs mt-1">{errors.dob}</p>}
-            </div>
+            <FormInput label="Age" value={f.age} onChange={() => { }} type="number" id="add-age" placeholder="Auto from DOB" disabled />
           </div>
 
           {/* Symptoms Checklist */}
