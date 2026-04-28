@@ -10,7 +10,7 @@ import GeneralInfoForm from './GeneralInfoForm';
 
 // Socket.IO client (optional)
 let io: any = null;
-try { io = require('socket.io-client'); } catch {}
+try { io = require('socket.io-client'); } catch { }
 
 // ── Types ──
 type User = { username: string; role: string; name: string };
@@ -210,22 +210,20 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none ${
-                activeTab === tab 
-                  ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
-              }`}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none ${activeTab === tab
+                ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                }`}
             >
               {tab}
             </button>
           ))}
           <button
             onClick={() => { setActiveTab('My Requests'); fetchCampRequests(); }}
-            className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none flex items-center justify-center space-x-1.5 ${
-              activeTab === 'My Requests'
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(251,191,36,0.1)]'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
-            }`}
+            className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex-1 sm:flex-none flex items-center justify-center space-x-1.5 ${activeTab === 'My Requests'
+              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(251,191,36,0.1)]'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+              }`}
           >
             <ClipboardCheck className="w-4 h-4" />
             <span>My Requests</span>
@@ -241,8 +239,8 @@ function SchoolEventList({ user, onSelect }: { user: User; onSelect: (e: EventDa
           {activeTab !== 'My Requests' && (
             <div className="relative w-full sm:w-52">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -397,19 +395,17 @@ function EventWorkspace({ user, event, onBack }: { user: User; event: EventData;
       {/* View Toggle */}
       <div className="flex space-x-2 bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-800">
         <button onClick={() => setActiveView('roster')}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            activeView === 'roster'
-              ? 'bg-gradient-to-r from-violet-500/20 to-purple-600/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}>
+          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeView === 'roster'
+            ? 'bg-gradient-to-r from-violet-500/20 to-purple-600/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}>
           <Users className="w-4 h-4" /><span>Manage Students</span>
         </button>
         <button onClick={() => setActiveView('progress')}
-          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            activeView === 'progress'
-              ? 'bg-gradient-to-r from-violet-500/20 to-purple-600/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}>
+          className={`flex items-center space-x-2 px-5 py-3 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${activeView === 'progress'
+            ? 'bg-gradient-to-r from-violet-500/20 to-purple-600/20 text-violet-400 border border-violet-500/30 shadow-[0_0_12px_rgba(139,92,246,0.1)]'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}>
           <BarChart3 className="w-4 h-4" /><span>Progress Tracking</span>
         </button>
       </div>
@@ -537,7 +533,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
       socket.on('students_bulk_created', refresh);
       socket.on('exam_saved', refresh);
       return () => { socket.disconnect(); };
-    } catch {}
+    } catch { }
   }, [eventId]);
 
   const toggleAbsent = async (studentId: number, currentStatus: string) => {
@@ -799,7 +795,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                 {students.map(s => {
                   let statusStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
                   let statusLabel = s.status || 'Pending Examination';
-                  
+
                   if (s.is_examined) {
                     if (s.assessment === 'N') { statusLabel = 'Normal'; statusStyle = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'; }
                     else if (s.assessment === 'O') { statusLabel = 'Observation'; statusStyle = 'bg-amber-500/20 text-amber-400 border-amber-500/30'; }
@@ -878,9 +874,8 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                           <span className="text-xs text-slate-500">— {specialty}</span>
                         </div>
                         <button onClick={() => handlePrintDoc(rec)}
-                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                            isReferral ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border-amber-500/30'
-                          }`}>
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${isReferral ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border-red-500/30' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border-amber-500/30'
+                            }`}>
                           <Printer className="w-3 h-3" /><span>Print</span>
                         </button>
                       </div>
@@ -979,11 +974,10 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
               <div className="flex space-x-3 mt-1">
                 {[{ v: 'M', label: 'Male' }, { v: 'F', label: 'Female' }].map(opt => (
                   <button key={opt.v} type="button" onClick={() => upd('gender', opt.v)}
-                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center space-x-2 ${
-                      f.gender === opt.v
-                        ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
-                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
-                    }`}>
+                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all border flex items-center justify-center space-x-2 ${f.gender === opt.v
+                      ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'
+                      }`}>
                     {f.gender === opt.v && <Check className="w-3.5 h-3.5" />}
                     <span>{opt.label}</span>
                   </button>
@@ -1084,7 +1078,7 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        
+
         if (data.length > 0) {
           const normalizedData = data.map((row: any) => {
             const newRow: any = {};
@@ -1096,10 +1090,10 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
 
           const firstRow = normalizedData[0];
           if (firstRow.name === undefined && firstRow.gender === undefined && firstRow.dob === undefined) {
-             const detected = Object.keys(firstRow).join(', ') || 'None';
-             setUploadError(`Invalid columns detected. Expected 'name', 'dob', etc. \n\nFound: [${detected}]. \n\nPlease upload a valid Excel or CSV file with appropriate headers.`);
-             setParsedRows([]);
-             return;
+            const detected = Object.keys(firstRow).join(', ') || 'None';
+            setUploadError(`Invalid columns detected. Expected 'name', 'dob', etc. \n\nFound: [${detected}]. \n\nPlease upload a valid Excel or CSV file with appropriate headers.`);
+            setParsedRows([]);
+            return;
           }
 
           const rows: ParsedRow[] = normalizedData.map((row: any) => {
@@ -1113,7 +1107,7 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
                 dobStr = d.toISOString().split('T')[0];
               }
               const normalized = normalizeDateStr(dobStr);
-              row.dob = normalized;  
+              row.dob = normalized;
               const d = new Date(normalized);
               if (isNaN(d.getTime())) errors.push('Invalid DOB format (use DD-MM-YYYY or YYYY-MM-DD)');
             }
@@ -1125,8 +1119,8 @@ function CSVUploadPanel({ eventId, userId, onClose, onDone }: {
           setParsedRows(rows);
           setResult(null);
         } else {
-           setUploadError('The uploaded file is empty.');
-           setParsedRows([]);
+          setUploadError('The uploaded file is empty.');
+          setParsedRows([]);
         }
       } catch (err) {
         console.error(err);
@@ -1422,15 +1416,15 @@ function ProgressTracking({ eventId }: { eventId: number }) {
                     const d = JSON.parse(rec.json_data);
                     assessment = d.assessment === 'N' ? 'Normal' : d.assessment === 'O' ? 'Observation' : d.assessment === 'R' ? 'Referred' : '—';
                     if (d.referralDepts) referralDepts = d.referralDepts;
-                  } catch {}
+                  } catch { }
 
                   const badgeStyle = assessment === 'Normal'
                     ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                     : assessment === 'Referred'
-                    ? 'bg-red-500/20 text-red-400 border-red-500/30 cursor-pointer hover:bg-red-500/30'
-                    : assessment === 'Observation'
-                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                    : 'text-slate-400';
+                      ? 'bg-red-500/20 text-red-400 border-red-500/30 cursor-pointer hover:bg-red-500/30'
+                      : assessment === 'Observation'
+                        ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                        : 'text-slate-400';
 
                   const isExpanded = expandedReferral === rec.record_id;
 
@@ -1513,29 +1507,7 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (!f.preferred_date) {
-      e.preferred_date = 'Preferred date is required';
-    } else {
-      const preferredDate = new Date(f.preferred_date);
-      preferredDate.setHours(0, 0, 0, 0);
-      if (preferredDate < today) e.preferred_date = 'Cannot be in the past';
-    }
-
-    if (f.end_date) {
-      if (!f.preferred_date) {
-        e.end_date = 'Set preferred date first';
-      } else {
-        const preferredDate = new Date(f.preferred_date);
-        preferredDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(f.end_date);
-        endDate.setHours(0, 0, 0, 0);
-        if (endDate < preferredDate) e.end_date = 'Cannot be before preferred date';
-      }
-    }
-
+    if (!f.preferred_date) e.preferred_date = 'Preferred date is required';
     const count = parseInt(f.student_count);
     if (!f.student_count || isNaN(count) || count <= 0) e.student_count = 'Enter a valid number of students';
     setErrors(e);
@@ -1624,10 +1596,9 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
                   type="date"
                   value={f.end_date}
                   onChange={e => upd('end_date', e.target.value)}
-                  min={f.preferred_date || new Date().toISOString().split('T')[0]}
-                  className={`${ic} ${errors.end_date ? 'border-red-500/50' : ''}`}
+                  min={new Date().toISOString().split('T')[0]}
+                  className={ic}
                 />
-                {errors.end_date && <p className="text-red-400 text-xs mt-1">{errors.end_date}</p>}
               </div>
             </div>
 
@@ -1689,4 +1660,3 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
     </div>
   );
 }
-
