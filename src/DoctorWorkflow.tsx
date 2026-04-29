@@ -1830,9 +1830,11 @@ function ClinicalWorkflow({ user, campId, campName, campSchoolId, onBack }: {
       </div>
 
       {/* ── MAIN BODY: LEFT + RIGHT ── */}
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden flex-col md:flex-row">
         {/* ── LEFT PANE: Student List ── */}
-        <div className="clinical-left-pane flex w-[min(100%,340px)] min-w-[280px] max-w-[340px] flex-shrink-0 flex-col overflow-hidden border-r border-[#E5E7EB] bg-[#F1F4F8]">
+        <div className={`clinical-left-pane flex-shrink-0 flex-col overflow-hidden border-[#E5E7EB] bg-[#F1F4F8] ${
+          selectedStudent ? 'hidden md:flex' : 'flex'
+        } w-full md:w-[min(100%,340px)] md:min-w-[280px] md:max-w-[340px] border-b md:border-b-0 md:border-r`}>
           {/* Search */}
           <div className="flex-shrink-0 space-y-2 border-b border-[#E5E7EB] bg-[#F7F9FB] p-3">
             <div className="relative">
@@ -1899,7 +1901,9 @@ function ClinicalWorkflow({ user, campId, campName, campSchoolId, onBack }: {
         </div>
 
         {/* ── RIGHT PANE: Clinical Workspace ── */}
-        <div className="clinical-right-pane min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#F7F9FB]">
+        <div className={`clinical-right-pane min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#F7F9FB] ${
+          !selectedStudent ? 'hidden md:block' : 'block'
+        }`}>
           {!selectedStudent ? (
             /* Empty state */
             <div className="flex h-full flex-col items-center justify-center px-8 text-center">

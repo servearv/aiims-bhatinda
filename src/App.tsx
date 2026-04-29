@@ -35,7 +35,7 @@ function isSpecialist(role: string) {
 // --- Main App Component ---
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile'>('dashboard');
@@ -228,7 +228,7 @@ export default function App() {
           className={`relative z-10 flex-1 min-w-0 ${
             isSpecialist(user.role) && activeTab === 'dashboard'
               ? 'flex min-h-0 flex-col overflow-hidden px-0 pb-0'
-              : 'px-8 pb-8'
+              : 'px-4 pb-4 md:px-8 md:pb-8'
           }`}
         >
           {activeTab === 'profile' ? (
