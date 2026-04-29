@@ -318,27 +318,29 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
         <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl border border-slate-800/50 shadow-sm overflow-hidden divide-y divide-slate-800/50">
           {filtered.map(event => (
             <div key={event.event_id} className="group">
-              <button onClick={() => setExpandedId(expandedId === event.event_id ? null : event.event_id)}
-                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-800/40 transition-colors text-left">
+              <div onClick={() => setExpandedId(expandedId === event.event_id ? null : event.event_id)}
+                className="w-full flex flex-col xl:flex-row xl:items-center justify-between px-5 py-4 hover:bg-slate-800/40 transition-colors text-left cursor-pointer gap-3 xl:gap-0">
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
                     <Calendar className="w-5 h-5 text-cyan-400" />
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-white font-semibold truncate">{event.school_name}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">
                       {formatDateDisplay(event.start_date)}{event.end_date ? ` → ${formatDateDisplay(event.end_date)}` : ''} · {event.operational_hours || 'TBD'}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
-                  <span className="text-xs text-slate-500">
-                    <Users className="w-3.5 h-3.5 inline mr-1" />{event.staff_count ?? 0} staff
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0}/{event.student_count ?? 0} screened
-                  </span>
-                  <div className="flex items-center space-x-2" onClick={e => e.stopPropagation()}>
+                <div className="flex flex-wrap xl:flex-nowrap items-center gap-3 xl:flex-shrink-0 xl:ml-4 pl-14 xl:pl-0">
+                  <div className="flex items-center space-x-3 whitespace-nowrap">
+                    <span className="text-xs text-slate-500">
+                      <Users className="w-3.5 h-3.5 inline mr-1" />{event.staff_count ?? 0} staff
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      <Activity className="w-3.5 h-3.5 inline mr-1" />{event.screened_count ?? 0}/{event.student_count ?? 0} screened
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2" onClick={e => e.stopPropagation()}>
                     <span className={`px-3 py-1 rounded-lg text-xs font-bold border ${TAG_STYLES[event.computed_status || event.tag] || TAG_STYLES.Upcoming}`}>
                       {event.computed_status || event.tag}
                     </span>
@@ -385,9 +387,11 @@ function EventsTab({ user, onAddNewSchool }: { user: User; onAddNewSchool: () =>
                       </button>
                     )}
                   </div>
-                  {expandedId === event.event_id ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                  <div className="ml-auto xl:ml-0 flex-shrink-0">
+                    {expandedId === event.event_id ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                  </div>
                 </div>
-              </button>
+              </div>
 
               {/* Expanded: Details + Records (staff tab removed) */}
               {expandedId === event.event_id && (
@@ -1237,7 +1241,7 @@ function getActionDot(action: string): { dot: string; label: string; textColor: 
     return { dot: 'bg-amber-400', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-amber-400' };
   if (a.includes('STUDENT') || a.includes('RECORD') || a.includes('EXAM'))
     return { dot: 'bg-rose-400', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-rose-400' };
-  return { dot: 'bg-slate-500', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-slate-400' };
+  return { dot: 'bg-indigo-400', label: action.replace(/_/g, ' ').toLowerCase(), textColor: 'text-indigo-300' };
 }
 
 // ── Compact detail parser ──────────────────────────────────────────────────
@@ -1260,8 +1264,7 @@ function compactDetail(details: string): string {
   // "Changed from X to Y"
   const changed = details.match(/changed from (.+) to (.+)/i);
   if (changed) return `${changed[1]} → ${changed[2]}`;
-  // Generic: truncate to ~60 chars
-  return details.length > 65 ? details.slice(0, 62) + '…' : details;
+  return details;
 }
 
 // ── Date-key helpers ───────────────────────────────────────────────────────
@@ -1412,7 +1415,7 @@ function AdminLogsTab() {
         <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 backdrop-blur-xl overflow-hidden">
 
           {/* Column headers */}
-          <div className="grid grid-cols-[72px_100px_1fr] gap-0 border-b border-slate-800/60 bg-slate-950/60 px-4 py-2">
+          <div className="hidden sm:grid grid-cols-[72px_100px_1fr] gap-0 border-b border-slate-800/60 bg-slate-950/60 px-4 py-2">
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Time</span>
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Actor</span>
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Action · Details</span>
@@ -1437,42 +1440,42 @@ function AdminLogsTab() {
                 return (
                   <div
                     key={log.log_id ?? idx}
-                    className="grid grid-cols-[72px_100px_1fr] gap-0 px-4 py-1.5 border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group items-center"
+                    className="flex flex-col sm:grid sm:grid-cols-[72px_100px_1fr] gap-2 sm:gap-0 px-4 py-3 sm:py-2 border-b border-slate-800/30 hover:bg-slate-800/20 transition-colors group sm:items-start"
                   >
                     {/* Time */}
-                    <div className="flex flex-col min-w-0">
+                    <div className="flex sm:flex-col items-center sm:items-start justify-between sm:justify-start min-w-0">
                       <span className="text-[11px] font-mono text-slate-300 leading-none">
                         {timeOnly(log.timestamp)}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-600 mt-0.5">{ago}</span>
+                      <span className="text-[10px] font-mono text-slate-500 mt-0 sm:mt-0.5">{ago}</span>
                     </div>
 
                     {/* Actor */}
-                    <div className="min-w-0 pr-2">
-                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/50 text-[11px] font-mono text-cyan-400/80 max-w-[90px]">
+                    <div className="min-w-0 sm:pr-2">
+                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/50 text-[11px] font-mono text-cyan-400/80 w-max sm:max-w-[90px]">
                         <span className="truncate">{log.user_id || '—'}</span>
                       </span>
                     </div>
 
                     {/* Action + detail inline */}
-                    <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                      {/* Colour dot */}
-                      <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-                      {/* Action label */}
-                      <span className={`text-[12px] font-semibold whitespace-nowrap ${meta.textColor}`}>
-                        {meta.label}
-                      </span>
-                      {/* Separator + compact detail */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:gap-1.5 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5 sm:mt-0 mb-1 sm:mb-0">
+                        {/* Colour dot */}
+                        <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                        {/* Action label */}
+                        <span className={`text-[12px] font-semibold whitespace-nowrap ${meta.textColor}`}>
+                          {meta.label}
+                        </span>
+                      </div>
+                      
+                      {/* Separator + full detail */}
                       {compact && (
-                        <>
-                          <span className="text-slate-700 text-[11px] flex-shrink-0">·</span>
-                          <span
-                            className="text-[11px] text-slate-400 truncate group-hover:text-slate-200 transition-colors"
-                            title={log.details}
-                          >
+                        <div className="flex items-start sm:items-start gap-1.5 min-w-0 text-left">
+                          <span className="text-slate-700 text-[11px] flex-shrink-0 hidden sm:inline mt-[1px]">·</span>
+                          <span className="text-[11px] text-slate-300 group-hover:text-slate-100 transition-colors break-words">
                             {compact}
                           </span>
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
