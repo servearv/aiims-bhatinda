@@ -203,7 +203,7 @@ export default function App() {
       {/* Main Content */}
       <main
         className={`relative flex flex-1 min-w-0 flex-col ${
-          isSpecialist(user.role) && activeTab === 'dashboard' ? 'min-h-0 overflow-hidden' : 'overflow-y-auto'
+          isSpecialist(user.role) && activeTab === 'dashboard' ? 'min-h-0 overflow-hidden' : 'overflow-y-auto overflow-x-hidden'
         }`}
       >
         {!(isSpecialist(user.role) && activeTab === 'dashboard') && (
