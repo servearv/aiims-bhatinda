@@ -4,7 +4,7 @@ import {
   Calendar, Users, Plus, X, Check, ChevronRight, ArrowRight,
   Upload, Download, FileText, Activity, UserPlus, Search,
   ChevronDown, AlertTriangle, BarChart3, ClipboardList, Printer,
-  Bell, ClipboardCheck, Loader2, AlertCircle
+  Bell, ClipboardCheck, Loader2, AlertCircle, History
 } from 'lucide-react';
 import GeneralInfoForm from './GeneralInfoForm';
 
@@ -25,6 +25,7 @@ interface EventData {
   tag: string;
   student_count?: number;
   screened_count?: number;
+  school_id?: number;
 }
 
 interface Student {
@@ -42,6 +43,8 @@ interface Student {
   is_examined?: number;
   last_exam_data?: string;
   assessment?: string;
+  registration_number?: string;
+  event_id?: number;
 }
 
 interface EventStats {
@@ -414,7 +417,7 @@ function EventWorkspace({ user, event, onBack }: { user: User; event: EventData;
         </button>
       </div>
 
-      {activeView === 'roster' && <RosterManagement user={user} eventId={event.event_id} />}
+      {activeView === 'roster' && <RosterManagement user={user} eventId={event.event_id} event={event} />}
       {activeView === 'progress' && <ProgressTracking eventId={event.event_id} />}
     </div>
   );
@@ -446,7 +449,8 @@ function buildDocumentBody(d: any, doctorInfo: any, studentInfo: any, campName: 
   html += `<table style="width:100%;font-size:13px;margin-bottom:16px;border-collapse:collapse;"><tbody>`;
   html += `<tr><td style="padding:3px 0;font-weight:bold;width:120px;">Student Name:</td><td>${studentName}</td><td style="font-weight:bold;width:60px;">Age:</td><td style="width:50px;">${studentAge}</td><td style="font-weight:bold;width:60px;">Sex:</td><td style="width:50px;">${studentGender}</td></tr>`;
   html += `<tr><td style="padding:3px 0;font-weight:bold;">Class:</td><td>${studentClass}${studentSection}</td><td style="font-weight:bold;">Father:</td><td colspan="3">${fatherName}</td></tr>`;
-  if (phone) html += `<tr><td style="padding:3px 0;font-weight:bold;">Contact:</td><td colspan="5">${phone}</td></tr>`;
+  const regNo = studentInfo?.registration_number || '—';
+  html += `<tr><td style="padding:3px 0;font-weight:bold;">Reg No:</td><td>${regNo}</td><td style="font-weight:bold;">Contact:</td><td colspan="3">${phone || '—'}</td></tr>`;
   html += `</tbody></table>`;
   html += `<div style="border-top:1px solid #ccc;padding-top:12px;margin-bottom:12px;"><h3 style="font-size:14px;font-weight:bold;margin:0 0 6px;">Clinical Findings</h3>`;
   html += `<p style="font-size:13px;white-space:pre-wrap;">${d.clinicalFindings || '—'}</p></div>`;
@@ -489,7 +493,7 @@ function buildPrintableHTML(d: any, doctorInfo: any, studentInfo: any, campName:
 // ════════════════════════════════════════
 // ██ OPTION A: ROSTER MANAGEMENT
 // ════════════════════════════════════════
-function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
+function RosterManagement({ user, eventId, event }: { user: User; eventId: number; event: EventData }) {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -504,6 +508,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
   const [studentDocs, setStudentDocs] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [bulkPrinting, setBulkPrinting] = useState(false);
+  const [viewingHistoryStudent, setViewingHistoryStudent] = useState<Student | null>(null);
   const bulkPrintRef = useRef<HTMLDivElement>(null);
 
   const CLASSES = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
@@ -786,6 +791,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
             <table className="w-full text-left text-sm">
               <thead className="text-slate-500 border-b border-slate-800 bg-slate-950/50">
                 <tr>
+                  <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Reg No</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Name</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Class</th>
                   <th className="px-5 py-3 font-medium text-xs uppercase tracking-wider">Gender</th>
@@ -811,6 +817,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 
                   return (
                     <tr key={s.student_id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-5 py-3 text-slate-300 text-xs">{s.registration_number || '—'}</td>
                       <td className="px-5 py-3 text-white font-medium">{s.name}</td>
                       <td className="px-5 py-3 text-slate-300">{s.student_class || '—'}{s.section ? `-${s.section}` : ''}</td>
                       <td className="px-5 py-3 text-slate-300">{s.gender === 'M' ? 'Male' : s.gender === 'F' ? 'Female' : '—'}</td>
@@ -834,6 +841,13 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
                           <button onClick={() => toggleAbsent(s.student_id, s.status)}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap">
                             {s.status === 'Absent' ? 'Present' : 'Absent'}
+                          </button>
+                        )}
+                        {s.registration_number && (
+                          <button onClick={() => { const st = {...s, event_id: eventId}; setViewingHistoryStudent(st); }}
+                            className="bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1"
+                            title="View previous camp records">
+                            <History className="w-3 h-3" /><span className="hidden sm:inline">History</span>
                           </button>
                         )}
                       </td>
@@ -909,6 +923,16 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
           </div>
         </div>
       )}
+
+      {/* Student History Modal */}
+      {viewingHistoryStudent && (
+        <SchoolPreviousRecordsModal
+          student={viewingHistoryStudent}
+          schoolId={event.school_id ?? null}
+          eventId={eventId}
+          onClose={() => setViewingHistoryStudent(null)}
+        />
+      )}
     </div>
   );
 }
@@ -919,7 +943,7 @@ function RosterManagement({ user, eventId }: { user: User; eventId: number }) {
 function AddStudentModal({ onClose, onCreated, userId, eventId }: {
   onClose: () => void; onCreated: () => void; userId: string; eventId: number;
 }) {
-  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '' });
+  const [f, setF] = useState({ name: '', age: '', dob: '', gender: '', student_class: '', section: '', blood_group: '', father_name: '', phone: '', registration_number: '' });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
@@ -939,6 +963,7 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = 'Name is required';
     if (!f.gender) e.gender = 'Sex is required';
+    if (!f.registration_number.trim()) e.registration_number = 'Registration number is required';
     if (f.phone?.trim() && !/^\d{10}$/.test(f.phone.replace(/\D/g, ''))) e.phone = 'Valid 10-digit phone is required';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -949,6 +974,14 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
     if (!validate()) return;
     setSaving(true);
     try {
+      const searchRes = await fetch(`/api/students/search?event_id=${eventId}&query=${encodeURIComponent(f.registration_number.trim())}`);
+      const searchData = await searchRes.json();
+      if (searchData.some((s: any) => s.registration_number === f.registration_number.trim())) {
+        setErrors(p => ({ ...p, registration_number: 'Registration number already exists in this camp' }));
+        setSaving(false);
+        return;
+      }
+
       const res = await fetch('/api/students', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...f, age: f.age ? parseInt(f.age) : null, user_id: userId, event_id: eventId, added_by: userId }),
@@ -998,7 +1031,6 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
               <input type="date" value={f.dob} onChange={e => upd('dob', e.target.value)}
                 className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all ${errors.dob ? 'border-red-500/50' : 'border-slate-800'}`} />
               {errors.dob && <p className="text-red-400 text-xs mt-1">{errors.dob}</p>}
-              {f.age && <p className="text-violet-400 text-xs mt-1">Age: {f.age} years</p>}
             </div>
 
             {/* Class */}
@@ -1030,6 +1062,13 @@ function AddStudentModal({ onClose, onCreated, userId, eventId }: {
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Father's Name</label>
               <input value={f.father_name} onChange={e => upd('father_name', e.target.value)} placeholder="Optional"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder-slate-600" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">Registration Number *</label>
+              <input value={f.registration_number} onChange={e => upd('registration_number', e.target.value)} placeholder="School reg. no"
+                className={`w-full bg-slate-950 border rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all placeholder-slate-600 ${errors.registration_number ? 'border-red-500/50' : 'border-slate-800'}`} />
+              {errors.registration_number && <p className="text-red-400 text-xs mt-1">{errors.registration_number}</p>}
             </div>
 
             <div>
@@ -1690,3 +1729,133 @@ function RequestCampModal({ user, onClose, onSubmitted }: {
   );
 }
 
+// ════════════════════════════════════════
+// ██ PREVIOUS RECORDS MODAL (cross-camp, school view)
+// ════════════════════════════════════════
+function SchoolPreviousRecordsModal({ student, schoolId, eventId, onClose }: {
+  student: Student; schoolId: number | null; eventId: number; onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!student.registration_number || !schoolId) { setLoading(false); return; }
+    const params = new URLSearchParams({
+      school_id: String(schoolId),
+      registration_number: student.registration_number,
+      current_event_id: String(eventId),
+    });
+    fetch(`/api/students/previous-records?${params}`)
+      .then(r => r.json())
+      .then(data => { setRecords(data.records || []); setEvents(data.events || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [student, schoolId, eventId]);
+
+  const fmtDate = (d: string) => {
+    if (!d) return ''; const dt = new Date(d); if (isNaN(dt.getTime())) return d;
+    return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
+  };
+
+  const catLabel = (c: string) => c.replace(/_/g, ' ');
+  const statusLabel = (s: string) => s === 'N' ? 'Normal' : s === 'O' ? 'Observation' : s === 'R' ? 'Referred' : s;
+  const statusColor = (s: string) => s === 'N' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : s === 'R' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+
+  const recordsByEvent: Record<number, any[]> = {};
+  for (const r of records) {
+    const eid = r.event_id;
+    if (!recordsByEvent[eid]) recordsByEvent[eid] = [];
+    recordsByEvent[eid].push(r);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        <h3 className="text-lg font-bold text-white mb-1 flex items-center">
+          <History className="w-5 h-5 mr-2 text-indigo-400" />
+          Previous Camp Records
+        </h3>
+        <p className="text-xs text-slate-400 mb-4">
+          {student.name} · Reg: {student.registration_number || '—'}
+        </p>
+
+        {loading ? (
+          <div className="text-center py-12 text-slate-400 flex items-center justify-center space-x-2">
+            <Loader2 className="w-5 h-5 animate-spin" /><span>Loading records...</span>
+          </div>
+        ) : !student.registration_number ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">No registration number assigned.</p>
+          </div>
+        ) : records.length === 0 ? (
+          <div className="text-center py-12">
+            <ClipboardList className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">No previous camp records found.</p>
+            <p className="text-slate-500 text-xs mt-1">This is the first camp for this student.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {events.map(evt => {
+              const evtRecords = recordsByEvent[evt.event_id] || [];
+              if (evtRecords.length === 0) return null;
+              return (
+                <div key={evt.event_id} className="bg-slate-800/50 rounded-2xl border border-slate-700 overflow-hidden">
+                  <div className="px-4 py-3 bg-indigo-500/10 border-b border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-indigo-400" />
+                      <span className="text-sm font-bold text-white">{evt.school_name}</span>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      {fmtDate(evt.start_date)}{evt.end_date ? ` → ${fmtDate(evt.end_date)}` : ''}
+                    </span>
+                  </div>
+                  {evt.general_info && (evt.general_info.height || evt.general_info.weight) && (
+                    <div className="px-4 py-2 border-b border-slate-700/50 flex items-center space-x-4 text-xs text-slate-400">
+                      {evt.general_info.height && <span>Height: <b className="text-slate-200">{evt.general_info.height} cm</b></span>}
+                      {evt.general_info.weight && <span>Weight: <b className="text-slate-200">{evt.general_info.weight} kg</b></span>}
+                      {evt.general_info.bmi && <span>BMI: <b className="text-slate-200">{evt.general_info.bmi}</b></span>}
+                    </div>
+                  )}
+                  <div className="p-3 space-y-2">
+                    {evtRecords.map((r: any, i: number) => {
+                      const d = r.parsed_data || {};
+                      return (
+                        <div key={i} className="bg-slate-900 rounded-xl px-3 py-2 border border-slate-700/50">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-400">{catLabel(r.category)}</span>
+                            <div className="flex items-center space-x-2">
+                              {d.status && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg border ${statusColor(d.status)}`}>
+                                  {statusLabel(d.status)}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-500">{r.doctor_id}</span>
+                            </div>
+                          </div>
+                          {d.clinicalFindings && <p className="text-[11px] text-slate-300 mt-1"><span className="text-slate-500 font-medium">Findings:</span> {d.clinicalFindings}</p>}
+                          {d.diagnosis && <p className="text-[11px] text-slate-300 mt-0.5"><span className="text-slate-500 font-medium">Dx:</span> {d.diagnosis}</p>}
+                          {d.referralReason && <p className="text-[11px] text-slate-300 mt-0.5"><span className="text-slate-500 font-medium">Referral:</span> {d.referralReason}</p>}
+                          {(d.medicines || []).length > 0 && (
+                            <div className="text-[11px] text-slate-300 mt-0.5">
+                              <span className="text-slate-500 font-medium">Rx:</span>
+                              {d.medicines.map((m: any, j: number) => (
+                                <span key={j} className="ml-1">{m.name} {m.dosage} {m.frequency} {m.duration}{j < d.medicines.length - 1 ? ',' : ''}</span>
+                              ))}
+                            </div>
+                          )}
+                          {d.advice && <p className="text-[11px] text-slate-300 mt-0.5"><span className="text-slate-500 font-medium">Advice:</span> {d.advice}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

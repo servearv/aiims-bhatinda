@@ -41,6 +41,7 @@ def api_create_student():
     father_occupation = data.get("father_occupation", "")
     address = data.get("address", "")
     pincode = data.get("pincode", "")
+    registration_number = data.get("registration_number", "").strip()
 
     if not name:
         return jsonify({"success": False, "message": "Name is required"}), 400
@@ -53,11 +54,13 @@ def api_create_student():
             """INSERT INTO Students
                (event_id, name, age, dob, gender, student_class, section,
                 blood_group, father_name, phone, qr_code_hash, added_by, status,
-                mother_name, mother_occupation, father_occupation, address, pincode)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
+                mother_name, mother_occupation, father_occupation, address, pincode,
+                registration_number)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
             (event_id, name, age, dob, gender, student_class, section,
              blood_group, father_name, phone, qr_hash, added_by, status,
-             mother_name, mother_occupation, father_occupation, address, pincode),
+             mother_name, mother_occupation, father_occupation, address, pincode,
+             registration_number),
         )
         new_id = cur.fetchone()["student_id"]
         conn.commit()
@@ -145,6 +148,8 @@ def api_bulk_create_students():
                 error_list.append({"row": row_num, "data": row, "errors": row_errors})
                 continue
 
+            reg_num = str(row.get("registration_number", "")).strip()
+
             qr_hash = "".join(random.choices(string.ascii_lowercase + string.digits, k=13))
             
             symptoms_checked = []
@@ -160,8 +165,8 @@ def api_bulk_create_students():
                        (event_id, name, age, dob, gender, student_class, section,
                         blood_group, father_name, mother_name, father_occupation,
                         mother_occupation, address, pincode, phone, qr_code_hash,
-                        added_by, status)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
+                        added_by, status, registration_number)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING student_id""",
                     (
                         event_id, name, age, dob, gender,
                         str(row.get("student_class", "")).strip(),
@@ -174,6 +179,7 @@ def api_bulk_create_students():
                         str(row.get("address", "")).strip(),
                         str(row.get("pincode", "")).strip(),
                         phone, qr_hash, added_by, "Pending Examination",
+                        reg_num,
                     ),
                 )
                 student_id = cur.fetchone()["student_id"]
@@ -214,7 +220,7 @@ def api_csv_template():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "name", "dob", "gender", "student_class", "section", "blood_group",
+        "registration_number", "name", "dob", "gender", "student_class", "section", "blood_group",
         "father_name", "father_occupation", "mother_name", "mother_occupation",
         "address", "pincode", "phone", "height", "weight",
         "symptom_rubs_eyes", "symptom_cannot_see_board", "symptom_pokes_ear",
@@ -226,7 +232,7 @@ def api_csv_template():
         "symptom_blood_stools"
     ])
     writer.writerow([
-        "John Doe", "2012-05-15", "M", "8", "A", "O+",
+        "2024-001", "John Doe", "2012-05-15", "M", "8", "A", "O+",
         "James Doe", "Engineer", "Jane Doe", "Teacher",
         "123 Street", "110001", "9876543210", "150", "45",
         "No", "No", "No", "No", "No", "No", "No", "No", "No",
@@ -265,17 +271,17 @@ def api_students_search():
             sid_val = int(query)
             conditions.append(
                 "(s.name ILIKE %s OR s.student_id = %s OR s.phone ILIKE %s "
-                "OR s.student_class ILIKE %s OR s.section ILIKE %s)"
+                "OR s.student_class ILIKE %s OR s.section ILIKE %s OR s.registration_number ILIKE %s)"
             )
             params.extend([f"%{query}%", sid_val, f"%{query}%",
-                            f"%{query}%", f"%{query}%"])
+                            f"%{query}%", f"%{query}%", f"%{query}%"])
         except ValueError:
             conditions.append(
                 "(s.name ILIKE %s OR s.phone ILIKE %s "
-                "OR s.student_class ILIKE %s OR s.section ILIKE %s)"
+                "OR s.student_class ILIKE %s OR s.section ILIKE %s OR s.registration_number ILIKE %s)"
             )
             params.extend([f"%{query}%", f"%{query}%",
-                            f"%{query}%", f"%{query}%"])
+                            f"%{query}%", f"%{query}%", f"%{query}%"])
 
     if student_class:
         conditions.append("s.student_class = %s")
@@ -379,6 +385,7 @@ def api_update_student(student_id):
         "name", "age", "dob", "gender", "student_class", "section",
         "blood_group", "father_name", "phone", "mother_name",
         "mother_occupation", "father_occupation", "address", "pincode",
+        "registration_number",
     ]
     fields = []
     params = []
@@ -525,4 +532,103 @@ def api_student_all_records(student_id):
         "student": row_to_dict(student),
         "general_info": gen_dict,
         "records": records_list,
+    })
+
+
+# ---- Previous Records (cross-camp) ----
+@bp.route("/api/students/previous-records")
+def api_student_previous_records():
+    """Get health records from OTHER camps for a student identified by school_id + registration_number.
+
+    This allows doctors and school POCs to see a student's examination history across
+    different camp events at the same school.
+    """
+    school_id = request.args.get("school_id", "").strip()
+    registration_number = request.args.get("registration_number", "").strip()
+    current_event_id = request.args.get("current_event_id", "").strip()
+
+    if not school_id or not registration_number:
+        return jsonify({"records": [], "message": "school_id and registration_number are required"})
+
+    with get_db_conn() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Find all student rows with the same registration_number in events linked to the same school
+        exclude_event = int(current_event_id) if current_event_id else 0
+        cur.execute("""
+            SELECT s.student_id, s.name, s.event_id, s.student_class, s.section,
+                   s.age, s.gender, s.registration_number,
+                   e.school_name, e.start_date, e.end_date
+            FROM Students s
+            JOIN Events e ON s.event_id = e.event_id
+            WHERE s.registration_number = %s
+              AND e.school_id = %s
+              AND (%s = 0 OR s.event_id != %s)
+            ORDER BY e.start_date DESC
+        """, (registration_number, int(school_id), exclude_event, exclude_event))
+        matching_students = cur.fetchall()
+
+    if not matching_students:
+        return jsonify({"records": [], "events": []})
+
+    events_seen = {}
+    all_records = []
+
+    with get_db_conn() as conn:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        for stu in matching_students:
+            stu_dict = row_to_dict(stu)
+            sid = stu_dict["student_id"]
+            eid = stu_dict["event_id"]
+
+            if eid not in events_seen:
+                events_seen[eid] = {
+                    "event_id": eid,
+                    "school_name": stu_dict.get("school_name", ""),
+                    "start_date": stu_dict.get("start_date", ""),
+                    "end_date": stu_dict.get("end_date", ""),
+                    "student_class": stu_dict.get("student_class", ""),
+                    "section": stu_dict.get("section", ""),
+                }
+
+            # Get health records for this student
+            cur.execute("""
+                SELECT hr.record_id, hr.category, hr.json_data, hr.timestamp, hr.doctor_id,
+                       hr.event_id
+                FROM Health_Records hr
+                WHERE hr.student_id = %s
+                ORDER BY hr.timestamp DESC
+            """, (sid,))
+            records = cur.fetchall()
+
+            for r in records:
+                rd = row_to_dict(r)
+                try:
+                    rd["parsed_data"] = json.loads(rd.get("json_data", "{}"))
+                except Exception:
+                    rd["parsed_data"] = {}
+                rd["event_school_name"] = stu_dict.get("school_name", "")
+                rd["event_start_date"] = stu_dict.get("start_date", "")
+                rd["student_name"] = stu_dict.get("name", "")
+                rd["student_class"] = stu_dict.get("student_class", "")
+                all_records.append(rd)
+
+            # Also get general info for this student
+            cur.execute("""
+                SELECT * FROM Student_General_Info
+                WHERE student_id = %s
+            """, (sid,))
+            gen = cur.fetchone()
+            if gen:
+                gen_dict = row_to_dict(gen)
+                try:
+                    gen_dict["symptoms"] = json.loads(gen_dict.get("symptoms_json", "[]"))
+                except Exception:
+                    gen_dict["symptoms"] = []
+                events_seen[eid]["general_info"] = gen_dict
+
+    return jsonify({
+        "records": all_records,
+        "events": list(events_seen.values()),
     })

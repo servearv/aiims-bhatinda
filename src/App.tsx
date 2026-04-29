@@ -535,16 +535,16 @@ function LoginScreen({ onLogin }: { onLogin: (u: User, needsPw: boolean) => void
                     <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                       className={`${inputClass} pl-11`} placeholder="••••••••" required autoFocus />
                   </div>
+                  <div className="flex justify-end pt-1">
+                    <button type="button" onClick={() => { setError(''); setStep('otp_send'); }}
+                      className="text-xs font-semibold text-[#64748b] hover:text-[#0ea5e9] transition-colors">
+                      Forgot password? Use OTP
+                    </button>
+                  </div>
                 </div>
                 <button type="submit" disabled={loading} className={btnClass}>
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Log In</span>}
                 </button>
-                <div className="pt-3 text-center">
-                  <button type="button" onClick={() => { setError(''); setStep('otp_send'); }}
-                    className="text-sm font-semibold text-[#64748b] hover:text-[#0ea5e9] transition-colors">
-                    Use OTP instead →
-                  </button>
-                </div>
               </form>
             )}
 

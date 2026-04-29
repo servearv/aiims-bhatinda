@@ -25,7 +25,7 @@ def api_auth_identify():
     with get_db_conn() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT username, email, role, name, password FROM Users WHERE email = %s OR username = %s",
+            "SELECT username, email, role, name, password FROM Users WHERE LOWER(email) = LOWER(%s) OR LOWER(username) = LOWER(%s)",
             (identifier, identifier),
         )
         user = cur.fetchone()
@@ -51,7 +51,7 @@ def api_auth_send_otp():
     with get_db_conn() as conn:
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            "SELECT username, email, name FROM Users WHERE email = %s OR username = %s",
+            "SELECT username, email, name FROM Users WHERE LOWER(email) = LOWER(%s) OR LOWER(username) = LOWER(%s)",
             (identifier, identifier),
         )
         user = cur.fetchone()
@@ -102,7 +102,7 @@ def api_auth_verify_otp():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT username, email, role, name, password, designation, specialization, "
-            "otp_code, otp_expires FROM Users WHERE email = %s OR username = %s",
+            "otp_code, otp_expires FROM Users WHERE LOWER(email) = LOWER(%s) OR LOWER(username) = LOWER(%s)",
             (identifier, identifier),
         )
         user = cur.fetchone()
@@ -151,7 +151,7 @@ def api_login():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT username, email, role, name, password, designation, specialization "
-            "FROM Users WHERE (email = %s OR username = %s) AND password = %s",
+            "FROM Users WHERE (LOWER(email) = LOWER(%s) OR LOWER(username) = LOWER(%s)) AND password = %s",
             (identifier, identifier, password),
         )
         user = cur.fetchone()

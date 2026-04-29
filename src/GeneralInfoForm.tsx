@@ -23,6 +23,7 @@ interface StudentData {
   phone: string;
   address: string;
   pincode: string;
+  registration_number?: string;
 }
 
 interface GeneralInfoData {
@@ -155,6 +156,7 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
     phone: student.phone || '',
     address: student.address || '',
     pincode: student.pincode || '',
+    registration_number: student.registration_number || '',
   });
 
   // Vitals + symptoms state
@@ -367,6 +369,10 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
               {BLOOD_GROUPS.map(o => <option key={o} value={o}>{o || '— Select —'}</option>)}
             </select>
           </FormField>
+          <FormField label="Registration Number">
+            <input value={demo.registration_number} onChange={e => updateDemo('registration_number', e.target.value)}
+              readOnly={readOnly} className={inputCls} placeholder="School Reg. No" />
+          </FormField>
         </div>
       </SectionCard>
 
@@ -501,7 +507,8 @@ export function GeneralInfoSummary({ studentId, eventId, className = '' }: {
       </h4>
 
       {/* Combined Demographics & Vitals */}
-      <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 md:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 md:grid-cols-7">
+        <InfoChip label="Reg No" value={s.registration_number || '—'} />
         <InfoChip label="Blood" value={s.blood_group || '—'} />
         <InfoChip label="Father" value={s.father_name || '—'} />
         <InfoChip label="Phone" value={s.phone || '—'} />
