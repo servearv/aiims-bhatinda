@@ -927,14 +927,6 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
-          {/* Email — always shown */}
-          <ModalInput label="Email *" value={f.email} onChange={v => upd('email', v)} placeholder="user@example.com" type="email" required />
-
-          {/* Name — for non-School-POC roles */}
-          {!isSchoolPOC && (
-            <ModalInput label="Full Name *" value={f.name} onChange={v => upd('name', v)} placeholder="e.g. Dr. Anil Kumar" required />
-          )}
-
           <div>
             <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Role</label>
             <div className="flex flex-wrap gap-2">
@@ -954,6 +946,14 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
               ))}
             </div>
           </div>
+
+          {/* Email — always shown */}
+          <ModalInput label="Email *" value={f.email} onChange={v => upd('email', v)} placeholder="user@example.com" type="email" required />
+
+          {/* Name — for non-School-POC roles */}
+          {!isSchoolPOC && (
+            <ModalInput label="Full Name *" value={f.name} onChange={v => upd('name', v)} placeholder="e.g. Dr. Anil Kumar" required />
+          )}
 
           {/* School POC specific fields */}
           {isSchoolPOC && (

@@ -726,7 +726,7 @@ function RosterManagement({ user, eventId, event }: { user: User; eventId: numbe
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 outline-none transition-all text-sm" />
           </div>
-          <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
             <button onClick={() => setShowAddModal(true)}
               className="flex-1 md:flex-none bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-400 hover:to-purple-500 text-white px-5 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 shadow-lg whitespace-nowrap text-sm">
               <Plus className="w-4 h-4" /><span>Add Student</span>
