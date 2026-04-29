@@ -378,7 +378,7 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
 
       {/* Section 2: Contact & Family */}
       <SectionCard title="Contact & Family Details" icon={<Heart className="w-4 h-4 text-pink-400" />}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="Father's Name">
             <input value={demo.father_name} onChange={e => updateDemo('father_name', e.target.value)}
               readOnly={readOnly} className={inputCls} placeholder="Father's name" />
@@ -412,7 +412,7 @@ export default function GeneralInfoForm({ student, eventId, user, onClose, readO
 
       {/* Section 3: Vitals & Measurements */}
       <SectionCard title="Vitals & Measurements" icon={<Stethoscope className="w-4 h-4 text-emerald-400" />}>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <FormField label="Height (cm)">
             <input value={vitals.height} onChange={e => updateVitals('height', e.target.value)}
               readOnly={readOnly} type="number" className={inputCls} placeholder="e.g. 140" />
@@ -546,11 +546,11 @@ function InfoChip({ label, value, highlight }: {
   label: string; value: string; highlight?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border px-2.5 py-2 ${
+    <div className={`flex flex-col min-w-0 overflow-hidden rounded-lg border px-2.5 py-2 ${
       highlight ? 'border-[#FDE68A] bg-[#FFFBEB]' : 'border-[#E5E7EB] bg-[#F9FAFB]'
     }`}>
-      <p className="text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-      <p className={`mt-0.5 text-sm font-semibold ${highlight ? 'text-[#B45309]' : 'text-[#1F2937]'}`}>{value}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wide text-[#9CA3AF] truncate" title={label}>{label}</p>
+      <p className={`mt-0.5 text-sm font-semibold truncate ${highlight ? 'text-[#B45309]' : 'text-[#1F2937]'}`} title={value}>{value}</p>
     </div>
   );
 }
