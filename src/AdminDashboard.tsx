@@ -26,7 +26,6 @@ const SPECIALIST_ROLES = [
   { key: 'ENT', label: 'ENT' },
   { key: 'Eye_Specialist', label: 'Ophthalmology' },
   { key: 'Skin_Specialist', label: 'Dermatology' },
-  { key: 'Other', label: 'Other' },
 ];
 
 const ALL_REGISTER_ROLES = [
@@ -854,12 +853,13 @@ const ModalInput = React.forwardRef<HTMLInputElement, {
 // ═══════════════════════════════════════════
 function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaultRole?: string; onRoleConsumed?: () => void }) {
   const [f, setF] = useState({
-    email: '', name: '', role: 'Other', designation: '',
+    email: '', name: '', role: 'Admin', designation: '',
     // School POC fields
     school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '',
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'error'; text: string } | null>(null);
+  const [successPopup, setSuccessPopup] = useState<{ email: string, role: string } | null>(null);
 
   useEffect(() => {
     if (defaultRole) {
@@ -899,10 +899,12 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
       });
       const data = await res.json();
       if (data.success) {
+        setSuccessPopup({ email: f.email, role: f.role });
         setF({
-          email: '', name: '', role: 'Other', designation: '',
+          email: '', name: '', role: 'Admin', designation: '',
           school_name: '', school_address: '', poc_name: '', poc_designation: '', poc_phone: '',
         });
+        setTimeout(() => setSuccessPopup(null), 5000);
       } else {
         setMessage({ type: 'error', text: data.message || 'Registration failed' });
       }
@@ -917,7 +919,39 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
   const isSpecialist = SPECIALIST_ROLES.some(r => r.key === f.role);
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-xl mx-auto relative">
+      <style>{`
+        @keyframes slideUpFade {
+          0% { opacity: 0; transform: translate(-50%, 20px) scale(0.95); }
+          100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+        }
+      `}</style>
+      
+      {successPopup && (
+        <div className="fixed bottom-10 left-1/2 z-50 flex items-start gap-4 p-5 bg-slate-900 border border-emerald-500/50 rounded-2xl shadow-2xl"
+             style={{ animation: 'slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+          <div className="bg-emerald-500/20 p-2 rounded-full shrink-0">
+            <Check className="w-6 h-6 text-emerald-400" />
+          </div>
+          <div className="pr-8">
+            <h4 className="text-white font-bold mb-2 text-base tracking-wide">User created successfully</h4>
+            <div className="text-slate-300 text-sm space-y-1.5">
+              <p className="flex items-center gap-2">
+                <span className="text-slate-400">Email:</span> 
+                <span className="text-emerald-300 font-semibold">{successPopup.email}</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <span className="text-slate-400">Role:</span> 
+                <span className="text-emerald-300 font-semibold">{successPopup.role}</span>
+              </p>
+            </div>
+          </div>
+          <button onClick={() => setSuccessPopup(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       <div className="bg-slate-900/80 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl">
         <h3 className="text-lg font-semibold text-white mb-5 flex items-center">
           <UserPlus className="w-5 h-5 mr-2 text-cyan-400" />
