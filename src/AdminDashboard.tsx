@@ -4,7 +4,7 @@ import {
   MapPin, Phone, Mail, Clock, Tag, ChevronDown, ChevronRight,
   Activity, FileText, Stethoscope, School, ExternalLink,
   HeartPulse, Eye, Ear, Scan, Bell, ClipboardCheck, AlertCircle, Loader2,
-  ScrollText, RefreshCw, Filter, ShieldCheck
+  ScrollText, RefreshCw, Filter, ShieldCheck, Trash2
 } from 'lucide-react';
 
 type User = { username: string; role: string; name: string };
@@ -860,10 +860,12 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'error'; text: string } | null>(null);
   const [successPopup, setSuccessPopup] = useState<{ email: string, role: string } | null>(null);
+  const [view, setView] = useState<'register' | 'manage'>('register');
 
   useEffect(() => {
     if (defaultRole) {
       setF(p => ({ ...p, role: defaultRole }));
+      setView('register');
       onRoleConsumed?.();
     }
   }, [defaultRole]);
@@ -918,7 +920,7 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
   const isSchoolPOC = f.role === 'School POC';
   const isSpecialist = SPECIALIST_ROLES.some(r => r.key === f.role);
 
-  return (
+  const registerForm = (
     <div className="max-w-xl mx-auto relative">
       <style>{`
         @keyframes slideUpFade {
@@ -1015,6 +1017,189 @@ function RegisterTab({ user, defaultRole, onRoleConsumed }: { user: User; defaul
           </button>
         </form>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 max-w-4xl mx-auto relative">
+      <div className="flex justify-center space-x-3 mb-6">
+        <button onClick={() => setView('register')} className={`px-5 py-2.5 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all ${view === 'register' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]' : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800'}`}>
+          <UserPlus className="w-4 h-4" />
+          <span>Register New User</span>
+        </button>
+        <button onClick={() => setView('manage')} className={`px-5 py-2.5 rounded-xl text-sm font-bold flex items-center space-x-2 transition-all ${view === 'manage' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_12px_rgba(34,211,238,0.1)]' : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800'}`}>
+          <Users className="w-4 h-4" />
+          <span>Manage Users</span>
+        </button>
+      </div>
+      
+      {view === 'register' ? registerForm : <ManageUsersList />}
+    </div>
+  );
+}
+
+function ManageUsersList() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const fetchUsers = () => {
+    setLoading(true);
+    fetch('/api/admin/users')
+      .then(r => r.json())
+      .then(data => { setUsers(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const handleDelete = async (username: string) => {
+    if (!window.confirm(`Are you sure you want to delete user ${username}? This may remove their access and associated records.`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${username}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        fetchUsers();
+      } else {
+        alert(data.message || 'Failed to delete user');
+      }
+    } catch {
+      alert('Connection error');
+    }
+  };
+
+  const filtered = users.filter(u => {
+    const matchesSearch = u.username.toLowerCase().includes(search.toLowerCase()) || 
+      (u.name && u.name.toLowerCase().includes(search.toLowerCase())) ||
+      (u.email && u.email.toLowerCase().includes(search.toLowerCase()));
+    const matchesRole = roleFilter ? u.role === roleFilter : true;
+    return matchesSearch && matchesRole;
+  });
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter]);
+
+  const availableRoles = Array.from(new Set(users.map(u => u.role))).filter(Boolean).sort();
+
+  return (
+    <div className="bg-slate-900/80 backdrop-blur-xl p-6 rounded-2xl border border-slate-800 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <h3 className="text-lg font-semibold text-white flex items-center">
+          <Users className="w-5 h-5 mr-2 text-cyan-400" />
+          Registered Users
+        </h3>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search users..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-sm focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all w-full sm:w-64"
+          />
+        </div>
+      </div>
+
+      {/* Role / Department Filter */}
+      {!loading && availableRoles.length > 0 && (
+        <div className="flex items-center space-x-2 overflow-x-auto pb-4 mb-2 hide-scrollbar">
+          <span className="text-sm text-slate-500 font-medium whitespace-nowrap">Department:</span>
+          <button onClick={() => setRoleFilter('')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border whitespace-nowrap ${!roleFilter ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
+            All
+          </button>
+          {availableRoles.map(role => (
+            <button key={role as string} onClick={() => setRoleFilter(role as string)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border whitespace-nowrap ${roleFilter === role ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600'}`}>
+              {(role as string).replace(/_/g, ' ')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-12 flex justify-center items-center text-slate-400">
+          <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading users...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="py-12 text-center text-slate-400 bg-slate-950 rounded-xl border border-slate-800">
+          No users found.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th className="px-4 py-3 font-medium">Username</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {paginated.map(u => (
+                <tr key={u.username} className="bg-white hover:bg-slate-50 transition-colors text-slate-900">
+                  <td className="px-4 py-3 text-cyan-700 font-mono text-xs">{u.username}</td>
+                  <td className="px-4 py-3 font-medium">{u.name || '—'}</td>
+                  <td className="px-4 py-3">{u.email || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium border border-slate-200">
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {u.username !== 'Admin' && (
+                      <button
+                        onClick={() => handleDelete(u.username)}
+                        className="p-1.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg transition-colors border border-red-200"
+                        title="Delete User"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-xs text-slate-500">
+            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} entries
+          </span>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600 disabled:opacity-50 transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-xs text-slate-400 font-medium">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-600 disabled:opacity-50 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
